@@ -1,0 +1,54 @@
+{
+	"schemaVersion": 2,
+	"generatedAt": "2026-08-14T11:10:00+08:00",
+	"title": "Design System: Kmai",
+	"extensions": {
+		"colorMeta": {
+			"archive-indigo": { "role": "primary", "displayName": "Archive Indigo", "canonical": "#315C91", "tonalRamp": ["#14263D", "#1D3858", "#274A74", "#315C91", "#5C7EAA", "#89A3C2", "#BBCBDC", "#EDF2F7"] },
+			"warm-canvas": { "role": "neutral", "displayName": "Warm Canvas", "canonical": "#F5F4F0", "tonalRamp": ["#252522", "#464640", "#686761", "#8B8982", "#ADABA4", "#CFCDC7", "#E4E2DD", "#F5F4F0"] },
+			"graphite-ink": { "role": "neutral", "displayName": "Graphite Ink", "canonical": "#202428", "tonalRamp": ["#111315", "#202428", "#3D4247", "#5E646A", "#81878D", "#A8ADB1", "#D0D3D5", "#F3F4F5"] }
+		},
+		"typographyMeta": {
+			"display": { "displayName": "Display", "purpose": "登入與首頁核心提問。" },
+			"headline": { "displayName": "Headline", "purpose": "頁面標題。" },
+			"body": { "displayName": "Body", "purpose": "文件、答案與操作說明。" }
+		},
+		"shadows": [{ "name": "overlay-only", "value": "0 12px 32px rgba(20, 24, 28, 0.16)", "purpose": "只用於 Dialog、Menu 與 temporary drawer。" }],
+		"motion": [{ "name": "state-change", "value": "180ms ease", "purpose": "hover、focus 與選取狀態回饋。" }],
+		"breakpoints": [{ "name": "mobile", "value": "600px" }, { "name": "navigation", "value": "960px" }]
+	},
+	"components": [
+		{
+			"name": "Primary Button",
+			"kind": "button",
+			"refersTo": "button-primary",
+			"description": "每個區域唯一的主要操作。",
+			"html": "<button class=\"ds-btn-primary\">搜尋</button>",
+			"css": ".ds-btn-primary{background:#315C91;color:#fff;padding:10px 16px;border:0;border-radius:8px;font:700 14px sans-serif;transition:background 180ms ease}.ds-btn-primary:hover{background:#24466F}.ds-btn-primary:focus-visible{outline:3px solid #315C91;outline-offset:3px}"
+		},
+		{
+			"name": "Search Field",
+			"kind": "input",
+			"refersTo": "search-field",
+			"description": "首頁與搜尋頁的核心入口。",
+			"html": "<label class=\"ds-search-label\">搜尋公司知識<input class=\"ds-search\" placeholder=\"輸入文件、流程或問題\"></label>",
+			"css": ".ds-search-label{display:grid;gap:6px;color:#202428;font:700 14px sans-serif}.ds-search{background:#fff;color:#202428;padding:14px 16px;border:1px solid #D7D5CE;border-radius:14px;font:400 16px sans-serif}.ds-search:focus-visible{outline:3px solid #315C91;outline-offset:2px}"
+		},
+		{
+			"name": "Content Card",
+			"kind": "card",
+			"refersTo": "content-card",
+			"description": "文件與管理項目的安靜容器。",
+			"html": "<article class=\"ds-card\"><strong>員工差旅與費用報支辦法</strong><p>說明申請與核銷流程。</p></article>",
+			"css": ".ds-card{background:#fff;color:#202428;padding:20px;border:1px solid #D7D5CE;border-radius:12px;font:400 16px/1.5 sans-serif;transition:border-color 180ms ease}.ds-card:hover{border-color:#315C91}.ds-card p{color:#596673}"
+		}
+	],
+	"narrative": {
+		"northStar": "The Living Field Guide",
+		"overview": "Kmai 像一本持續更新、容易翻閱的公司工作手冊；資訊安靜排列，重點在需要時才浮現。",
+		"keyCharacteristics": ["搜尋與提問是最清楚的第一步。", "來源、版本與狀態緊鄰內容。", "管理介面提高密度但維持可掃讀性。"],
+		"rules": [{ "name": "The Ten Percent Rule", "body": "Archive Indigo 在任何畫面中不得超過約 10%。", "section": "colors" }, { "name": "The Flat by Default Rule", "body": "靜止表面不得使用裝飾性陰影。", "section": "elevation" }],
+		"dos": ["Do 讓搜尋框或提問入口成為員工首頁最明確的互動焦點。", "Do 讓來源、版本、適用範圍與處理狀態立即可見。"],
+		"donts": ["Don't 使用紫藍漸層、發光邊框、巨大 AI 圖示或滿版卡片牆。", "Don't 讓聊天介面壟斷所有工作流程。"]
+	}
+}
