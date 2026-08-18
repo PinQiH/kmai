@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
+import { useTheme } from 'vuetify'
 
 import PageHeader from '@/components/PageHeader.vue'
 import {
@@ -12,6 +13,7 @@ import {
 	type GraphNodeType,
 	type KnowledgeGraphNode,
 } from '@/mocks/graph'
+import { clusterPalette } from '@/theme'
 import { ForceLayout, type ForceLink } from '@/utils/force-layout'
 
 const ALL_TYPES = '全部類型'
@@ -30,6 +32,23 @@ const LABEL_FONT_SIZE = 12
 const LABEL_LINE_HEIGHT = 16
 
 const route = useRoute()
+const theme = useTheme()
+
+const isDark = computed(() => theme.current.value.dark)
+
+/*
+ * !! 用 JS 依主題選色，**不要**改回 CSS 的 `.v-theme--dark .graph-canvas`：
+ *    Vuetify 的 VCard 自己就帶 themeClasses，`v-theme--dark` 與 `graph-canvas`
+ *    會落在同一個元素上，後代選擇器永遠匹配不到，深色覆寫會靜默失效。
+ */
+const clusterVars = computed<Record<string, string>>(() => {
+	const palette = isDark.value ? clusterPalette.dark : clusterPalette.light
+	const vars: Record<string, string> = {}
+	palette.forEach((color, index) => {
+		vars[`--cluster-${index}`] = color
+	})
+	return vars
+})
 
 const search = ref('')
 const selectedType = ref<TypeFilter>(ALL_TYPES)
@@ -415,7 +434,8 @@ onBeforeUnmount(() => {
 			<VBtn variant="tonal" prepend-icon="mdi-shuffle-variant" @click="rearrange">重新排列</VBtn>
 		</div>
 
-		<div class="graph-layout">
+		<!-- @ 色票以 inline 自訂屬性下放，才不會受 Vuetify theme class 的掛載位置影響 -->
+		<div class="graph-layout" :class="{ 'is-dark': isDark }" :style="clusterVars">
 			<VCard class="graph-canvas surface-border">
 				<div ref="canvas" class="canvas-inner">
 					<!-- @ 不要用 role="presentation"：內部節點是可聚焦的按鈕，需要保留語意樹 -->
@@ -549,29 +569,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /*
- * > 主題群色票
- * @ 五個色相刻意壓低彩度，與暖灰底一致；不是螢光或漸層。
- *   深色主題整組提亮並降彩度，維持與 Night Surface 的對比。
- * @ 這是 DESIGN.md 之外的新增色票（章程原本只有單一 Archive Indigo），
+ * @ --cluster-0 ~ 4 由 script 依主題以 inline style 下放到 .graph-layout。
+ *   這是 DESIGN.md 之外的新增色票（章程原本只有單一 Archive Indigo），
  *   理由：分群是這一頁的核心資訊，只用單色無法表達五個群的邊界。
  */
-.graph-canvas {
-	--cluster-0: #31649b;
-	--cluster-1: #7d4e7a;
-	--cluster-2: #96453f;
-	--cluster-3: #3f7355;
-	--cluster-4: #8a6a2c;
-}
-
-/* @ theme class 掛在祖先的 v-application 上；scoped 只會替最後一個選擇器加 data-v，故可直接寫 */
-.v-theme--dark .graph-canvas {
-	--cluster-0: #8fb6e0;
-	--cluster-1: #c99bc6;
-	--cluster-2: #e39b94;
-	--cluster-3: #8fc9a8;
-	--cluster-4: #d8bd7e;
-}
-
 .cluster-0 {
 	--node-color: var(--cluster-0);
 }
@@ -630,8 +631,18 @@ onBeforeUnmount(() => {
 	transition: opacity var(--motion-base) var(--ease-standard);
 }
 
+/* @ 深色底上細線的視覺重量比淺色底輕，同樣的 opacity 會看不見 */
+.is-dark .edges line {
+	stroke-width: 1.2;
+	opacity: 0.42;
+}
+
 .edges line.is-faded {
 	opacity: 0.1;
+}
+
+.is-dark .edges line.is-faded {
+	opacity: 0.14;
 }
 
 .edges line.is-active {
@@ -663,6 +674,15 @@ onBeforeUnmount(() => {
 .graph-node.is-dimmed {
 	opacity: 0.08;
 	pointer-events: none;
+}
+
+/* @ 退到背景的節點在深色底上掉得比淺色底快，補一點回來才不會整片消失 */
+.is-dark .graph-node.is-faded {
+	opacity: 0.3;
+}
+
+.is-dark .graph-node.is-dimmed {
+	opacity: 0.14;
 }
 
 /* @ 擴大命中範圍但不改變視覺尺寸，小節點才點得到 */

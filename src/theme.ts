@@ -1,5 +1,18 @@
 import type { ThemeDefinition } from 'vuetify'
 
+/*
+ * > 知識圖譜的主題群色票
+ * @ 五個色相刻意壓低彩度，與暖灰底一致；不是螢光或漸層。
+ *   這是 DESIGN.md 之外的新增（章程原本只有單一 Archive Indigo），
+ *   理由：分群是圖譜頁的核心資訊，只用單色無法表達五個群的邊界。
+ * !! 兩組色票對各自 surface 的對比有測試保護（graph-palette.test.ts），
+ *    調色後請確認測試仍過，不要只憑肉眼。
+ */
+export const clusterPalette = {
+	light: ['#31649b', '#7d4e7a', '#96453f', '#3f7355', '#8a6a2c'],
+	dark: ['#8fb6e0', '#c99bc6', '#e39b94', '#8fc9a8', '#d8bd7e'],
+}
+
 export const lightTheme: ThemeDefinition = {
 	dark: false,
 	colors: {
