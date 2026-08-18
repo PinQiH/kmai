@@ -1,16 +1,30 @@
 <script setup lang="ts">
-import { computed, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useDisplay, useTheme } from "vuetify"
 
 import brandLogoUrl from "@/assets/brand/kmai-logo.png"
+import ConversationHistoryPanel from "@/components/ConversationHistoryPanel.vue"
+import ConversationSearchDialog from "@/components/ConversationSearchDialog.vue"
+import { useConversationStore } from "@/stores/conversation"
 import { useAppStore } from "@/stores/app"
 import type { NavigationItem } from "@/types"
 
 const employeeItems: NavigationItem[] = [
   { title: "首頁", icon: "mdi-home-outline", to: "/" },
-  { title: "AI 問答", icon: "mdi-message-text-outline", to: "/ask" },
+  {
+    title: "開新對話",
+    icon: "mdi-message-plus-outline",
+    action: "new-conversation",
+  },
+  {
+    title: "搜尋對話",
+    icon: "mdi-magnify",
+    action: "search-conversation",
+    hint: "Ctrl K",
+  },
   { title: "知識庫", icon: "mdi-bookshelf", to: "/library" },
+  { title: "個人筆記本", icon: "mdi-notebook-outline", to: "/notebooks" },
   { title: "知識圖譜", icon: "mdi-graph-outline", to: "/graph" },
   { title: "我的收藏", icon: "mdi-bookmark-outline", to: "/favorites" },
 ]
@@ -70,6 +84,19 @@ const navigationModel = computed({
     if (isCompactLayout.value) appStore.isNavigationOpen = isOpen
   },
 })
+// @ rail 只在桌面生效；小螢幕維持 temporary drawer 的完整寬度
+const isRailMode = computed(
+  () => appStore.isNavigationRail && !isCompactLayout.value,
+)
+const railToggleLabel = computed(() =>
+  appStore.isNavigationRail ? "展開側邊欄" : "收合側邊欄",
+)
+// @ 歷史對話只在員工前台的完整寬度側邊欄顯示
+const showDrawerHistory = computed(
+  () => !isAdminWorkspace.value && !isRailMode.value,
+)
+const primaryNavigationItems = computed(() => navigationItems.value.slice(0, 3))
+const secondaryNavigationItems = computed(() => navigationItems.value.slice(3))
 
 watch(
   () => route.fullPath,
@@ -77,6 +104,34 @@ watch(
     if (isCompactLayout.value) appStore.isNavigationOpen = false
   },
 )
+
+
+const conversationStore = useConversationStore()
+const isSearchOpen = ref(false)
+
+// - 帶 action 的導覽項目不做路由跳轉，改觸發對應行為
+async function handleNavigate(item: NavigationItem): Promise<void> {
+  if (item.action === "new-conversation") {
+    conversationStore.startNewConversation()
+    if (route.path !== "/ask") await router.push("/ask")
+    return
+  }
+  if (item.action === "search-conversation") {
+    isSearchOpen.value = true
+    return
+  }
+  if (item.to) await router.push(item.to)
+}
+
+// @ 只在非輸入元素上攔截 Ctrl/Cmd + K，避免搶走輸入框的組字與選取
+function handleSearchShortcut(event: KeyboardEvent): void {
+  if (event.key !== "k" || !(event.ctrlKey || event.metaKey)) return
+  event.preventDefault()
+  isSearchOpen.value = true
+}
+
+onMounted(() => window.addEventListener("keydown", handleSearchShortcut))
+onBeforeUnmount(() => window.removeEventListener("keydown", handleSearchShortcut))
 
 async function handleLogout(): Promise<void> {
   appStore.logout()
@@ -91,12 +146,15 @@ async function handleLogout(): Promise<void> {
     <VNavigationDrawer
       v-model="navigationModel"
       :temporary="isCompactLayout"
+      :rail="isRailMode"
+      :class="{ 'has-drawer-history': showDrawerHistory }"
+      rail-width="72"
       width="264"
       border="0"
     >
-      <div class="brand-lockup px-5 py-5">
+      <div class="brand-lockup py-5" :class="isRailMode ? 'px-3' : 'px-5'">
         <img :src="brandLogoUrl" alt="" class="brand-logo" aria-hidden="true" />
-        <div>
+        <div v-if="!isRailMode">
           <p class="font-weight-bold">Kmai</p>
           <p class="text-caption text-medium-emphasis">
             {{ isAdminWorkspace ? "管理後台" : "凌群知識庫" }}
@@ -106,35 +164,47 @@ async function handleLogout(): Promise<void> {
 
       <VList
         nav
-        :density="isAdminWorkspace ? 'compact' : 'comfortable'"
-        class="px-3"
+        density="compact"
+        class="navigation-list px-3"
         :aria-label="isAdminWorkspace ? '管理後台導覽' : '員工前台導覽'"
       >
         <VListItem
-          v-for="item in navigationItems"
-          :key="item.to"
-          :to="item.to"
+          v-for="item in isAdminWorkspace ? navigationItems : primaryNavigationItems"
+          :key="item.title"
+          :to="item.action ? undefined : item.to"
           :prepend-icon="item.icon"
           :title="item.title"
-        />
+          @click="item.action ? handleNavigate(item) : undefined"
+        >
+          <template v-if="item.hint && !isRailMode" #append>
+            <kbd class="nav-hint">{{ item.hint }}</kbd>
+          </template>
+          <VTooltip v-if="isRailMode" activator="parent" location="right">{{
+            item.title
+          }}</VTooltip>
+        </VListItem>
       </VList>
 
-      <template #append>
-        <VDivider />
-        <VList nav class="px-3 py-3">
-          <VListItem
-            to="/account"
-            prepend-icon="mdi-account-circle-outline"
-            title="王小明"
-            subtitle="產品企劃部"
-          />
-          <VListItem
-            prepend-icon="mdi-logout"
-            title="登出"
-            @click="handleLogout"
-          />
-        </VList>
+			<VList v-if="isRailMode && !isAdminWorkspace" nav density="compact" class="navigation-list px-3" aria-label="其他功能">
+				<VListItem v-for="item in secondaryNavigationItems" :key="item.title" :to="item.to" :prepend-icon="item.icon" :title="item.title">
+					<VTooltip activator="parent" location="right">{{ item.title }}</VTooltip>
+				</VListItem>
+			</VList>
+
+      <!--
+        @ 歷史對話住在側邊欄導覽下方，吃掉剩餘高度。
+          只在員工前台的完整寬度模式顯示：rail 太窄、管理後台導覽已有九項。
+      -->
+      <template v-if="showDrawerHistory">
+				<ConversationHistoryPanel>
+					<template #navigation>
+						<VList nav density="compact" class="navigation-list secondary-navigation px-3" aria-label="其他功能">
+							<VListItem v-for="item in secondaryNavigationItems" :key="item.title" :to="item.to" :prepend-icon="item.icon" :title="item.title" />
+						</VList>
+					</template>
+				</ConversationHistoryPanel>
       </template>
+
     </VNavigationDrawer>
 
     <VAppBar flat border="b" height="64">
@@ -143,6 +213,21 @@ async function handleLogout(): Promise<void> {
         aria-label="開啟導覽"
         @click="appStore.toggleNavigation"
       />
+      <VBtn
+        v-else
+        icon
+        class="ml-2"
+        :aria-label="railToggleLabel"
+        :aria-pressed="appStore.isNavigationRail"
+        @click="appStore.toggleNavigationRail"
+      >
+        <VIcon
+          :icon="appStore.isNavigationRail ? 'mdi-menu' : 'mdi-dock-left'"
+        />
+        <VTooltip activator="parent" location="bottom">{{
+          railToggleLabel
+        }}</VTooltip>
+      </VBtn>
       <VToolbarTitle class="text-body-1 font-weight-bold">{{
         route.meta.title
       }}</VToolbarTitle>
@@ -180,11 +265,23 @@ async function handleLogout(): Promise<void> {
         aria-label="問題回報"
         to="/account?tab=support"
       />
+			<VMenu location="bottom end">
+				<template #activator="{ props: menuProps }">
+					<VBtn v-bind="menuProps" icon="mdi-account-circle-outline" aria-label="開啟使用者選單" />
+				</template>
+				<VList min-width="240" lines="two">
+					<VListItem prepend-icon="mdi-account-circle-outline" title="王小明" subtitle="產品企劃部" to="/account" />
+					<VDivider />
+					<VListItem prepend-icon="mdi-logout" title="登出" @click="handleLogout" />
+				</VList>
+			</VMenu>
     </VAppBar>
 
     <VMain id="main-content" class="app-main" tabindex="-1">
       <RouterView />
     </VMain>
+
+    <ConversationSearchDialog v-model="isSearchOpen" />
   </template>
 </template>
 
@@ -206,6 +303,35 @@ async function handleLogout(): Promise<void> {
   transform: translateY(0);
 }
 
+/*
+ * > 側邊欄含歷史對話時，內容區改為 flex column：
+ *   品牌與導覽維持自然高度，歷史面板吃掉剩餘空間並自行捲動。
+ * @ 只在這個情況覆寫 overflow，管理後台的九項導覽仍需外層可捲。
+ */
+.has-drawer-history :deep(.v-navigation-drawer__content) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 主要功能列不可被下方歷史對話區壓縮，避免最後一項遭到裁切。 */
+.has-drawer-history > .navigation-list {
+	flex: 0 0 auto;
+	margin-bottom: var(--space-xs);
+}
+
+/* @ 快捷鍵提示：不搶焦點，僅在完整寬度時出現 */
+.nav-hint {
+  padding: 1px 5px;
+  border: 1px solid rgb(var(--v-theme-outline));
+  border-radius: var(--radius-sm);
+  color: var(--ink-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.6;
+}
+
 .brand-lockup {
   display: flex;
   align-items: center;
@@ -217,6 +343,16 @@ async function handleLogout(): Promise<void> {
   height: 40px;
   object-fit: cover;
   object-position: center 56%;
+}
+
+.navigation-list :deep(.v-list-item) {
+	min-height: 36px;
+	margin-block: 2px;
+}
+
+.secondary-navigation {
+	padding-block: var(--space-xs) !important;
+	margin-inline: calc(var(--space-sm) * -1);
 }
 
 .app-main {

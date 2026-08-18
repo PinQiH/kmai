@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AnimatedNumber from '@/components/AnimatedNumber.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { getHealthMetricsSnapshot, getRecentActivitiesSnapshot } from '@/repositories/admin.repository'
 
@@ -22,10 +23,10 @@ const metricColor = { good: 'success', warning: 'warning', critical: 'error' } a
 		<section aria-labelledby="health-title" class="mb-10">
 			<h2 id="health-title" class="section-heading mb-4">內容與系統健康度</h2>
 			<VRow>
-				<VCol v-for="metric in healthMetrics" :key="metric.label" cols="12" sm="6" lg="3">
-					<VCard class="metric surface-border pa-5 h-100">
+				<VCol v-for="(metric, index) in healthMetrics" :key="metric.label" cols="12" sm="6" lg="3">
+					<VCard class="metric surface-border pa-5 h-100 rise-in" :style="{ '--rise-index': index }">
 						<div class="d-flex align-center"><p class="text-body-2 text-medium-emphasis">{{ metric.label }}</p><VSpacer /><VIcon icon="mdi-circle" :color="metricColor[metric.status]" size="10" :aria-label="metric.status === 'good' ? '正常' : '需要注意'" /></div>
-						<p class="metric-value mt-3">{{ metric.value }}</p>
+						<p class="metric-value mt-3"><AnimatedNumber :value="metric.value" :duration-ms="1100" /></p>
 						<p class="text-caption text-medium-emphasis mt-1">{{ metric.detail }}</p>
 					</VCard>
 				</VCol>

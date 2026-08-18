@@ -70,6 +70,18 @@ const routes: RouteRecordRaw[] = [
 		meta: { title: "知識庫" },
 	},
 	{
+		path: "/notebooks",
+		name: "notebooks",
+		component: () => import("@/views/NotebooksView.vue"),
+		meta: { title: "個人筆記本" },
+	},
+	{
+		path: "/notebooks/:id",
+		name: "notebook-detail",
+		component: () => import("@/views/NotebookDetailView.vue"),
+		meta: { title: "筆記本內容" },
+	},
+	{
 		path: "/documents/:id",
 		name: "document",
 		component: () => import("@/views/DocumentView.vue"),

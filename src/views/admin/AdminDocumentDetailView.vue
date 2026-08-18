@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+import DocumentVersionTimeline from '@/components/DocumentVersionTimeline.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
+import { documentVersionHistoryById } from '@/mocks/data'
 import { getAdminDocumentById } from '@/repositories/admin.repository'
+import type { DocumentVersionEntry } from '@/types'
 
 const route = useRoute()
 const activeTab = ref('metadata')
@@ -16,6 +19,18 @@ const isVersionDialogOpen = ref(false)
 const strategyMessage = ref('')
 const attachments = ref([{ id: 'attachment-1', name: '補充說明.pdf', size: '248 KB' }])
 const deleteAttachmentTarget = ref<{ id: string; name: string } | null>(null)
+const documentVersions = computed<DocumentVersionEntry[]>(() => {
+	const currentDocument = document.value
+	if (!currentDocument) return []
+	return documentVersionHistoryById[currentDocument.id] ?? [{
+		version: currentDocument.version,
+		date: currentDocument.updatedAt,
+		author: currentDocument.owner,
+		summary: currentDocument.summary,
+		changes: [],
+		isCurrent: true,
+	}]
+})
 
 function saveChanges(): void {
 	if (!document.value) return
@@ -58,7 +73,7 @@ watch(() => route.params.id, (documentId) => {
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-6"><VTab value="metadata">文件欄位</VTab><VTab value="versions">版本</VTab><VTab value="attachments">附件</VTab><VTab value="access">存取控制</VTab><VTab value="strategy">處理策略</VTab></VTabs>
 		<VWindow v-model="activeTab">
 			<VWindowItem value="metadata"><VCard class="surface-border pa-6"><VTextField v-model="title" label="文件標題" /><VRow><VCol cols="12" md="6"><VSelect label="知識主題" :model-value="document.category" :items="['公司制度', '人事流程', '資訊安全', '作業流程']" /></VCol><VCol cols="12" md="6"><VSelect label="編制單位" :model-value="document.department" :items="['財務部', '人力資源部', '資訊安全部', '採購部']" /></VCol></VRow><VCombobox label="標籤" :model-value="document.tags" multiple chips /></VCard></VWindowItem>
-			<VWindowItem value="versions"><VCard class="surface-border pa-6"><div class="d-flex align-center mb-4"><h2 class="section-heading">版本紀錄</h2><VSpacer /><VBtn color="primary" prepend-icon="mdi-upload" @click="isVersionDialogOpen = true">上傳新版本</VBtn></div><VList><VListItem :title="`第 ${document.version} 版（目前版本）`" :subtitle="`${document.updatedAt} · 已發布`" prepend-icon="mdi-check-circle-outline" /><VListItem title="前一版本" subtitle="2026-02-03 · 已封存" prepend-icon="mdi-history" /></VList></VCard></VWindowItem>
+			<VWindowItem value="versions"><VCard class="surface-border pa-6"><div class="d-flex flex-wrap align-center ga-3 mb-6"><h2 class="section-heading">版本紀錄</h2><VSpacer /><VBtn color="primary" prepend-icon="mdi-upload" @click="isVersionDialogOpen = true">上傳新版本</VBtn></div><DocumentVersionTimeline :versions="documentVersions" /></VCard></VWindowItem>
 			<VWindowItem value="attachments"><VCard class="surface-border pa-6"><VBtn prepend-icon="mdi-paperclip-plus" variant="outlined" @click="addAttachment">新增附件</VBtn><VList class="mt-4"><VListItem v-for="attachment in attachments" :key="attachment.id" :title="attachment.name" :subtitle="attachment.size" prepend-icon="mdi-file-pdf-box"><template #append><VBtn icon="mdi-delete-outline" variant="text" :aria-label="`刪除 ${attachment.name}`" @click="deleteAttachmentTarget = attachment" /></template></VListItem></VList></VCard></VWindowItem>
 			<VWindowItem value="access"><VCard class="surface-border pa-6"><VRadioGroup v-model="visibility" label="可見範圍"><VRadio label="全部成員" value="全公司" /><VRadio label="指定群組" value="指定群組" /><VRadio label="僅自己" value="僅自己" /></VRadioGroup><VAutocomplete v-if="visibility === '指定群組'" label="可查看群組" :items="['財務部', '主管群組', '專案 Alpha']" multiple chips /></VCard></VWindowItem>
 			<VWindowItem value="strategy"><VCard class="surface-border pa-6"><VSwitch label="覆蓋全域處理策略" color="primary" /><VSelect label="解析策略" :items="['使用全域設定', '內建解析器', 'Docling']" /><VSelect label="切塊策略" :items="['使用全域設定', '段落優先', '固定長度']" /><VAlert v-if="strategyMessage" type="success" variant="tonal" class="mb-4">{{ strategyMessage }}</VAlert><VBtn variant="tonal" @click="testStrategy">測試目前策略</VBtn></VCard></VWindowItem>

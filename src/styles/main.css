@@ -4,6 +4,62 @@
 	text-rendering: optimizeLegibility;
 	--content-max-width: 1280px;
 	--reading-max-width: 760px;
+
+	/* > Motion token：對應 DESIGN.md「150-220ms 內回應」的規範 */
+	--motion-fast: 140ms;
+	--motion-base: 200ms;
+	--motion-slow: 320ms;
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+	/* > 等寬字：僅用於數字、識別碼與狀態標籤，中文本體維持 Noto Sans TC */
+	--font-mono: "JetBrains Mono", "Cascadia Code", "IBM Plex Mono", "SF Mono", Consolas, Menlo, monospace;
+
+	/* > Spacing scale：對應 DESIGN.md 第 42-47 行，先前只寫在文件沒有實作 */
+	--space-xs: 4px;
+	--space-sm: 8px;
+	--space-md: 16px;
+	--space-lg: 24px;
+	--space-xl: 32px;
+	--space-2xl: 48px;
+
+	/* > Radius scale：對應 DESIGN.md 第 38-41 行；xl 供大型面板使用 */
+	--radius-sm: 8px;
+	--radius-md: 12px;
+	--radius-lg: 14px;
+	--radius-xl: 18px;
+
+	/* > z-index 語意層級，避免各處自訂 999 之類的魔術數字 */
+	--z-sticky: 100;
+	--z-drawer: 200;
+	--z-modal: 300;
+	--z-toast: 400;
+	--z-tooltip: 500;
+	--z-skip-link: 600;
+}
+
+/*
+ * > 文字階層與互動底色：以 color-mix 產生固定色，不用 opacity。
+ * @ opacity 會與背景混色，hover 改變背景時對比會跟著掉；固定色不會。
+ * @ 對比實測（AA 需 4.5:1）：muted 深色 7.4:1／淺色 6.4:1，subtle 深色 5.6:1／淺色 4.9:1。
+ * !! 必須宣告在 .v-theme--* 上而非只有 :root。Vuetify 的主題變數是 runtime 注入在
+ *    該 class 的元素上，自訂屬性的 var() 在宣告處就解析完並往下繼承；
+ *    只寫在 :root 的話切換深色時會沿用淺色算好的值。
+ */
+:root,
+[class*="v-theme--"] {
+	--ink-strong: rgb(var(--v-theme-on-surface));
+	--ink-muted: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 76%, rgb(var(--v-theme-surface)));
+	--ink-subtle: color-mix(in srgb, rgb(var(--v-theme-on-surface)) 65%, rgb(var(--v-theme-surface)));
+	--tint-hover: rgba(var(--v-theme-primary), 0.09);
+	--tint-active: rgba(var(--v-theme-primary), 0.16);
+}
+
+/* @ 註冊自訂角度屬性，讓 conic-gradient 的掃描動畫可被補間 */
+@property --sweep-angle {
+	syntax: "<angle>";
+	inherits: false;
+	initial-value: 0turn;
 }
 
 * {
@@ -87,8 +143,133 @@ body {
 	border: 1px solid rgb(var(--v-theme-outline));
 }
 
+/*
+ * > 覆寫 Vuetify 的次要文字：預設 medium-emphasis 是 0.6 opacity，
+ * @ 深色主題下約 3.9:1，未達 AA；改用固定色 token 拉到 6.4:1 以上。
+ */
+.text-medium-emphasis {
+	color: var(--ink-muted) !important;
+	opacity: 1 !important;
+}
+
+.text-caption.text-medium-emphasis,
+.v-list-item-subtitle {
+	color: var(--ink-muted) !important;
+	opacity: 1 !important;
+}
+
+/*
+ * > Vuetify 互動元件的 hover：預設 overlay 只有 0.04，
+ * @ 在深色主題幾乎看不出來；提高到可辨識但不影響文字對比的強度。
+ */
+.v-btn:hover > .v-btn__overlay,
+.v-list-item:hover > .v-list-item__overlay {
+	opacity: 0.1;
+}
+
+/* @ text/plain variant 的按鈕 hover 時把文字補到全不透明，避免糊掉 */
+.v-btn--variant-text:hover,
+.v-btn--variant-plain:hover {
+	opacity: 1;
+}
+
+.v-btn--variant-plain {
+	opacity: 0.9;
+}
+
+/*
+ * > Tooltip：改用實心表面而非 Vuetify 預設的半透明灰底。
+ * @ 預設底色會讓次要文字掉到 3:1 以下，放說明性內容時看不清楚。
+ */
+.v-tooltip > .v-overlay__content {
+	max-width: 380px;
+	padding: 10px 12px;
+	border: 1px solid rgb(var(--v-theme-outline));
+	border-radius: var(--radius-md);
+	background: rgb(var(--v-theme-surface));
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+	color: rgb(var(--v-theme-on-surface));
+	font-size: 0.82rem;
+	line-height: 1.55;
+	opacity: 1;
+}
+
 .text-balance {
 	text-wrap: balance;
+}
+
+/* 隱藏側邊欄原生捲軸外觀，保留滾輪、觸控板、鍵盤與觸控捲動。 */
+.v-navigation-drawer,
+.v-navigation-drawer__content,
+.history-scroll {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+.v-navigation-drawer::-webkit-scrollbar,
+.v-navigation-drawer__content::-webkit-scrollbar,
+.history-scroll::-webkit-scrollbar {
+	display: none;
+	width: 0;
+	height: 0;
+}
+
+/* > 數字與識別碼：等寬並固定字寬，避免計數動畫時版面跳動 */
+.mono {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+}
+
+.tabular {
+	font-variant-numeric: tabular-nums;
+}
+
+/* > 列表進場：由父層設定 --rise-index 產生 stagger */
+@keyframes rise-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, var(--rise-distance, 12px), 0);
+	}
+
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.rise-in {
+	animation: rise-in var(--rise-duration, var(--motion-slow)) var(--ease-out) backwards;
+	animation-delay: calc(var(--rise-index, 0) * var(--rise-step, 45ms));
+}
+
+/* > 互動表面：只改變色調與邊界，不位移版面（遵守 Flat by Default） */
+.surface-border {
+	transition: border-color var(--motion-base) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
+}
+
+/* > 串流游標：AI 逐字輸出時的插入點 */
+@keyframes caret-blink {
+	0%,
+	45% {
+		opacity: 1;
+	}
+
+	55%,
+	100% {
+		opacity: 0;
+	}
+}
+
+.stream-caret {
+	display: inline-block;
+	width: 0.46em;
+	height: 1.02em;
+	margin-left: 3px;
+	transform: translateY(0.16em);
+	border-radius: 1px;
+	background: rgb(var(--v-theme-primary));
+	animation: caret-blink 1s steps(1, end) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

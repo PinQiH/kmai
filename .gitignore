@@ -6,3 +6,5 @@ vite.stderr.log
 vite.config.js
 vite.config.d.ts
 .impeccable/live/
+.claude/
+.agents/

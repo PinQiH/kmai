@@ -2,7 +2,9 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+import DocumentVersionTimeline from '@/components/DocumentVersionTimeline.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import type { DocumentVersionEntry } from '@/types'
 
 const route = useRoute()
 const activeTab = ref('profile')
@@ -20,6 +22,33 @@ const confirmedPassword = ref('')
 const passwordTouched = ref(false)
 const passwordMessage = ref('')
 const isPrivacyOpen = ref(false)
+
+const systemReleaseHistory: DocumentVersionEntry[] = [
+	{
+		version: '0.2.0',
+		date: '2026-08-18',
+		author: '系統管理團隊',
+		summary: '整理個人筆記本、網路搜尋控制與導覽體驗，準備下一次發布。',
+		changes: ['新增個人筆記本與文件上傳介面', '加入筆記本分享與成員權限設定', '問答頁可切換是否進行網路搜尋'],
+		status: '即將推出',
+	},
+	{
+		version: '0.1.0',
+		date: '2026-08-14',
+		author: '系統管理團隊',
+		summary: 'Kmai 知識管理平台第一個展示版本。',
+		changes: ['提供企業知識搜尋與 AI 問答', '支援文件版本與引用追溯', '建立管理端健康度與處理監控'],
+		isCurrent: true,
+	},
+	{
+		version: '0.0.5',
+		date: '2026-08-01',
+		author: '產品開發團隊',
+		summary: '完成內部測試版本，確認主要知識查詢流程。',
+		changes: ['完成側邊導覽與權限路由', '加入文件列表與搜尋結果頁', '建立淺色及深色主題'],
+		status: '已封存',
+	},
+]
 
 const allowedTabs = new Set(['profile', 'security', 'support', 'about'])
 
@@ -96,12 +125,11 @@ onMounted(syncTabFromRoute)
 			</VWindowItem>
 			<VWindowItem value="about">
 				<VCard class="surface-border pa-6">
-					<h2 class="section-heading">Kmai 0.1.0</h2>
-					<p class="text-body-2 text-medium-emphasis mt-2">展示版本 · 2026-08-14</p>
-					<VDivider class="my-5" />
-					<h3 class="font-weight-bold">本次更新</h3>
-					<ul class="pl-5 mt-3 text-body-2"><li>全新知識搜尋與 AI 問答</li><li>文件版本與引用追溯</li><li>管理端健康度與處理監控</li></ul>
-					<VBtn class="mt-5" variant="tonal" @click="isPrivacyOpen = true">查看隱私權政策</VBtn>
+					<div class="about-heading mb-6">
+						<div><h2 class="section-heading mb-1">系統版本</h2><p class="text-body-2 text-medium-emphasis">依發布時間查看每一版的更新內容。</p></div>
+						<VBtn variant="tonal" prepend-icon="mdi-shield-account-outline" @click="isPrivacyOpen = true">查看隱私權政策</VBtn>
+					</div>
+					<DocumentVersionTimeline :versions="systemReleaseHistory" />
 				</VCard>
 			</VWindowItem>
 		</VWindow>
@@ -112,5 +140,18 @@ onMounted(syncTabFromRoute)
 <style scoped>
 .account-page {
 	max-width: 860px;
+}
+
+.about-heading {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-md);
+}
+
+@media (max-width: 600px) {
+	.about-heading {
+		flex-direction: column;
+	}
 }
 </style>

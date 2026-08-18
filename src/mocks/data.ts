@@ -1,4 +1,4 @@
-import type { ActivityItem, Citation, HealthMetric, KnowledgeDocument } from '@/types'
+import type { ActivityItem, Citation, ConversationSummary, DocumentVersionEntry, HealthMetric, KnowledgeDocument } from '@/types'
 
 // TODO(api-integration): 串接文件查詢 API 後移除此 Mock 資料。
 export const documents: KnowledgeDocument[] = [
@@ -69,6 +69,38 @@ export const documents: KnowledgeDocument[] = [
 	},
 ]
 
+export const documentVersionHistoryById: Record<string, DocumentVersionEntry[]> = Object.fromEntries(
+	documents.map((document, documentIndex) => [
+		document.id,
+		[
+			{
+				version: document.version,
+				date: document.updatedAt,
+				author: document.owner,
+				summary: document.summary,
+				changes: documentIndex % 2 === 0
+					? ['更新主要內容與作業說明', '補充適用範圍與注意事項']
+					: ['調整文件結構與閱讀順序', '更新相關規範與附件資訊'],
+				isCurrent: true,
+			},
+			{
+				version: documentIndex === 0 ? '3.1' : documentIndex === 1 ? '1.5' : documentIndex === 2 ? '4.0' : documentIndex === 3 ? '1.7' : '2.2',
+				date: documentIndex === 0 ? '2026-02-03' : documentIndex === 1 ? '2025-12-18' : documentIndex === 2 ? '2026-04-22' : documentIndex === 3 ? '2026-03-14' : '2026-01-10',
+				author: document.owner,
+				summary: '依據使用回饋調整內容，讓操作步驟與規範更清楚。',
+				changes: ['修正文句與名詞用法', '補充常見情境範例'],
+			},
+			{
+				version: documentIndex === 0 ? '3.0' : documentIndex === 1 ? '1.0' : documentIndex === 2 ? '3.5' : documentIndex === 3 ? '1.0' : '2.0',
+				date: documentIndex === 0 ? '2025-10-16' : documentIndex === 1 ? '2025-07-08' : documentIndex === 2 ? '2025-11-30' : documentIndex === 3 ? '2025-09-02' : '2025-08-21',
+				author: document.owner,
+				summary: '建立文件基準版本，整理當時適用的流程與參考資料。',
+				changes: ['建立初始內容架構', '加入必要附件與參考來源'],
+			},
+		],
+	]),
+)
+
 export const citations: Citation[] = [
 	{
 		id: 'cite-1',
@@ -85,6 +117,64 @@ export const citations: Citation[] = [
 		section: '6.1 核銷期限',
 		excerpt: '出差結束後十個工作天內，應完成費用報支並檢附有效憑證。',
 		confidence: 0.91,
+	},
+]
+
+// TODO(api-integration): 串接歷史對話 API 後移除此 Mock 資料。
+export const conversationHistory: ConversationSummary[] = [
+	{
+		id: 'conv-001',
+		title: '國內出差住宿費用上限是多少？',
+		updatedAt: '2026-08-17T10:42:00',
+		messageCount: 2,
+		previewAnswer: '依目前有效的差旅辦法，國內住宿每晚原則上限為新台幣 3,000 元。',
+		isPinned: true,
+		isArchived: false,
+	},
+	{
+		id: 'conv-002',
+		title: '新進同仁第一週要完成哪些事情？',
+		updatedAt: '2026-08-16T15:08:00',
+		messageCount: 4,
+		previewAnswer: '新進同仁第一週應完成公司帳號啟用、設備點交、資訊安全訓練及主管安排的到職會談。',
+		isPinned: false,
+		isArchived: false,
+	},
+	{
+		id: 'conv-003',
+		title: '如何申請客戶資料存取權限？',
+		updatedAt: '2026-08-14T09:20:00',
+		messageCount: 2,
+		previewAnswer: '客戶資料需依分級申請存取權限，對外分享前必須確認接收者、用途與保存期限。',
+		isPinned: false,
+		isArchived: false,
+	},
+	{
+		id: 'conv-004',
+		title: '比較差旅辦法 3.1 與 3.2 版差異',
+		updatedAt: '2026-08-13T16:26:00',
+		messageCount: 6,
+		previewAnswer: '3.2 版調整了國內住宿上限與核銷期限，並新增旺季例外的申請欄位。',
+		isPinned: true,
+		isArchived: false,
+	},
+	{
+		id: 'conv-005',
+		title: '採購請款需要哪些附件？',
+		updatedAt: '2026-08-11T11:03:00',
+		messageCount: 2,
+		previewAnswer: '請款需檢附驗收單、發票或收據，以及完成簽核的採購申請單。',
+		isPinned: false,
+		isArchived: true,
+	},
+	{
+		id: 'conv-006',
+		title: '年度績效申覆的時間限制',
+		updatedAt: '2026-08-08T14:47:00',
+		messageCount: 3,
+		previewAnswer: '評等公布後十個工作天內可提出申覆，逾期不再受理。',
+		isPinned: false,
+		isArchived: true,
 	},
 ]
 

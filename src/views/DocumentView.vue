@@ -2,9 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import DocumentVersionTimeline from '@/components/DocumentVersionTimeline.vue'
 import StatePanel from '@/components/StatePanel.vue'
+import { documentVersionHistoryById } from '@/mocks/data'
 import { getDocumentById } from '@/repositories/knowledge.repository'
-import type { KnowledgeDocument } from '@/types'
+import type { DocumentVersionEntry, KnowledgeDocument } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,17 +35,23 @@ const contentByDocumentId: Record<string, Array<{ heading: string; body: string 
 const documentSections = computed(() => contentByDocumentId[document.value?.id ?? ''] ?? [
 	{ heading: '文件摘要', body: document.value?.summary ?? '' },
 ])
-const previousVersionByDocumentId: Record<string, { version: string; date: string; note: string }> = {
-	'doc-001': { version: '3.1', date: '2026-02-03', note: '更新海外差旅附件要求' },
-	'doc-002': { version: '1.5', date: '2025-12-18', note: '新增前三十天任務清單' },
-	'doc-005': { version: '2.2', date: '2026-01-10', note: '更新申覆流程與期限' },
-}
 const attachmentByDocumentId: Record<string, { name: string; size: string }> = {
 	'doc-001': { name: '差旅費用明細表.xlsx', size: '32 KB' },
 	'doc-002': { name: '到職第一週檢核表.pdf', size: '186 KB' },
 	'doc-005': { name: '績效目標設定範例.xlsx', size: '48 KB' },
 }
-const previousVersion = computed(() => previousVersionByDocumentId[document.value?.id ?? ''])
+const documentVersions = computed<DocumentVersionEntry[]>(() => {
+	const currentDocument = document.value
+	if (!currentDocument) return []
+	return documentVersionHistoryById[currentDocument.id] ?? [{
+		version: currentDocument.version,
+		date: currentDocument.updatedAt,
+		author: currentDocument.owner,
+		summary: currentDocument.summary,
+		changes: [],
+		isCurrent: true,
+	}]
+})
 const attachment = computed(() => attachmentByDocumentId[document.value?.id ?? ''])
 
 async function loadDocument(): Promise<void> {
@@ -118,11 +126,9 @@ function downloadDocument(): void {
 					</VCard>
 				</VWindowItem>
 				<VWindowItem value="versions">
-					<VList class="surface-border rounded-lg">
-						<VListItem :title="`第 ${document.version} 版（目前版本）`" :subtitle="`${document.updatedAt} · ${document.summary}`" prepend-icon="mdi-check-circle-outline" />
-						<VDivider />
-						<VListItem v-if="previousVersion" :title="`第 ${previousVersion.version} 版`" :subtitle="`${previousVersion.date} · ${previousVersion.note}`" prepend-icon="mdi-history" />
-					</VList>
+					<VCard class="surface-border pa-6 pa-md-8">
+						<DocumentVersionTimeline :versions="documentVersions" />
+					</VCard>
 				</VWindowItem>
 				<VWindowItem value="attachments">
 					<VList class="surface-border rounded-lg">

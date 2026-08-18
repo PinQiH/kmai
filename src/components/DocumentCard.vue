@@ -25,17 +25,18 @@ withDefaults(defineProps<ComponentProps>(), { showStatus: false })
 			<div class="d-flex flex-wrap ga-2 mt-4">
 				<VChip v-for="tag in document.tags" :key="tag" size="x-small" variant="tonal">{{ tag }}</VChip>
 			</div>
-			<p class="text-caption text-medium-emphasis mt-4">更新於 {{ document.updatedAt }} · 第 {{ document.version }} 版</p>
+			<p class="text-caption text-medium-emphasis mt-4">更新於 <span class="mono">{{ document.updatedAt }}</span> · 第 <span class="mono">{{ document.version }}</span> 版</p>
 		</VCardText>
 	</VCard>
 </template>
 
 <style scoped>
 .document-card {
-	transition: border-color 180ms ease, background-color 180ms ease;
+	transition: border-color var(--motion-base) var(--ease-standard), background-color var(--motion-base) var(--ease-standard);
 }
 
 .document-card:hover {
 	border-color: rgb(var(--v-theme-primary));
+	background: rgba(var(--v-theme-primary), 0.03);
 }
 </style>
