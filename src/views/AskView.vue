@@ -11,7 +11,13 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { useNotebooksStore } from '@/stores/notebooks'
 import type { Citation, OutlineItem } from '@/types'
 
-const suggestions = ['公司請假流程是什麼？', '差旅費用怎麼申請？', '最新版的資安規範有哪些重點？']
+// > 起手問題依知識來源分組；切換來源會換掉整組題目，讓來源選擇的影響立即可見
+const SOURCE_STARTERS: Record<string, string[]> = {
+	company: ['公司請假流程是什麼？', '差旅費用怎麼申請？', '最新版的資安規範有哪些重點？'],
+	policy: ['加班與補休怎麼計算？', '採購金額到多少需要主管簽核？', '離職交接必須繳回哪些項目？'],
+	benefits: ['年度健康檢查補助多少？', '育嬰留職停薪最長可以請多久？', '團體保險的理賠怎麼申請？'],
+}
+
 const companySources = [
 	{ id: 'company', name: '全公司知識', defaultWebSearchEnabled: false, description: '使用目前可見的公司知識庫。' },
 	{ id: 'policy', name: '公司制度', defaultWebSearchEnabled: false, description: '優先搜尋公司制度與作業規範。' },
@@ -48,6 +54,23 @@ const knowledgeSources = computed(() => [
 	})),
 ])
 
+// - 目前選到的個人筆記本；選到公司來源時為 null
+const selectedNotebook = computed(() => notebooksStore.notebooks.find((notebook) => notebook.id === conversationStore.selectedKnowledgeSourceId) ?? null)
+
+// - 已選但尚無文件的筆記本：這種來源問了也不會有引用，空狀態要先講清楚
+const emptyNotebook = computed(() => (selectedNotebook.value?.documents.length === 0 ? selectedNotebook.value : null))
+
+const starterQuestions = computed<string[]>(() => {
+	const preset = SOURCE_STARTERS[conversationStore.selectedKnowledgeSourceId]
+	if (preset) return preset
+
+	const notebook = selectedNotebook.value
+	if (!notebook) return SOURCE_STARTERS.company
+
+	const [firstDocument] = notebook.documents
+	if (!firstDocument) return []
+	return [`${notebook.name}裡有哪些重點？`, `幫我整理${notebook.name}的重要結論`, `${firstDocument.name} 提到什麼？`]
+})
 
 function selectKnowledgeSource(sourceId: string | null): void {
 	if (!sourceId) return
@@ -107,9 +130,28 @@ function resizeComposer(): void {
 	field.style.height = `${Math.min(field.scrollHeight, COMPOSER_MAX_HEIGHT)}px`
 }
 
+/**
+ * 把游標放進輸入框。
+ * @ router 的 afterEach 會在下一個動畫影格把焦點移到 #main-content，
+ *   因此這裡也必須排進 rAF，才會排在它之後執行而不被搶走。
+ * @ 小螢幕不自動聚焦，避免一進頁面就彈出虛擬鍵盤蓋掉半個畫面。
+ */
+function focusComposer(): void {
+	if (!display.mdAndUp.value) return
+	window.requestAnimationFrame(() => composerField.value?.focus())
+}
+
 watch(question, async () => {
 	await nextTick()
 	resizeComposer()
+})
+
+// @ 側邊欄的「開新對話」在同一頁清空訊息，不會觸發 mounted，需要另外把焦點帶回輸入框
+// @ 回饋訊息屬於上一輪對話，不清掉會殘留在新對話的空狀態下
+watch(isEmptyState, (isEmpty) => {
+	if (!isEmpty) return
+	feedbackMessage.value = ''
+	focusComposer()
 })
 
 watch(
@@ -204,7 +246,11 @@ function observeQuestions(): void {
 
 onMounted(() => {
 	const initialQuestion = String(route.query.q ?? '')
-	if (initialQuestion) void submitQuestion(initialQuestion)
+	if (initialQuestion) {
+		void submitQuestion(initialQuestion)
+		return
+	}
+	focusComposer()
 })
 
 onBeforeUnmount(() => outlineObserver?.disconnect())
@@ -229,23 +275,22 @@ watch(() => route.query.q, (nextQuestion) => {
 		  再放一個 h1 是重複資訊，也會吃掉約 100px 的對話高度。
 		@ 歷史對話已移到全域側邊欄，這裡維持單欄，版面才不易跑掉。
 	-->
-	<div class="ask-page">
+	<div class="ask-page" :class="{ 'is-empty': isEmptyState }">
 		<div class="ask-body">
 			<div ref="scrollArea" class="ask-scroll">
 				<div class="ask-content">
 					<VAlert v-if="conversationStore.errorMessage" type="error" variant="tonal" density="compact" class="mb-4">{{ conversationStore.errorMessage }}</VAlert>
 
+					<!-- @ 空狀態刻意左對齊並貼齊輸入框：標題→輸入框→建議題目形成一條可讀的直欄，而非置中的 AI 首屏 -->
 					<div v-if="isEmptyState" class="ask-empty">
-						<div class="empty-badge" aria-hidden="true">
-							<VIcon icon="mdi-message-text-outline" size="26" color="primary" />
-						</div>
-						<h2 class="empty-title">從知識庫裡直接問出答案</h2>
-						<p class="empty-description">輸入問題後，系統會整理可見文件、產生引用證據，並同步顯示處理進度。</p>
-						<div class="empty-suggestions">
-							<button v-for="suggestion in suggestions" :key="suggestion" type="button" class="suggestion-chip" @click="submitQuestion(suggestion)">
-								{{ suggestion }}
-							</button>
-						</div>
+						<h2 class="empty-title">向「{{ conversationStore.selectedScope }}」提問</h2>
+						<p class="empty-description">回答會標註引用來源與適用版本，可以展開原文逐句核對。換一個知識來源，檢索範圍與建議題目也會跟著換。</p>
+						<VAlert v-if="emptyNotebook" type="info" variant="tonal" density="compact" class="empty-notice">
+							「{{ emptyNotebook.name }}」還沒有文件，現在提問不會有可查證的引用。
+							<div class="mt-2">
+								<VBtn :to="`/notebooks/${emptyNotebook.id}`" variant="tonal" size="small">開啟筆記本上傳文件</VBtn>
+							</div>
+						</VAlert>
 					</div>
 
 					<div v-else class="message-list">
@@ -314,6 +359,16 @@ watch(() => route.query.q, (nextQuestion) => {
 				<span class="composer-hint">Enter 送出 · Shift + Enter 換行</span>
 			</div>
 		</form>
+
+		<!-- @ 建議題目放在輸入框「之後」：DOM 順序＝視覺順序＝Tab 順序，先給輸入再給範例 -->
+		<div v-if="isEmptyState && starterQuestions.length > 0" class="ask-starters">
+			<span id="starter-label" class="starters-label">可以試著問</span>
+			<div class="starters-list" role="group" aria-labelledby="starter-label">
+				<button v-for="starter in starterQuestions" :key="starter" type="button" class="suggestion-chip" @click="submitQuestion(starter)">
+					{{ starter }}
+				</button>
+			</div>
+		</div>
 
 		<VDialog v-model="isCitationOpen" max-width="560">
 			<VCard class="pa-6">
@@ -394,61 +449,109 @@ watch(() => route.query.q, (nextQuestion) => {
 	margin-inline: auto;
 }
 
-/* > 空狀態 */
+/*
+ * > 空狀態版面：把輸入框從畫面底部拉到垂直中央，與說明、建議題目併成同一組。
+ * @ 沒有第二個 composer；只切換 .ask-page 的對齊方式，
+ *   輸入框仍是同一個 DOM 節點，送出後不會失焦或掉字。
+ */
+.ask-page.is-empty {
+	justify-content: center;
+	gap: var(--space-lg);
+}
+
+/* @ 空狀態的說明不需要佔滿剩餘高度，但仍允許在矮視窗中壓縮並自行捲動 */
+.ask-page.is-empty .ask-body {
+	flex: 0 1 auto;
+}
+
+/* @ 沒有捲軸時取消預留的捲軸間距，說明文字才會與輸入框左右對齊 */
+.ask-page.is-empty .ask-scroll {
+	padding-right: 0;
+}
+
+/* @ 空狀態下與 composer 同寬（900px），避免兩塊寬度差 40px 造成邊緣不齊 */
+.ask-page.is-empty .ask-content {
+	max-width: 900px;
+}
+
+/* > 空狀態內容 */
 .ask-empty {
 	display: flex;
 	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-xs);
-	min-height: 100%;
-	padding: var(--space-lg) var(--space-md);
-	text-align: center;
+	gap: var(--space-sm);
+	animation: empty-appear var(--motion-base) var(--ease-out);
 }
 
-.empty-badge {
-	display: grid;
-	place-items: center;
-	width: 56px;
-	height: 56px;
-	margin-bottom: var(--space-sm);
-	border-radius: 50%;
-	background: var(--tint-active);
+@keyframes empty-appear {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
 }
 
 .empty-title {
-	font-size: 1.375rem;
-	font-weight: 700;
+	font-size: 1.5rem;
+	font-weight: 650;
 	letter-spacing: -0.02em;
+	line-height: 1.3;
+	overflow-wrap: anywhere;
 	text-wrap: balance;
 }
 
 .empty-description {
-	max-width: 48ch;
+	max-width: 52ch;
 	color: var(--ink-muted);
-	font-size: 0.9rem;
+	font-size: 0.925rem;
 	line-height: 1.7;
 	text-wrap: pretty;
 }
 
-.empty-suggestions {
+.empty-notice {
+	margin-top: var(--space-xs);
+	max-width: 52ch;
+}
+
+/* > 建議題目：貼在 composer 下方，與 composer 同寬同軸 */
+.ask-starters {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: var(--space-xs) var(--space-sm);
+	flex: 0 0 auto;
+	width: min(100%, 900px);
+	margin-inline: auto;
+	animation: empty-appear var(--motion-base) var(--ease-out);
+}
+
+.starters-label {
+	color: var(--ink-subtle);
+	font-size: 0.78rem;
+}
+
+.starters-list {
 	display: flex;
 	flex-wrap: wrap;
-	justify-content: center;
 	gap: var(--space-sm);
-	margin-top: var(--space-md);
 }
 
 /* @ 自訂 chip 而非 VBtn：Vuetify 的 hover overlay 會壓低文字對比 */
 .suggestion-chip {
+	/* @ 筆記本題目會帶入檔名，長度不可控；必須允許換行並限寬，否則會撐破容器 */
+	max-width: 100%;
 	padding: var(--space-sm) var(--space-md);
 	border: 1px solid rgb(var(--v-theme-outline));
-	border-radius: 999px;
+	/* @ 用 14px 圓角（與 composer 一致）而非藥丸：這是輸入框的延伸而非篩選 chip，換行時藥丸也會變形 */
+	border-radius: var(--radius-lg);
 	background: rgb(var(--v-theme-surface));
 	color: var(--ink-strong);
 	cursor: pointer;
 	font: inherit;
 	font-size: 0.85rem;
+	overflow-wrap: anywhere;
+	text-align: left;
 	transition: border-color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
 }
 
@@ -651,6 +754,15 @@ watch(() => route.query.q, (nextQuestion) => {
 	.ask-page {
 		gap: var(--space-sm);
 		padding: var(--space-sm) var(--space-md) var(--space-md);
+	}
+
+	/* @ .ask-page.is-empty 的權重高於上面的 .ask-page，必須在此另外收窄 */
+	.ask-page.is-empty {
+		gap: var(--space-md);
+	}
+
+	.empty-title {
+		font-size: 1.3rem;
 	}
 
 	.user-message {

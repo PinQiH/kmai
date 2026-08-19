@@ -123,7 +123,8 @@ export const useConversationStore = defineStore('conversation', {
 	state: (): ConversationState => ({
 		messages: [],
 		isResponding: false,
-		selectedScope: '自動判斷',
+		// @ 必須與 selectedKnowledgeSourceId 的預設值同義，否則來源晶片與來源對話框會顯示不一致
+		selectedScope: '全公司知識',
 		selectedKnowledgeSourceId: 'company',
 		selectedSourceDefaultWebSearch: false,
 		webSearchOverride: null,
