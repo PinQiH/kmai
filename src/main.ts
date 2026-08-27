@@ -10,7 +10,7 @@ import * as directives from 'vuetify/directives'
 import App from '@/App.vue'
 import { router } from '@/router'
 import { pinia } from '@/stores'
-import { darkTheme, lightTheme } from '@/theme'
+import { darkTheme, lightTheme, redDarkTheme, redLightTheme } from '@/theme'
 
 const vuetify = createVuetify({
 	components,
@@ -20,6 +20,8 @@ const vuetify = createVuetify({
 		themes: {
 			kmaiLight: lightTheme,
 			kmaiDark: darkTheme,
+			kmaiRedLight: redLightTheme,
+			kmaiRedDark: redDarkTheme,
 		},
 	},
 	defaults: {

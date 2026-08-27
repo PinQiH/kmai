@@ -1,4 +1,4 @@
-# Kmai Frontend
+# Syscom Cubi Frontend
 
 ## GitHub Pages
 

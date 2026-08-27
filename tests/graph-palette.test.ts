@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { clusterPalette, darkTheme, lightTheme } from '../src/theme'
+import { contrastRatio, deltaE, relativeLuminance } from './helpers/color'
 
 /*
  * > 知識圖譜群組色票的對比檢查
@@ -8,48 +9,6 @@ import { clusterPalette, darkTheme, lightTheme } from '../src/theme'
  *   使用者回報「顏色有點不清楚」。純靠肉眼看不出是「顏色選錯」還是「規則沒生效」，
  *   這裡把色票本身的對比釘死，讓調色出問題時測試先失敗。
  */
-
-// - 將 hex 轉為 sRGB 相對亮度（WCAG 2.1 定義）
-function relativeLuminance(hex: string): number {
-	const value = hex.replace('#', '')
-	const channels = [0, 2, 4].map((offset) => {
-		const raw = Number.parseInt(value.slice(offset, offset + 2), 16) / 255
-		return raw <= 0.03928 ? raw / 12.92 : Math.pow((raw + 0.055) / 1.055, 2.4)
-	})
-	return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
-}
-
-function contrastRatio(foreground: string, background: string): number {
-	const a = relativeLuminance(foreground)
-	const b = relativeLuminance(background)
-	const lighter = Math.max(a, b)
-	const darker = Math.min(a, b)
-	return (lighter + 0.05) / (darker + 0.05)
-}
-
-// - 轉為 CIE L*a*b*，用於量測「人眼感知到的顏色差異」
-function toLab(hex: string): [number, number, number] {
-	const value = hex.replace('#', '')
-	const [r, g, b] = [0, 2, 4].map((offset) => {
-		const raw = Number.parseInt(value.slice(offset, offset + 2), 16) / 255
-		return raw <= 0.04045 ? raw / 12.92 : Math.pow((raw + 0.055) / 1.055, 2.4)
-	})
-
-	// @ sRGB → XYZ（D65）→ Lab
-	const x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
-	const y = 0.2126 * r + 0.7152 * g + 0.0722 * b
-	const z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
-	const f = (t: number): number => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116)
-	const [fx, fy, fz] = [f(x), f(y), f(z)]
-
-	return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)]
-}
-
-function deltaE(first: string, second: string): number {
-	const a = toLab(first)
-	const b = toLab(second)
-	return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
-}
 
 describe('知識圖譜群組色票', () => {
 	it('01. 淺色主題 - 每個群組色對 surface 的對比達非文字元素的 AA 門檻', () => {

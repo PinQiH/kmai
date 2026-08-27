@@ -37,6 +37,11 @@ const adminItems: NavigationItem[] = [
     to: "/admin/documents",
   },
   { title: "處理監控", icon: "mdi-progress-wrench", to: "/admin/processing" },
+  {
+    title: "營運監控",
+    icon: "mdi-chart-timeline-variant",
+    to: "/admin/monitoring",
+  },
   { title: "圖譜管理", icon: "mdi-vector-polyline", to: "/admin/graph" },
   {
     title: "回饋與問題",
@@ -155,7 +160,7 @@ async function handleLogout(): Promise<void> {
       <div class="brand-lockup py-5" :class="isRailMode ? 'px-3' : 'px-5'">
         <img :src="brandLogoUrl" alt="" class="brand-logo" aria-hidden="true" />
         <div v-if="!isRailMode">
-          <p class="font-weight-bold">Kmai</p>
+          <p class="font-weight-bold">Syscom Cubi</p>
           <p class="text-caption text-medium-emphasis">
             {{ isAdminWorkspace ? "管理後台" : "凌群知識庫" }}
           </p>

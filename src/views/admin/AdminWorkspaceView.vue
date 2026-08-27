@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useTheme } from 'vuetify'
 
 import PageHeader from '@/components/PageHeader.vue'
+import { useAppStore } from '@/stores/app'
+import { themeAccentLabels, type ThemeAccent } from '@/theme'
 
 interface WorkspaceConfig {
 	eyebrow: string
@@ -65,13 +68,13 @@ const workspaceConfigs: Record<string, WorkspaceConfig> = {
 	},
 	settings: {
 		eyebrow: '產品與治理',
-		description: '維護品牌外觀、版本公告、隱私權政策與全公司預設主題。',
-		tabs: ['品牌外觀', '版本管理', '隱私權政策', '預設主題'],
+		description: '維護品牌外觀、版本公告、隱私權政策與全公司預設配色。',
+		tabs: ['品牌外觀', '版本管理', '隱私權政策', '預設配色'],
 		items: [
-			{ title: '品牌外觀', description: '系統名稱：Kmai · Logo 已設定 · 瀏覽器圖示已設定', status: '已發布', action: '編輯外觀' },
+			{ title: '品牌外觀', description: '系統名稱：Syscom Cubi · Logo 已設定 · 瀏覽器圖示已設定', status: '已發布', action: '編輯外觀' },
 			{ title: '系統版本 0.1.0', description: '目前使用版本 · 發布於 2026-08-14', status: '目前版本', action: '管理版本' },
 			{ title: '隱私權暨個人資料保護政策', description: '最後發布於 2026-07-01', status: '已發布', action: '編輯條款' },
-			{ title: '預設主題', description: '跟隨作業系統 · 使用者可自行切換', status: '已套用', action: '變更主題' },
+			{ title: '預設配色', description: 'Cubi 藍 · 由系統管理員統一設定', status: '已套用', action: '變更配色' },
 		],
 	},
 }
@@ -113,11 +116,13 @@ const workspaceTabItems: Record<string, WorkspaceItem[][]> = {
 		[{ title: '品牌外觀', description: '系統名稱、Logo、瀏覽器標題與圖示', status: '已發布', action: '編輯外觀' }],
 		[{ title: '0.1.0', description: '目前版本 · 發布於 2026-08-14', status: '目前版本', action: '編輯說明' }, { title: '0.2.0 草稿', description: '尚未發布 · 3 項更新', status: '草稿', action: '預覽版本' }],
 		[{ title: '隱私權暨個資保護政策', description: '最後發布於 2026-07-01', status: '已發布', action: '編輯條款' }, { title: '政策草稿', description: '林怡君最後編輯於今天 09:20', status: '草稿', action: '預覽草稿' }],
-		[{ title: '系統預設主題', description: '跟隨作業系統 · 使用者可自行切換', status: '已套用', action: '變更主題' }],
+		[{ title: '系統預設配色', description: 'Cubi 藍 · 由系統管理員統一設定', status: '已套用', action: '變更配色' }],
 	],
 }
 
 const route = useRoute()
+const theme = useTheme()
+const appStore = useAppStore()
 const activeTab = ref(0)
 const search = ref('')
 const dialogItem = ref<WorkspaceConfig['items'][number] | null>(null)
@@ -127,14 +132,21 @@ const semanticSearchEnabled = ref(true)
 const keywordSearchEnabled = ref(true)
 const graphExpansionEnabled = ref(true)
 const resultLimit = ref(20)
-const systemName = ref('Kmai')
+const systemName = ref('Syscom Cubi')
 const defaultTheme = ref('跟隨作業系統')
+const defaultThemeAccent = ref<ThemeAccent>(appStore.themeAccent)
 const newUserEmail = ref('')
 const filterStatus = ref('全部')
 
 const workspaceKey = computed(() => String(route.meta.workspace ?? 'settings'))
 const config = computed(() => workspaceConfigs[workspaceKey.value] ?? workspaceConfigs.settings)
-const currentItems = computed(() => workspaceTabItems[workspaceKey.value]?.[activeTab.value] ?? config.value.items)
+const systemThemeAccentLabel = computed(() => themeAccentLabels[appStore.themeAccent])
+const currentItems = computed(() => {
+	if (workspaceKey.value === 'settings' && activeTab.value === 3) {
+		return [{ title: '系統預設配色', description: `${systemThemeAccentLabel.value} · 由系統管理員統一設定`, status: '已套用', action: '變更配色' }]
+	}
+	return workspaceTabItems[workspaceKey.value]?.[activeTab.value] ?? config.value.items
+})
 const visibleItems = computed(() => currentItems.value.filter((item) => {
 	const matchesSearch = `${item.title} ${item.description}`.includes(search.value)
 	const matchesStatus = filterStatus.value === '全部' || item.status === filterStatus.value
@@ -144,6 +156,11 @@ const visibleItems = computed(() => currentItems.value.filter((item) => {
 function showSavedMessage(): void {
 	isSaved.value = true
 	window.setTimeout(() => { isSaved.value = false }, 2200)
+}
+
+function applySystemAppearance(): void {
+	appStore.setThemeAccent(theme, defaultThemeAccent.value)
+	showSavedMessage()
 }
 
 function openCreateDialog(): void {
@@ -176,14 +193,14 @@ watch(workspaceKey, () => {
 			<template v-else-if="activeTab === 2"><VTextField label="Reranker 服務網址" placeholder="由後端安全設定提供" /><VTextField label="模型名稱" model-value="bge-reranker-v2" /><VSlider label="引用證據最低分數" :model-value="72" :min="0" :max="100" thumb-label /><VTextField label="最多引用筆數" type="number" model-value="6" /></template>
 			<template v-else-if="activeTab === 3"><VSelect label="服務提供者" :items="['OpenAI 相容服務', 'Azure OpenAI', 'Gemini', 'Ollama']" /><VTextField label="模型名稱" model-value="gpt-4.1-mini" /><VTextField label="服務網址" placeholder="由後端安全設定提供" persistent-hint hint="API Key 只由後端安全保存，不在此展示介面顯示" /><VSlider label="Temperature" :model-value="20" :min="0" :max="100" thumb-label /></template>
 			<template v-else-if="activeTab === 4"><VSwitch label="啟用 Agent 工具調度" color="primary" model-value /><VCombobox label="可用工具" :items="['知識搜尋', '全文讀取', '版本比較', '文件摘要']" :model-value="['知識搜尋', '全文讀取']" multiple chips /><VTextField label="最多呼叫次數" type="number" model-value="6" /><VTextField label="時間預算（秒）" type="number" model-value="45" /></template>
-			<template v-else><VTextarea label="共用系統提示詞" rows="5" model-value="只根據可追溯的公司知識回答，資訊不足時明確說明。" /><VCombobox label="專有名詞保護" :items="['Kmai', 'ACME Cloud', 'Project Alpha']" :model-value="['Kmai', 'ACME Cloud']" multiple chips /></template>
+			<template v-else><VTextarea label="共用系統提示詞" rows="5" model-value="只根據可追溯的公司知識回答，資訊不足時明確說明。" /><VCombobox label="專有名詞保護" :items="['Syscom Cubi', 'ACME Cloud', 'Project Alpha']" :model-value="['Syscom Cubi', 'ACME Cloud']" multiple chips /></template>
 			<VBtn color="primary" @click="showSavedMessage">儲存目前設定</VBtn><VBtn v-if="activeTab === 2 || activeTab === 3" class="ml-2" variant="outlined" @click="showSavedMessage">測試連線</VBtn>
 		</VCard>
 		<VCard v-else-if="workspaceKey === 'access'" class="surface-border pa-5 mb-5">
 			<h2 class="section-heading mb-4">快速新增使用者</h2><div class="access-form"><VTextField v-model="newUserEmail" label="公司電子郵件" type="email" hide-details /><VSelect label="角色" :items="['一般使用者', '知識管理員', '系統管理員']" hide-details /><VBtn color="primary" :disabled="!newUserEmail.includes('@')" @click="newUserEmail = ''; showSavedMessage()">新增使用者</VBtn></div>
 		</VCard>
 		<VCard v-else-if="workspaceKey === 'settings'" class="surface-border pa-5 mb-5">
-			<h2 class="section-heading mb-4">品牌與預設外觀</h2><VTextField v-model="systemName" label="系統名稱" /><VFileInput label="Logo" accept="image/png,image/svg+xml" prepend-icon="mdi-image-outline" /><VSelect v-model="defaultTheme" label="預設主題" :items="['淺色', '深色', '跟隨作業系統']" /><VBtn color="primary" @click="showSavedMessage">套用外觀</VBtn>
+			<h2 class="section-heading mb-4">品牌與預設外觀</h2><VTextField v-model="systemName" label="系統名稱" /><VFileInput label="Logo" accept="image/png,image/svg+xml" prepend-icon="mdi-image-outline" /><VSelect v-model="defaultTheme" label="預設主題" :items="['淺色', '深色', '跟隨作業系統']" /><VRadioGroup v-model="defaultThemeAccent" label="系統預設配色"><VRadio value="indigo" :label="themeAccentLabels.indigo" /><VRadio value="red" :label="themeAccentLabels.red" /></VRadioGroup><VBtn color="primary" @click="applySystemAppearance">套用外觀</VBtn>
 		</VCard>
 		<VCard v-else-if="workspaceKey === 'graph'" class="surface-border pa-5 mb-5">
 			<h2 class="section-heading mb-4">圖譜操作</h2><div class="d-flex flex-wrap ga-3"><VBtn variant="tonal" prepend-icon="mdi-account-check-outline" @click="showSavedMessage">批次核准實體</VBtn><VBtn variant="outlined" prepend-icon="mdi-graph-outline" @click="dialogItem = { title: '快速重建知識圖譜', description: '將保留已確認實體，並重新計算新增與異動文件。', action: '確認重建' }">快速重建</VBtn><VBtn variant="outlined" color="error" prepend-icon="mdi-alert-outline" @click="dialogItem = { title: '完整重建知識圖譜', description: '完整重建期間圖譜搜尋可能暫時無法使用。', action: '確認重建' }">完整重建</VBtn></div>

@@ -35,8 +35,8 @@ async function handleLogin(): Promise<void> {
 <template>
   <main class="login-page">
     <section class="login-intro">
-      <img :src="brandLogoUrl" alt="Kmai" class="login-logo mb-8" />
-      <p class="eyebrow mb-3">Kmai 凌群知識庫</p>
+      <img :src="brandLogoUrl" alt="Syscom Cubi" class="login-logo mb-8" />
+      <p class="eyebrow mb-3">Syscom Cubi 凌群知識庫</p>
       <h1 class="login-title text-balance">找資料，不必先知道要問誰。</h1>
       <p class="text-medium-emphasis mt-5 reading-width">
         搜尋公司文件、詢問工作流程，並從每個答案回到原始來源。

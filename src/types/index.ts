@@ -100,6 +100,101 @@ export interface ActivityItem {
 	type: 'document' | 'question' | 'system'
 }
 
+// > 營運監控：指標、日誌、告警規則與電子郵件通知
+export type MetricStatus = 'good' | 'warning' | 'critical'
+
+export interface ServiceMetric {
+	id: string
+	label: string
+	value: number
+	unit: string
+	// @ 與前一個相同長度區間相比的變化百分比，正值代表上升
+	deltaPercent: number
+	// @ 上升是否代表變糟：延遲與錯誤率為 true，請求量這類中性指標為 false
+	higherIsWorse: boolean
+	status: MetricStatus
+	detail: string
+	// @ 由舊到新的取樣值，長度即取樣點數
+	series: number[]
+}
+
+export interface ServiceHealth {
+	id: string
+	name: string
+	component: string
+	status: MetricStatus
+	latencyMs: number
+	successRate: number
+	checkedAt: string
+	note: string
+}
+
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug'
+
+export interface LogEntry {
+	id: string
+	timestamp: string
+	level: LogLevel
+	service: string
+	message: string
+	traceId: string
+	fields: Record<string, string>
+}
+
+export type AlertSeverity = 'critical' | 'warning' | 'info'
+export type AlertComparison = '>' | '>=' | '<' | '<='
+
+export interface AlertRule {
+	id: string
+	name: string
+	metricId: string
+	metricLabel: string
+	comparison: AlertComparison
+	threshold: number
+	unit: string
+	durationMinutes: number
+	severity: AlertSeverity
+	recipientGroupId: string
+	isEnabled: boolean
+}
+
+export interface RecipientGroup {
+	id: string
+	name: string
+	description: string
+	emails: string[]
+	severities: AlertSeverity[]
+}
+
+export type AlertEventStatus = 'firing' | 'resolved' | 'silenced'
+
+export interface AlertEvent {
+	id: string
+	ruleName: string
+	severity: AlertSeverity
+	status: AlertEventStatus
+	observed: string
+	startedAt: string
+	durationLabel: string
+	notifiedCount: number
+	notifyResult: '已寄出' | '寄送失敗' | '未通知'
+}
+
+// @ SMTP 帳密只由後端保管，型別中刻意不存在對應欄位
+export interface EmailChannelSettings {
+	smtpHost: string
+	smtpPort: number
+	encryption: 'TLS' | 'SSL' | '不加密'
+	senderName: string
+	senderAddress: string
+	repeatIntervalMinutes: number
+	groupWindowMinutes: number
+	notifyOnResolved: boolean
+	isQuietHoursEnabled: boolean
+	quietHoursStart: string
+	quietHoursEnd: string
+}
+
 // > AI 問答的問題大綱項目：以每一則使用者問題為節點
 export interface OutlineItem {
 	id: string

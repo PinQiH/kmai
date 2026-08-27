@@ -136,6 +136,12 @@ const routes: RouteRecordRaw[] = [
 		meta: { admin: true, title: "處理監控" },
 	},
 	{
+		path: "/admin/monitoring",
+		name: "admin-monitoring",
+		component: () => import("@/views/admin/AdminMonitoringView.vue"),
+		meta: { admin: true, title: "營運監控" },
+	},
+	{
 		path: "/admin/graph",
 		name: "admin-graph",
 		component: () => import("@/views/admin/AdminWorkspaceView.vue"),
@@ -207,7 +213,7 @@ router.beforeEach((to) => {
 })
 
 router.afterEach((to) => {
-	document.title = `${String(to.meta.title ?? "凌群知識庫")}｜Kmai`
+	document.title = `${String(to.meta.title ?? "凌群知識庫")}｜Syscom Cubi`
 	window.requestAnimationFrame(() => {
 		document
 			.querySelector<HTMLElement>("#main-content")

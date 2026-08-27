@@ -477,6 +477,8 @@ onBeforeUnmount(() => {
 						>
 							<circle class="hit-area" :r="view.radius + 10" />
 							<circle v-if="view.isSelected" class="node-halo" :r="view.radius + 8" />
+							<!-- @ 焦點環畫在節點外圈，顏色與節點無關，見下方樣式說明 -->
+							<circle class="node-focus-ring" :r="view.radius + 4" />
 							<circle class="node-dot" :r="view.radius" />
 						</g>
 
@@ -717,8 +719,25 @@ onBeforeUnmount(() => {
 	outline: none;
 }
 
+/*
+ * !! 焦點環不可以用 primary 畫。
+ *    primary #315C91 對第一群的節點色 #31649b 對比只有 1.12:1（ΔE 3.5），
+ *    等於鍵盤焦點在那一群節點上完全看不見；凌群紅主題在磚紅那一群也是同樣狀況。
+ *    改成雙環且顏色與節點無關：內圈 surface 把環與節點隔開（對各群組色 5.0~7.0:1），
+ *    外圈 on-surface 對畫布背景高對比。不論之後換什麼強調色或群組色都成立。
+ */
+.node-focus-ring {
+	fill: none;
+	stroke: none;
+}
+
+.graph-node:focus-visible .node-focus-ring {
+	stroke: rgb(var(--v-theme-on-surface));
+	stroke-width: 2;
+}
+
 .graph-node:focus-visible .node-dot {
-	stroke: rgb(var(--v-theme-primary));
+	stroke: rgb(var(--v-theme-surface));
 	stroke-width: 3;
 }
 

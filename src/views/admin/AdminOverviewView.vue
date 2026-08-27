@@ -52,6 +52,7 @@ const metricColor = { good: 'success', warning: 'warning', critical: 'error' } a
 						<VBtn variant="tonal" prepend-icon="mdi-file-check-outline" to="/admin/documents">審核文件 <VChip class="ml-2" size="x-small">12</VChip></VBtn>
 						<VBtn variant="tonal" prepend-icon="mdi-reload-alert" to="/admin/processing">重跑失敗工作 <VChip class="ml-2" size="x-small">3</VChip></VBtn>
 						<VBtn variant="tonal" prepend-icon="mdi-comment-alert-outline" to="/admin/feedback">處理使用者回饋 <VChip class="ml-2" size="x-small">8</VChip></VBtn>
+						<VBtn variant="tonal" prepend-icon="mdi-bell-ring-outline" to="/admin/monitoring">查看營運告警 <VChip class="ml-2" size="x-small" color="error">2</VChip></VBtn>
 					</div>
 				</VCard>
 			</VCol>

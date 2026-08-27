@@ -16,7 +16,7 @@ function formatElapsed({ elapsedMs }: { elapsedMs: number }): string {
 
 <template>
 	<div class="thinking-trace surface-border" role="status" aria-live="polite">
-		<p class="trace-caption">Kmai 正在處理</p>
+		<p class="trace-caption">Syscom Cubi 正在處理</p>
 		<ol class="stage-list">
 			<li
 				v-for="(stage, index) in stages"

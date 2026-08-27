@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useTheme } from 'vuetify'
 
 import DocumentVersionTimeline from '@/components/DocumentVersionTimeline.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useAppStore } from '@/stores/app'
+import type { ThemeMode } from '@/theme'
 import type { DocumentVersionEntry } from '@/types'
 
 const route = useRoute()
+const theme = useTheme()
+const appStore = useAppStore()
+
+function handleModeChange(mode: ThemeMode): void {
+	if (mode === appStore.themeMode) return
+	appStore.toggleTheme(theme)
+}
+
 const activeTab = ref('profile')
 const displayName = ref('王小明')
 const email = ref('employee@company.com')
@@ -36,7 +47,7 @@ const systemReleaseHistory: DocumentVersionEntry[] = [
 		version: '0.1.0',
 		date: '2026-08-14',
 		author: '系統管理團隊',
-		summary: 'Kmai 知識管理平台第一個展示版本。',
+		summary: 'Syscom Cubi 知識管理平台第一個展示版本。',
 		changes: ['提供企業知識搜尋與 AI 問答', '支援文件版本與引用追溯', '建立管理端健康度與處理監控'],
 		isCurrent: true,
 	},
@@ -50,7 +61,7 @@ const systemReleaseHistory: DocumentVersionEntry[] = [
 	},
 ]
 
-const allowedTabs = new Set(['profile', 'security', 'support', 'about'])
+const allowedTabs = new Set(['profile', 'appearance', 'security', 'support', 'about'])
 
 async function saveProfile(): Promise<void> {
 	emailTouched.value = true
@@ -90,7 +101,7 @@ onMounted(syncTabFromRoute)
 	<div class="page-shell account-page">
 		<PageHeader title="個人設定" description="管理個人資料、密碼、問題回報與產品資訊。" />
 		<VTabs v-model="activeTab" color="primary" class="mb-6" show-arrows>
-			<VTab value="profile">個人資料</VTab><VTab value="security">密碼</VTab><VTab value="support">問題回報</VTab><VTab value="about">版本與隱私</VTab>
+			<VTab value="profile">個人資料</VTab><VTab value="appearance">外觀</VTab><VTab value="security">密碼</VTab><VTab value="support">問題回報</VTab><VTab value="about">版本與隱私</VTab>
 		</VTabs>
 		<VWindow v-model="activeTab">
 			<VWindowItem value="profile">
@@ -100,6 +111,16 @@ onMounted(syncTabFromRoute)
 					<VTextField v-model="email" label="電子郵件" type="email" autocomplete="email" :error-messages="emailTouched && !email.includes('@') ? '請輸入有效的電子郵件地址，例如 name@company.com' : undefined" @blur="emailTouched = true" />
 					<VAlert v-if="isSaved" type="success" variant="tonal" class="mb-4">個人資料已更新。</VAlert>
 					<VBtn type="submit" color="primary">儲存變更</VBtn>
+				</VCard>
+			</VWindowItem>
+			<VWindowItem value="appearance">
+				<VCard class="surface-border pa-6">
+					<h2 class="section-heading mb-1">外觀</h2>
+					<p class="text-body-2 text-medium-emphasis mb-5">可依使用習慣選擇明暗模式；系統配色由管理員統一設定。</p>
+					<VRadioGroup :model-value="appStore.themeMode" label="明暗模式" inline @update:model-value="handleModeChange($event as ThemeMode)">
+						<VRadio label="淺色" value="light" />
+						<VRadio label="深色" value="dark" />
+					</VRadioGroup>
 				</VCard>
 			</VWindowItem>
 			<VWindowItem value="security">
@@ -133,7 +154,7 @@ onMounted(syncTabFromRoute)
 				</VCard>
 			</VWindowItem>
 		</VWindow>
-		<VDialog v-model="isPrivacyOpen" max-width="720"><VCard><VCardTitle class="pa-6 pb-2">隱私權暨個人資料保護政策</VCardTitle><VCardText class="pa-6 pt-2"><p class="mb-3">Kmai 僅在授權範圍內處理公司知識與使用紀錄，用於提供搜尋、問答、系統安全及服務改善。</p><p>使用者的提問、回饋與操作紀錄會依公司治理規範保存；如需查詢或更正個人資料，請聯絡系統管理員。</p></VCardText><VCardActions class="pa-5"><VSpacer /><VBtn color="primary" @click="isPrivacyOpen = false">我知道了</VBtn></VCardActions></VCard></VDialog>
+		<VDialog v-model="isPrivacyOpen" max-width="720"><VCard><VCardTitle class="pa-6 pb-2">隱私權暨個人資料保護政策</VCardTitle><VCardText class="pa-6 pt-2"><p class="mb-3">Syscom Cubi 僅在授權範圍內處理公司知識與使用紀錄，用於提供搜尋、問答、系統安全及服務改善。</p><p>使用者的提問、回饋與操作紀錄會依公司治理規範保存；如需查詢或更正個人資料，請聯絡系統管理員。</p></VCardText><VCardActions class="pa-5"><VSpacer /><VBtn color="primary" @click="isPrivacyOpen = false">我知道了</VBtn></VCardActions></VCard></VDialog>
 	</div>
 </template>
 

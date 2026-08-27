@@ -1,5 +1,5 @@
 ---
-name: Kmai
+name: Syscom Cubi
 description: 像查閱一份可信公司手冊般，快速找到有根據的答案。
 colors:
   archive-indigo: "#315C91"
@@ -63,13 +63,13 @@ components:
     padding: "20px"
 ---
 
-# Design System: Kmai
+# Design System: Syscom Cubi
 
 ## 1. Overview
 
 **Creative North Star: "The Living Field Guide"**
 
-Kmai 應像一本持續更新、容易翻閱的公司工作手冊：資訊安靜地排列，重點在需要時才浮現。整體採瑞士式網格、紙張般的淺色表面與節制的單一重點色，讓搜尋、答案與來源本身成為視覺焦點。
+Syscom Cubi 應像一本持續更新、容易翻閱的公司工作手冊：資訊安靜地排列，重點在需要時才浮現。整體採瑞士式網格、紙張般的淺色表面與節制的單一重點色，讓搜尋、答案與來源本身成為視覺焦點。
 
 介面延續「可靠、平靜、俐落」的產品個性，吸收 Google 搜尋的直接性、Notion 的內容閱讀感與 Linear 的操作效率。動態只用於回應操作與交代狀態，不用於裝飾。系統明確拒絕通用 AI SaaS 的紫藍漸層、發光邊框、巨大 AI 圖示、漂浮卡片與滿版卡片牆。
 
