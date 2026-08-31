@@ -4,11 +4,13 @@ import { useRoute, useRouter } from "vue-router"
 import { useDisplay, useTheme } from "vuetify"
 
 import brandLogoUrl from "@/assets/brand/kmai-logo.png"
+import AdminAssistantWidget from "@/components/AdminAssistantWidget.vue"
 import ConversationHistoryPanel from "@/components/ConversationHistoryPanel.vue"
 import ConversationSearchDialog from "@/components/ConversationSearchDialog.vue"
 import NotificationMenu from "@/components/NotificationMenu.vue"
 import { useConversationStore } from "@/stores/conversation"
 import { useAppStore } from "@/stores/app"
+import { useAdminAssistantStore } from "@/stores/adminAssistant"
 import type { NavigationItem } from "@/types"
 
 const employeeItems: NavigationItem[] = [
@@ -73,6 +75,7 @@ const router = useRouter()
 const theme = useTheme()
 const display = useDisplay()
 const appStore = useAppStore()
+const assistantStore = useAdminAssistantStore()
 
 const isPublicPage = computed(() => Boolean(route.meta.public))
 const isAdminWorkspace = computed(() => Boolean(route.meta.admin))
@@ -145,6 +148,7 @@ onMounted(() => window.addEventListener("keydown", handleSearchShortcut))
 onBeforeUnmount(() => window.removeEventListener("keydown", handleSearchShortcut))
 
 async function handleLogout(): Promise<void> {
+  assistantStore.endSession("logout")
   appStore.logout()
   await router.push("/login")
 }
@@ -294,6 +298,7 @@ async function handleLogout(): Promise<void> {
     </VMain>
 
     <ConversationSearchDialog v-model="isSearchOpen" />
+    <AdminAssistantWidget v-if="isAdminWorkspace" />
   </template>
 </template>
 

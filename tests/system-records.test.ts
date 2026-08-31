@@ -4,6 +4,7 @@ import { alertEvents } from '../src/mocks/monitoring'
 import { notifications } from '../src/mocks/notifications'
 import { baseSystemRecords } from '../src/mocks/systemRecords'
 import { buildSystemRecords, getSystemRecordTimeCutoff } from '../src/utils/systemRecords'
+import type { AssistantAuditSession } from '../src/types'
 
 describe('system records', () => {
 	it('should merge base notification and alert records in descending time order', () => {
@@ -58,5 +59,41 @@ describe('system records', () => {
 		expect(scheduledRecord?.occurredAt).toBe(futureNotification.createdAt)
 		expect(scheduledRecord?.statusLabel).toBe('已排程')
 		expect(scheduledRecord?.title).toContain('已排程')
+	})
+
+	it('should index an assistant session as one AI system record', () => {
+		const assistantSession: AssistantAuditSession = {
+			id: 'assistant-session-1',
+			userId: 'user-current',
+			userName: '王小明',
+			department: '產品企劃部',
+			startedAt: '2026-08-31T04:00:00.000Z',
+			endedAt: '2026-08-31T04:05:00.000Z',
+			status: 'completed',
+			endReason: 'manual_end',
+			modelLabel: 'Mock model',
+			durationMs: 300000,
+			messages: [{
+				id: 'message-1',
+				role: 'user',
+				content: '如何使用通知管理？',
+				createdAt: '2026-08-31T04:00:00.000Z',
+				pageTitle: '通知管理',
+				routePath: '/admin/notifications',
+				sourceId: 'model',
+				sourceKind: 'model',
+				sourceLabel: '模型一般知識',
+				webSearchEnabled: false,
+				requestId: 'request-1',
+				redactedFields: [],
+			}],
+		}
+
+		const records = buildSystemRecords(baseSystemRecords, notifications, alertEvents, new Date(), [assistantSession])
+		const record = records.find((item) => item.sourceId === assistantSession.id)
+
+		expect(record?.category).toBe('ai')
+		expect(record?.title).toBe('後台 AI 小幫手對話')
+		expect(record?.sourceTo).toBe('/admin/logs?assistantSessionId=assistant-session-1')
 	})
 })

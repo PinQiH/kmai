@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 import { citations, conversationHistory } from '@/mocks/data'
 import type { AnswerSegment, ConversationMessage, ConversationSummary, ThinkingStage } from '@/types'
+import { MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
 
 interface ConversationState {
 	messages: ConversationMessage[]
@@ -45,8 +46,10 @@ function matchesKeyword({ conversation, keyword }: { conversation: ConversationS
 	return conversation.title.toLowerCase().includes(normalized) || conversation.previewAnswer.toLowerCase().includes(normalized)
 }
 
-function createStagePlan(): ThinkingStage[] {
-	return STAGE_PLAN.map((stage) => ({ id: stage.id, label: stage.label, detail: stage.detail, status: 'pending', elapsedMs: 0 }))
+function createStagePlan(usesRetrieval = true): ThinkingStage[] {
+	return STAGE_PLAN
+		.filter((stage) => usesRetrieval || stage.id === 'parse' || stage.id === 'generate')
+		.map((stage) => ({ id: stage.id, label: stage.label, detail: stage.detail, status: 'pending', elapsedMs: 0 }))
 }
 
 // @ jsdom 與部分舊環境沒有 matchMedia，需先判斷再呼叫
@@ -90,14 +93,16 @@ export function formatHistoryTime({ isoDate }: { isoDate: string }): string {
 	return `${String(target.getMonth() + 1).padStart(2, '0')}/${String(target.getDate()).padStart(2, '0')} ${timeText}`
 }
 
-function createMockAnswer(question: string, scope: string): ConversationMessage {
+function createMockAnswer(question: string, scope: string, includeCitations = true): ConversationMessage {
 	const normalizedQuestion = question.toLowerCase()
-	let content = `我在「${scope}」範圍內找到幾份可能相關的資料 [1]。這是展示回答；正式環境會依實際檢索結果整理答案並附上對應引用。`
-	if (normalizedQuestion.includes('出差') || normalizedQuestion.includes('住宿') || normalizedQuestion.includes('差旅')) {
+	let content = includeCitations
+		? `我在「${scope}」範圍內找到幾份可能相關的資料 [1]。這是展示回答；正式環境會依實際檢索結果整理答案並附上對應引用。`
+		: `我會直接使用「${scope}」回答，不檢索知識庫、不搜尋網路，也不產生引用。這是展示回答；正式環境會由選定模型產生內容。`
+	if (includeCitations && (normalizedQuestion.includes('出差') || normalizedQuestion.includes('住宿') || normalizedQuestion.includes('差旅'))) {
 		content = '依目前有效的差旅辦法 [1]，國內住宿每晚原則上限為新台幣 3,000 元。若遇特殊地區或旺季，請在出差申請時事先說明。出差結束後，需在十個工作天內完成核銷並附上有效憑證 [2]。'
-	} else if (normalizedQuestion.includes('新進') || normalizedQuestion.includes('到職')) {
+	} else if (includeCitations && (normalizedQuestion.includes('新進') || normalizedQuestion.includes('到職'))) {
 		content = '新進同仁第一週應完成公司帳號啟用、設備點交、資訊安全訓練及主管安排的到職會談 [1]。完整清單請參考《新進同仁到職指南》。'
-	} else if (normalizedQuestion.includes('資安') || normalizedQuestion.includes('客戶資料')) {
+	} else if (includeCitations && (normalizedQuestion.includes('資安') || normalizedQuestion.includes('客戶資料'))) {
 		content = '客戶資料需依分級申請存取權限 [1]，對外分享前必須確認接收者、用途與保存期限。若發現異常存取，請立即通知資訊安全部 [2]。'
 	}
 
@@ -106,7 +111,7 @@ function createMockAnswer(question: string, scope: string): ConversationMessage 
 		role: 'assistant',
 		content,
 		createdAt: new Date().toISOString(),
-		citations,
+		citations: includeCitations ? citations : [],
 	}
 }
 
@@ -137,7 +142,11 @@ export const useConversationStore = defineStore('conversation', {
 		onlyArchived: false,
 	}),
 	getters: {
+		canUseWebSearch(state): boolean {
+			return state.selectedKnowledgeSourceId !== MODEL_ONLY_SOURCE_ID
+		},
 		isWebSearchEnabled(state): boolean {
+			if (state.selectedKnowledgeSourceId === MODEL_ONLY_SOURCE_ID) return false
 			return state.webSearchOverride ?? state.selectedSourceDefaultWebSearch
 		},
 		webSearchSettingSource(state): 'default' | 'override' {
@@ -181,6 +190,10 @@ export const useConversationStore = defineStore('conversation', {
 			this.selectedSourceDefaultWebSearch = defaultWebSearchEnabled
 		},
 		setWebSearchEnabled(isEnabled: boolean): void {
+			if (!this.canUseWebSearch) {
+				this.webSearchOverride = null
+				return
+			}
 			this.webSearchOverride = isEnabled
 		},
 		resetWebSearchToDefault(): void {
@@ -199,7 +212,8 @@ export const useConversationStore = defineStore('conversation', {
 			this.isResponding = true
 			this.errorMessage = ''
 			this.retrievedCount = 0
-			this.thinkingStages = createStagePlan()
+			const usesRetrieval = this.selectedKnowledgeSourceId !== MODEL_ONLY_SOURCE_ID
+			this.thinkingStages = createStagePlan(usesRetrieval)
 
 			const isReducedMotion = prefersReducedMotion()
 			const askStartTime = Date.now()
@@ -207,14 +221,14 @@ export const useConversationStore = defineStore('conversation', {
 			try {
 				// TODO(api-integration): 改為串接 AI 串流回答 API，階段狀態由後端事件推送。
 				const searchDescription = this.isWebSearchEnabled ? `${this.selectedScope}＋網路搜尋` : this.selectedScope
-				const answer = createMockAnswer(trimmedQuestion, searchDescription)
+				const answer = createMockAnswer(trimmedQuestion, searchDescription, usesRetrieval)
 
 				// > 前置階段：解析、檢索、比對版本
 				for (const [index, stage] of this.thinkingStages.entries()) {
 					if (stage.id === 'generate') break
 
 					stage.status = 'active'
-					if (stage.id === 'retrieve') this.retrievedCount = SEARCHABLE_DOCUMENT_TOTAL
+					if (usesRetrieval && stage.id === 'retrieve') this.retrievedCount = SEARCHABLE_DOCUMENT_TOTAL
 
 					const startTime = Date.now()
 					await delay({ ms: isReducedMotion ? 0 : STAGE_PLAN[index].plannedMs })

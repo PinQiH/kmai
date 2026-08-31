@@ -62,6 +62,66 @@ export interface AnswerTrace {
 
 export type AnswerSegment = { type: 'text'; value: string } | { type: 'citation'; index: number }
 
+export type KnowledgeSourceKind = 'model' | 'knowledge-base' | 'notebook'
+
+export interface KnowledgeSourceOption {
+	id: string
+	name: string
+	description: string
+	kind: KnowledgeSourceKind
+	defaultWebSearchEnabled: boolean
+	supportsWebSearch: boolean
+	documentCount?: number
+}
+
+export interface AdminAssistantMessage {
+	id: string
+	role: 'user' | 'assistant'
+	content: string
+	createdAt: string
+	requestId: string
+	citations?: Citation[]
+}
+
+export type AssistantSessionStatus = 'active' | 'completed' | 'expired' | 'cancelled' | 'failed'
+export type AssistantSessionEndReason = 'manual_end' | 'idle_timeout' | 'leave_admin' | 'logout'
+export type AssistantRedactedField = 'password' | 'api-key' | 'access-token' | 'bearer-token'
+export type AssistantLauncherEdge = 'left' | 'right'
+
+export interface AssistantLauncherPosition {
+	x: number
+	y: number
+}
+
+export interface AssistantAuditMessage {
+	id: string
+	role: 'user' | 'assistant'
+	content: string
+	createdAt: string
+	pageTitle: string
+	routePath: string
+	sourceId: string
+	sourceKind: KnowledgeSourceKind
+	sourceLabel: string
+	webSearchEnabled: boolean
+	requestId: string
+	redactedFields: AssistantRedactedField[]
+}
+
+export interface AssistantAuditSession {
+	id: string
+	userId: string
+	userName: string
+	department: string
+	startedAt: string
+	endedAt: string | null
+	status: AssistantSessionStatus
+	endReason: AssistantSessionEndReason | null
+	modelLabel: string
+	durationMs: number
+	messages: AssistantAuditMessage[]
+}
+
 export interface ConversationSummary {
 	id: string
 	title: string

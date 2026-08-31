@@ -32,8 +32,10 @@ export const baseSystemRecords: SystemRecordEntry[] = [
 		title: 'AI 問答完成：差旅住宿費用上限',
 		summary: 'gpt-4.1-mini · 2.4 秒 · 2 筆引用',
 		statusLabel: '完成',
-		sourceId: 'conversation-001',
-		sourceTo: '/ask',
+		sourceId: 'question-001',
+		sourceTo: '/admin/logs?tab=questions&questionId=question-001',
+		resourceLabel: 'question-001',
+		requestId: 'req-qa-9f1386',
 	},
 	{
 		id: 'record-ai-fallback',
@@ -78,6 +80,10 @@ export const baseSystemRecords: SystemRecordEntry[] = [
 		statusLabel: '成功',
 		sourceId: 'doc-001',
 		sourceTo: '/admin/documents/doc-001/manage',
+		actorLabel: '林怡君',
+		resourceLabel: 'doc-001',
+		operationScope: 'document.update',
+		requestId: 'req-audit-001',
 	},
 	{
 		id: 'record-audit-user-delete',
@@ -89,5 +95,9 @@ export const baseSystemRecords: SystemRecordEntry[] = [
 		statusLabel: '拒絕',
 		sourceId: 'user-28',
 		sourceTo: '/admin/access',
+		actorLabel: '系統管理員',
+		resourceLabel: 'user-28',
+		operationScope: 'user.delete',
+		requestId: 'req-audit-002',
 	},
 ]

@@ -2,8 +2,10 @@ import { defineStore } from 'pinia'
 import type { ThemeInstance } from 'vuetify'
 
 import { resolveThemeName, type ThemeAccent, type ThemeMode } from '@/theme'
+import type { AdminRole } from '@/types'
 
 interface AppState {
+	adminRole: AdminRole
 	isAdmin: boolean
 	isAuthenticated: boolean
 	isNavigationOpen: boolean
@@ -22,6 +24,7 @@ function prefersDarkScheme(): boolean {
 
 export const useAppStore = defineStore('app', {
 	state: (): AppState => ({
+		adminRole: 'system-admin',
 		isAdmin: true,
 		isAuthenticated: true,
 		isNavigationOpen: false,
@@ -62,6 +65,7 @@ export const useAppStore = defineStore('app', {
 			this.isNavigationRail = !this.isNavigationRail
 		},
 		logout(): void {
+			this.adminRole = null
 			this.isAuthenticated = false
 			this.isAdmin = false
 		},

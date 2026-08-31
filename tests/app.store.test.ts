@@ -28,6 +28,16 @@ describe('app store navigation', () => {
 
 		expect(store.isNavigationOpen).toBe(true)
 	})
+
+	it('should clear the explicit admin role on logout', () => {
+		const store = useAppStore()
+		expect(store.adminRole).toBe('system-admin')
+
+		store.logout()
+
+		expect(store.adminRole).toBeNull()
+		expect(store.isAdmin).toBe(false)
+	})
 })
 
 describe('app store theme', () => {

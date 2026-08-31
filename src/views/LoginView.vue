@@ -22,6 +22,11 @@ async function handleLogin(): Promise<void> {
   appStore.isAdmin =
     account.value.toLowerCase().includes("admin") ||
     account.value === "employee@company.com"
+  appStore.adminRole = !appStore.isAdmin
+    ? null
+    : account.value.toLowerCase().includes("km.admin")
+      ? "knowledge-admin"
+      : "system-admin"
   isSubmitting.value = false
   const redirect =
     typeof route.query.redirect === "string" &&

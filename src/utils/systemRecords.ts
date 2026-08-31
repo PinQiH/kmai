@@ -1,12 +1,25 @@
 import type {
+	AdminQuestionRecord,
+	AdminQuestionRecordStatus,
 	AlertEvent,
 	AppNotification,
+	AssistantAuditSession,
 	SystemRecordEntry,
 	SystemRecordLevel,
 } from '@/types'
 import { formatNotificationTimestamp, summarizeNotificationPerformance } from '@/utils/notifications'
+import { buildAssistantSystemRecords } from '@/utils/assistantAudit'
 
 export type SystemRecordTimeRange = 'all' | '1h' | '24h' | '7d'
+
+export interface AdminQuestionRecordFilters {
+	keyword: string
+	userId: string
+	department: string
+	status: AdminQuestionRecordStatus | 'all'
+	timeRange: SystemRecordTimeRange
+	now: number
+}
 
 /**
  * 計算系統紀錄時間範圍的起始時間。
@@ -19,6 +32,38 @@ export function getSystemRecordTimeCutoff(range: SystemRecordTimeRange, now: num
 
 	const rangeHours = range === '1h' ? 1 : range === '24h' ? 24 : 24 * 7
 	return now - rangeHours * 60 * 60 * 1000
+}
+
+/**
+ * 依管理端篩選條件取得可見的單次問答紀錄。
+ * @param records 原始問答紀錄。
+ * @param filters 使用者、部門、狀態、時間及關鍵字條件。
+ * @returns 依提問時間由新到舊排列的問答紀錄。
+ */
+export function filterAdminQuestionRecords(
+	records: AdminQuestionRecord[],
+	filters: AdminQuestionRecordFilters,
+): AdminQuestionRecord[] {
+	const normalizedKeyword = filters.keyword.trim().toLocaleLowerCase('zh-TW')
+	const cutoff = getSystemRecordTimeCutoff(filters.timeRange, filters.now)
+
+	return records
+		.filter((record) => {
+			const matchesUser = filters.userId === 'all' || record.userId === filters.userId
+			const matchesDepartment = filters.department === 'all' || record.department === filters.department
+			const matchesStatus = filters.status === 'all' || record.status === filters.status
+			const matchesTime = Date.parse(record.askedAt) >= cutoff
+			const searchableText = [
+				record.question,
+				record.answer,
+				record.userName,
+				record.userEmail,
+				record.requestId,
+			].join(' ').toLocaleLowerCase('zh-TW')
+			const matchesKeyword = !normalizedKeyword || searchableText.includes(normalizedKeyword)
+			return matchesUser && matchesDepartment && matchesStatus && matchesTime && matchesKeyword
+		})
+		.sort((left, right) => Date.parse(right.askedAt) - Date.parse(left.askedAt))
 }
 
 function notificationLevel(notification: AppNotification): SystemRecordLevel {
@@ -39,6 +84,7 @@ function alertLevel(event: AlertEvent): SystemRecordLevel {
  * @param baseRecords 登入、AI、排程與稽核紀錄。
  * @param notifications 站內通知。
  * @param alertEvents 告警事件。
+ * @param assistantSessions 目前頁籤中的後台 AI 小幫手稽核 session。
  * @returns 依發生時間由新到舊排列的統一紀錄。
  */
 export function buildSystemRecords(
@@ -46,6 +92,7 @@ export function buildSystemRecords(
 	notifications: AppNotification[],
 	alertEvents: AlertEvent[],
 	now = new Date(),
+	assistantSessions: AssistantAuditSession[] = [],
 ): SystemRecordEntry[] {
 	const notificationRecords = notifications.map<SystemRecordEntry>((notification) => {
 		const performance = summarizeNotificationPerformance(notification)
@@ -76,7 +123,12 @@ export function buildSystemRecords(
 		sourceTo: `/admin/monitoring?tab=alerts&eventId=${encodeURIComponent(event.id)}`,
 	}))
 
-	return [...baseRecords.map((record) => ({ ...record })), ...notificationRecords, ...alertRecords].sort(
+	return [
+		...baseRecords.map((record) => ({ ...record })),
+		...notificationRecords,
+		...alertRecords,
+		...buildAssistantSystemRecords(assistantSessions),
+	].sort(
 		(left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt),
 	)
 }

@@ -51,6 +51,26 @@ describe('conversation store', () => {
 		vi.useRealTimers()
 	})
 
+	it('should skip retrieval citations and web search in model-only mode', async () => {
+		vi.useFakeTimers()
+		const store = useConversationStore()
+		store.selectKnowledgeSource({ id: 'model', name: '模型一般知識', defaultWebSearchEnabled: false })
+		store.setWebSearchEnabled(true)
+		const request = store.askQuestion('新進同仁第一週要完成哪些事情？')
+
+		expect(store.canUseWebSearch).toBe(false)
+		expect(store.isWebSearchEnabled).toBe(false)
+		expect(store.thinkingStages.map((stage) => stage.id)).toEqual(['parse', 'generate'])
+
+		await vi.runAllTimersAsync()
+		await request
+
+		expect(store.messages[1]?.citations).toEqual([])
+		expect(store.messages[1]?.content).not.toMatch(/\[\d+\]/)
+		expect(store.messages[1]?.trace?.retrievedCount).toBe(0)
+		vi.useRealTimers()
+	})
+
 	it('should mark every thinking stage as done after answering', async () => {
 		vi.useFakeTimers()
 		const store = useConversationStore()

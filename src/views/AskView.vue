@@ -10,19 +10,16 @@ import { useConversationStore } from '@/stores/conversation'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useNotebooksStore } from '@/stores/notebooks'
 import type { Citation, OutlineItem } from '@/types'
+import { buildKnowledgeSourceOptions, MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
 
 // > 起手問題依知識來源分組；切換來源會換掉整組題目，讓來源選擇的影響立即可見
 const SOURCE_STARTERS: Record<string, string[]> = {
+	[MODEL_ONLY_SOURCE_ID]: ['這個頁面可以怎麼操作？', '幫我整理這個問題的處理步驟', '有哪些常見風險要注意？'],
 	company: ['公司請假流程是什麼？', '差旅費用怎麼申請？', '最新版的資安規範有哪些重點？'],
 	policy: ['加班與補休怎麼計算？', '採購金額到多少需要主管簽核？', '離職交接必須繳回哪些項目？'],
 	benefits: ['年度健康檢查補助多少？', '育嬰留職停薪最長可以請多久？', '團體保險的理賠怎麼申請？'],
 }
 
-const companySources = [
-	{ id: 'company', name: '全公司知識', defaultWebSearchEnabled: false, description: '使用目前可見的公司知識庫。' },
-	{ id: 'policy', name: '公司制度', defaultWebSearchEnabled: false, description: '優先搜尋公司制度與作業規範。' },
-	{ id: 'benefits', name: '人事與福利', defaultWebSearchEnabled: true, description: '搜尋內部規章，並預設補充外部法規資訊。' },
-]
 const QUESTION_MAX_LENGTH = 120
 const SUMMARY_MAX_LENGTH = 140
 
@@ -44,15 +41,7 @@ const activeQuestionId = ref<string | null>(null)
 
 const COMPOSER_MAX_HEIGHT = 120
 
-const knowledgeSources = computed(() => [
-	...companySources,
-	...notebooksStore.notebooks.map((notebook) => ({
-		id: notebook.id,
-		name: notebook.name,
-		defaultWebSearchEnabled: notebook.defaultWebSearchEnabled,
-		description: `個人筆記本 · ${notebook.documents.length} 份文件`,
-	})),
-])
+const knowledgeSources = computed(() => buildKnowledgeSourceOptions(notebooksStore.notebooks))
 
 // - 目前選到的個人筆記本；選到公司來源時為 null
 const selectedNotebook = computed(() => notebooksStore.notebooks.find((notebook) => notebook.id === conversationStore.selectedKnowledgeSourceId) ?? null)
@@ -346,12 +335,13 @@ watch(() => route.query.q, (nextQuestion) => {
 					type="button"
 					class="tool-chip"
 					:class="{ 'is-enabled': conversationStore.isWebSearchEnabled }"
+					:disabled="!conversationStore.canUseWebSearch"
 					:aria-pressed="conversationStore.isWebSearchEnabled"
 					:title="conversationStore.webSearchSettingSource === 'default' ? '使用知識來源的預設值' : '你已覆寫知識來源的預設值'"
 					@click="toggleWebSearch"
 				>
-					<VIcon icon="mdi-web" size="13" aria-hidden="true" />網路搜尋：{{ conversationStore.isWebSearchEnabled ? '開' : '關' }}
-					<span class="setting-origin">{{ conversationStore.webSearchSettingSource === 'default' ? '預設' : '已調整' }}</span>
+					<VIcon icon="mdi-web" size="13" aria-hidden="true" />網路搜尋：{{ conversationStore.canUseWebSearch ? (conversationStore.isWebSearchEnabled ? '開' : '關') : '不可用' }}
+					<span v-if="conversationStore.canUseWebSearch" class="setting-origin">{{ conversationStore.webSearchSettingSource === 'default' ? '預設' : '已調整' }}</span>
 				</button>
 				<button type="button" class="tool-chip" @click="isSettingsOpen = true">
 					<VIcon icon="mdi-tune-variant" size="13" aria-hidden="true" />回答設定
@@ -392,7 +382,7 @@ watch(() => route.query.q, (nextQuestion) => {
 				<p class="dialog-hint mb-4">切換來源會套用該來源的網路搜尋預設值，你仍可在輸入框下方自行調整。</p>
 				<VRadioGroup :model-value="conversationStore.selectedKnowledgeSourceId" hide-details @update:model-value="selectKnowledgeSource">
 					<VRadio v-for="source in knowledgeSources" :key="source.id" :value="source.id">
-						<template #label><div><strong>{{ source.name }}</strong><div class="source-description">{{ source.description }} · 預設{{ source.defaultWebSearchEnabled ? '搜尋網路' : '不搜尋網路' }}</div></div></template>
+						<template #label><div><strong>{{ source.name }}</strong><div class="source-description">{{ source.description }} · {{ source.supportsWebSearch ? `預設${source.defaultWebSearchEnabled ? '搜尋網路' : '不搜尋網路'}` : '不使用網路搜尋' }}</div></div></template>
 					</VRadio>
 				</VRadioGroup>
 				<div class="d-flex justify-end mt-6"><VBtn color="primary" variant="tonal" @click="isScopeOpen = false">完成</VBtn></div>
