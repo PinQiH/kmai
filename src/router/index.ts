@@ -100,6 +100,12 @@ const routes: RouteRecordRaw[] = [
 		meta: { title: "我的收藏" },
 	},
 	{
+		path: "/notifications",
+		name: "notifications",
+		component: () => import("@/views/NotificationsView.vue"),
+		meta: { title: "通知中心" },
+	},
+	{
 		path: "/account",
 		name: "account",
 		component: () => import("@/views/AccountView.vue"),
@@ -142,6 +148,12 @@ const routes: RouteRecordRaw[] = [
 		meta: { admin: true, title: "營運監控" },
 	},
 	{
+		path: "/admin/notifications",
+		name: "admin-notifications",
+		component: () => import("@/views/admin/AdminNotificationsView.vue"),
+		meta: { admin: true, title: "通知管理" },
+	},
+	{
 		path: "/admin/graph",
 		name: "admin-graph",
 		component: () => import("@/views/admin/AdminWorkspaceView.vue"),
@@ -168,7 +180,7 @@ const routes: RouteRecordRaw[] = [
 	{
 		path: "/admin/logs",
 		name: "admin-logs",
-		component: () => import("@/views/admin/AdminWorkspaceView.vue"),
+		component: () => import("@/views/admin/AdminSystemRecordsView.vue"),
 		meta: { admin: true, workspace: "logs", title: "系統紀錄" },
 	},
 	{

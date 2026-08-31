@@ -6,6 +6,7 @@ import { useDisplay, useTheme } from "vuetify"
 import brandLogoUrl from "@/assets/brand/kmai-logo.png"
 import ConversationHistoryPanel from "@/components/ConversationHistoryPanel.vue"
 import ConversationSearchDialog from "@/components/ConversationSearchDialog.vue"
+import NotificationMenu from "@/components/NotificationMenu.vue"
 import { useConversationStore } from "@/stores/conversation"
 import { useAppStore } from "@/stores/app"
 import type { NavigationItem } from "@/types"
@@ -41,6 +42,11 @@ const adminItems: NavigationItem[] = [
     title: "營運監控",
     icon: "mdi-chart-timeline-variant",
     to: "/admin/monitoring",
+  },
+  {
+    title: "通知管理",
+    icon: "mdi-bell-cog-outline",
+    to: "/admin/notifications",
   },
   { title: "圖譜管理", icon: "mdi-vector-polyline", to: "/admin/graph" },
   {
@@ -254,6 +260,7 @@ async function handleLogout(): Promise<void> {
         <VTooltip activator="parent">{{ workspaceSwitchLabel }}</VTooltip>
       </VBtn>
       <VBtn icon="mdi-magnify" aria-label="前往搜尋" to="/search" />
+      <NotificationMenu />
       <VBtn
         :icon="
           appStore.themeMode === 'light'

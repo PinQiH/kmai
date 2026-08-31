@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRoute } from 'vue-router'
 
 import AnimatedNumber from '@/components/AnimatedNumber.vue'
 import MetricSparkline from '@/components/MetricSparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
 import {
-	getAlertEventsSnapshot,
-	getAlertRulesSnapshot,
 	getEmailChannelSettingsSnapshot,
 	getLogEntriesSnapshot,
 	getRecipientGroupsSnapshot,
 	getServiceHealthSnapshot,
 	getServiceMetricsSnapshot,
 } from '@/repositories/monitoring.repository'
+import { useMonitoringStore } from '@/stores/monitoring'
 import type {
 	AlertComparison,
 	AlertEvent,
@@ -38,17 +39,28 @@ import {
 type TimeRange = '最近 1 小時' | '最近 6 小時' | '最近 24 小時' | '最近 7 天'
 type FeedbackTone = 'success' | 'error'
 
+const route = useRoute()
+const monitoringStore = useMonitoringStore()
+const { rules, events } = storeToRefs(monitoringStore)
+
 const metrics = ref(getServiceMetricsSnapshot())
 const services = ref(getServiceHealthSnapshot())
 const logs = ref(getLogEntriesSnapshot())
-const rules = ref(getAlertRulesSnapshot())
-const events = ref(getAlertEventsSnapshot())
 const groups = ref(getRecipientGroupsSnapshot())
 const emailSettings = ref(getEmailChannelSettingsSnapshot())
 
 const activeTab = ref('metrics')
 const feedbackMessage = ref('')
 const feedbackTone = ref<FeedbackTone>('success')
+const focusedEventId = computed(() => typeof route.query.eventId === 'string' ? route.query.eventId : null)
+
+watch(
+	() => route.query.tab,
+	(tab) => {
+		if (tab === 'alerts') activeTab.value = 'alerts'
+	},
+	{ immediate: true },
+)
 
 // @ 狀態一律同時給顏色、圖示與文字，符合 DESIGN.md 的 Meaning Before Color Rule
 const statusMeta: Record<MetricStatus, { color: string; icon: string; label: string }> = {
@@ -259,16 +271,15 @@ function saveRule(): void {
 	const draft = ruleDraft.value
 	if (!draft || !isRuleDraftValid.value) return
 
-	rules.value = isNewRule.value
-		? [...rules.value, draft]
-		: rules.value.map((rule) => (rule.id === draft.id ? draft : rule))
+	if (isNewRule.value) monitoringStore.addRule(draft)
+	else monitoringStore.updateRule(draft)
 	ruleDraft.value = null
 	notify(`已儲存規則「${draft.name}」，觸發時以電子郵件通知 ${groupLabel(draft.recipientGroupId)}。`)
 }
 
 function toggleRule(rule: AlertRule, isEnabled: boolean | null): void {
 	const nextEnabled = Boolean(isEnabled)
-	rules.value = rules.value.map((item) => (item.id === rule.id ? { ...item, isEnabled: nextEnabled } : item))
+	monitoringStore.setRuleEnabled(rule.id, nextEnabled)
 	notify(`規則「${rule.name}」已${nextEnabled ? '啟用' : '停用'}。`)
 }
 
@@ -276,7 +287,7 @@ function confirmDeleteRule(): void {
 	const target = deleteTarget.value
 	if (!target) return
 
-	rules.value = rules.value.filter((rule) => rule.id !== target.id)
+	monitoringStore.deleteRule(target.id)
 	deleteTarget.value = null
 	notify(`已刪除規則「${target.name}」。`)
 }
@@ -354,12 +365,7 @@ function sendTestEmail(): void {
 const alertSummary = computed(() => summarizeAlertEvents(events.value))
 
 function silenceEvent(event: AlertEvent): void {
-	events.value = events.value.map((item) => {
-		if (item.id !== event.id) return item
-
-		const silenced: AlertEvent = { ...item, status: 'silenced', durationLabel: '靜音 1 小時' }
-		return silenced
-	})
+	monitoringStore.silenceEvent(event.id)
 	notify(`已靜音「${event.ruleName}」1 小時，期間不再寄送通知。`)
 }
 
@@ -742,6 +748,8 @@ onBeforeUnmount(() => {
 						<VTimelineItem
 							v-for="event in events"
 							:key="event.id"
+							:id="`alert-event-${event.id}`"
+							:class="{ 'focused-alert-event': event.id === focusedEventId }"
 							:dot-color="eventStatusMeta[event.status].color"
 							size="small"
 						>
@@ -961,6 +969,12 @@ onBeforeUnmount(() => {
 	width: 160px;
 	color: var(--ink-subtle);
 	font-size: 0.82rem;
+}
+
+.focused-alert-event {
+	padding: var(--space-sm);
+	border-radius: var(--radius-md);
+	background: var(--tint-hover);
 }
 
 @media (max-width: 860px) {

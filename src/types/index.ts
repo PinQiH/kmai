@@ -133,6 +133,7 @@ export type LogLevel = 'error' | 'warn' | 'info' | 'debug'
 
 export interface LogEntry {
 	id: string
+	occurredAt: string
 	timestamp: string
 	level: LogLevel
 	service: string
@@ -170,6 +171,7 @@ export type AlertEventStatus = 'firing' | 'resolved' | 'silenced'
 
 export interface AlertEvent {
 	id: string
+	occurredAt: string
 	ruleName: string
 	severity: AlertSeverity
 	status: AlertEventStatus
@@ -193,6 +195,153 @@ export interface EmailChannelSettings {
 	isQuietHoursEnabled: boolean
 	quietHoursStart: string
 	quietHoursEnd: string
+}
+
+// > 站內通知 Mock：人工發送、自動事件、逐人查看狀態與成效
+export type NotificationPriority = 'normal' | 'important' | 'urgent'
+export type NotificationSource = 'manual' | 'automatic'
+export type NotificationAudienceType = 'all' | 'department' | 'role' | 'selected'
+export type NotificationRole = 'user' | 'knowledge-admin' | 'system-admin'
+export type NotificationEventType =
+	| 'document-ready'
+	| 'document-failed'
+	| 'document-review-required'
+	| 'document-expiring'
+	| 'notebook-shared'
+	| 'notebook-mentioned'
+	| 'permission-granted'
+	| 'system-maintenance'
+
+export interface NotificationUser {
+	id: string
+	name: string
+	email: string
+	department: string
+	role: NotificationRole
+	roleLabel: string
+}
+
+export interface NotificationRecipient {
+	userId: string
+	deliveredAt: string
+	readAt: string | null
+	firstViewedAt: string | null
+	lastViewedAt: string | null
+	viewCount: number
+	firstActionClickedAt: string | null
+	lastActionClickedAt: string | null
+	actionClickCount: number
+}
+
+export interface AppNotification {
+	id: string
+	title: string
+	body: string
+	priority: NotificationPriority
+	source: NotificationSource
+	sourceLabel: string
+	audienceLabel: string
+	actionLabel: string | null
+	actionTo: string | null
+	createdAt: string
+	sentAt: string
+	createdBy: string
+	recipients: NotificationRecipient[]
+}
+
+export interface AutomaticNotificationRule {
+	id: string
+	name: string
+	eventType: NotificationEventType
+	eventLabel: string
+	title: string
+	body: string
+	priority: NotificationPriority
+	audienceType: NotificationAudienceType
+	targetDepartment: string | null
+	targetRole: NotificationRole | null
+	targetUserIds: string[]
+	actionLabel: string | null
+	actionTo: string | null
+	isEnabled: boolean
+}
+
+export interface SendNotificationInput {
+	title: string
+	body: string
+	priority: NotificationPriority
+	audienceType: NotificationAudienceType
+	targetDepartment: string | null
+	targetRole: NotificationRole | null
+	targetUserIds: string[]
+	actionLabel: string | null
+	actionTo: string | null
+}
+
+export interface NotificationRuleInput {
+	name: string
+	eventType: NotificationEventType
+	title: string
+	body: string
+	priority: NotificationPriority
+	audienceType: NotificationAudienceType
+	targetDepartment: string | null
+	targetRole: NotificationRole | null
+	targetUserIds: string[]
+	actionLabel: string | null
+	actionTo: string | null
+	isEnabled: boolean
+}
+
+export interface NotificationPerformance {
+	targetedCount: number
+	viewedCount: number
+	unviewedCount: number
+	viewRate: number
+	averageTimeToViewSeconds: number | null
+	actionClickedCount: number
+	actionClickRate: number
+}
+
+export type AdminRole = 'system-admin' | 'knowledge-admin' | null
+export type AdminQuestionRecordStatus = 'completed' | 'failed'
+
+export interface AdminQuestionRecord {
+	id: string
+	conversationId: string
+	askedAt: string
+	userId: string
+	userName: string
+	userEmail: string
+	department: string
+	question: string
+	answer: string
+	status: AdminQuestionRecordStatus
+	modelLabel: string
+	knowledgeScopeLabel: string
+	durationMs: number
+	requestId: string
+	citations: Citation[]
+	trace: AnswerTrace | null
+}
+
+export type SystemRecordCategory = 'auth' | 'ai' | 'job' | 'audit' | 'notification' | 'alert'
+export type SystemRecordLevel = 'info' | 'success' | 'warning' | 'error'
+
+export interface SystemRecordEntry {
+	id: string
+	occurredAt: string
+	category: SystemRecordCategory
+	level: SystemRecordLevel
+	title: string
+	summary: string
+	statusLabel: string
+	sourceId: string | null
+	sourceTo: string | null
+	actorLabel?: string
+	resourceLabel?: string
+	operationScope?: string
+	requestId?: string
 }
 
 // > AI 問答的問題大綱項目：以每一則使用者問題為節點
