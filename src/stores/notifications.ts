@@ -3,18 +3,24 @@ import { defineStore } from 'pinia'
 import {
 	automaticNotificationRules,
 	CURRENT_NOTIFICATION_USER_ID,
+	emailChannelSettings,
 	notifications,
 	notificationUsers,
+	recipientGroups,
 } from '@/mocks/notifications'
 import type {
+	AlertSeverity,
 	AppNotification,
+	AutomaticNotificationTriggerResult,
 	AutomaticNotificationRule,
+	EmailChannelSettings,
 	NotificationAudienceType,
 	NotificationEventType,
 	NotificationRecipient,
 	NotificationRole,
 	NotificationRuleInput,
 	NotificationUser,
+	RecipientGroup,
 	SendNotificationInput,
 } from '@/types'
 import { normalizeNotificationActionTarget } from '@/utils/notifications'
@@ -23,6 +29,8 @@ interface NotificationsState {
 	notifications: AppNotification[]
 	rules: AutomaticNotificationRule[]
 	users: NotificationUser[]
+	recipientGroups: RecipientGroup[]
+	emailSettings: EmailChannelSettings
 	deliveryClock: number
 }
 
@@ -34,6 +42,8 @@ const NOTIFICATION_EVENT_LABELS: Record<NotificationEventType, string> = {
 	'notebook-shared': '使用者被加入共用筆記本',
 	'notebook-mentioned': '使用者在筆記本留言中被提及',
 	'permission-granted': '使用者取得文件或資料夾權限',
+	'system-alert-triggered': '營運監控產生新的系統告警',
+	'system-alert-resolved': '營運監控的系統告警已解除',
 	'system-maintenance': '系統維護時段即將開始',
 }
 
@@ -45,7 +55,11 @@ function cloneNotification(notification: AppNotification): AppNotification {
 }
 
 function cloneRule(rule: AutomaticNotificationRule): AutomaticNotificationRule {
-	return { ...rule, targetUserIds: [...rule.targetUserIds] }
+	return {
+		...rule,
+		targetUserIds: [...rule.targetUserIds],
+		deliveryChannels: [...rule.deliveryChannels],
+	}
 }
 
 function resolveAudienceUsers(
@@ -100,7 +114,7 @@ function normalizeRuleInput(input: NotificationRuleInput): NotificationRuleInput
 		(input.audienceType === 'department' && Boolean(input.targetDepartment?.trim())) ||
 		(input.audienceType === 'role' && Boolean(input.targetRole)) ||
 		(input.audienceType === 'selected' && input.targetUserIds.length > 0)
-	if (!name || !title || !body || actionTo === undefined || !hasValidAudience) return null
+	if (!name || !title || !body || actionTo === undefined || !hasValidAudience || input.deliveryChannels.length === 0) return null
 
 	return {
 		...input,
@@ -110,6 +124,7 @@ function normalizeRuleInput(input: NotificationRuleInput): NotificationRuleInput
 		targetDepartment: input.audienceType === 'department' ? input.targetDepartment?.trim() || null : null,
 		targetRole: input.audienceType === 'role' ? input.targetRole : null,
 		targetUserIds: input.audienceType === 'selected' ? [...new Set(input.targetUserIds)] : [],
+		deliveryChannels: [...new Set(input.deliveryChannels)],
 		actionTo,
 		actionLabel: actionTo ? input.actionLabel?.trim() || '查看詳情' : null,
 	}
@@ -128,6 +143,12 @@ export const useNotificationsStore = defineStore('notifications', {
 		notifications: notifications.map(cloneNotification),
 		rules: automaticNotificationRules.map(cloneRule),
 		users: notificationUsers.map((user) => ({ ...user })),
+		recipientGroups: recipientGroups.map((group) => ({
+			...group,
+			emails: [...group.emails],
+			severities: [...group.severities],
+		})),
+		emailSettings: { ...emailChannelSettings },
 		deliveryClock: Date.now(),
 	}),
 	getters: {
@@ -147,6 +168,55 @@ export const useNotificationsStore = defineStore('notifications', {
 		departments: (state): string[] => Array.from(new Set(state.users.map((user) => user.department))).sort(),
 	},
 	actions: {
+		/**
+		 * 將不重複的電子郵件加入指定收件人群組。
+		 * @param groupId 收件人群組識別碼。
+		 * @param emails 已完成格式驗證的電子郵件清單。
+		 * @returns 實際加入的電子郵件數量。
+		 */
+		addRecipientEmails(groupId: string, emails: string[]): number {
+			const group = this.recipientGroups.find((item) => item.id === groupId)
+			if (!group) return 0
+
+			const existingEmails = new Set(group.emails.map((email) => email.toLocaleLowerCase('en-US')))
+			const addedEmails = emails.filter((email) => !existingEmails.has(email.toLocaleLowerCase('en-US')))
+			group.emails.push(...addedEmails)
+			return addedEmails.length
+		},
+		/**
+		 * 移除指定群組中的收件人。
+		 * @param groupId 收件人群組識別碼。
+		 * @param email 要移除的電子郵件。
+		 * @returns 是否找到並移除收件人。
+		 */
+		removeRecipientEmail(groupId: string, email: string): boolean {
+			const group = this.recipientGroups.find((item) => item.id === groupId)
+			const emailIndex = group?.emails.indexOf(email) ?? -1
+			if (!group || emailIndex < 0) return false
+
+			group.emails.splice(emailIndex, 1)
+			return true
+		},
+		/**
+		 * 更新收件人群組接收的告警嚴重度。
+		 * @param groupId 收件人群組識別碼。
+		 * @param severities 要接收的告警嚴重度。
+		 * @returns 是否找到群組並完成更新。
+		 */
+		updateRecipientGroupSeverities(groupId: string, severities: AlertSeverity[]): boolean {
+			const group = this.recipientGroups.find((item) => item.id === groupId)
+			if (!group) return false
+
+			group.severities = [...new Set(severities)]
+			return true
+		},
+		/**
+		 * 儲存非機密的電子郵件通知設定。
+		 * @param settings 完整電子郵件通知設定。
+		 */
+		saveEmailSettings(settings: EmailChannelSettings): void {
+			this.emailSettings = { ...settings }
+		},
 		/**
 		 * 以 Mock 使用者清單建立立即或排程通知。
 		 * @param input 通知內容與受眾。
@@ -318,9 +388,9 @@ export const useNotificationsStore = defineStore('notifications', {
 		 * 模擬指定事件發生並依規則產生通知。
 		 * @param ruleId 規則識別碼。
 		 * @param occurredAt 事件發生時間，測試可傳入固定值。
-		 * @returns 新通知識別碼；規則不存在、停用或無收件人時回傳 null。
+		 * @returns 模擬結果；規則不存在、停用或無收件人時回傳 null。
 		 */
-		triggerAutomaticRule(ruleId: string, occurredAt = new Date().toISOString()): string | null {
+		triggerAutomaticRule(ruleId: string, occurredAt = new Date().toISOString()): AutomaticNotificationTriggerResult | null {
 			const rule = this.rules.find((item) => item.id === ruleId)
 			if (!rule?.isEnabled || !Number.isFinite(Date.parse(occurredAt))) return null
 
@@ -333,24 +403,32 @@ export const useNotificationsStore = defineStore('notifications', {
 			)
 			if (recipients.length === 0) return null
 
-			const notificationId = `notification-${rule.eventType}-${Date.parse(occurredAt)}-${this.notifications.length + 1}`
-			this.notifications.unshift({
-				id: notificationId,
-				title: rule.title,
-				body: rule.body,
-				priority: rule.priority,
-				source: 'automatic',
-				sourceLabel: rule.name,
-				audienceLabel: buildAudienceLabel(rule.audienceType, recipients, rule.targetDepartment, rule.targetRole),
-				actionLabel: rule.actionLabel,
-				actionTo: rule.actionTo,
-				createdAt: occurredAt,
-				sentAt: occurredAt,
-				createdBy: '系統自動通知',
-				recipients: recipients.map((user) => buildRecipient(user.id, occurredAt)),
-			})
-			this.deliveryClock = Date.now()
-			return notificationId
+			const sendsInApp = rule.deliveryChannels.includes('in-app')
+			const notificationId = sendsInApp
+				? `notification-${rule.eventType}-${Date.parse(occurredAt)}-${this.notifications.length + 1}`
+				: null
+			if (notificationId) {
+				this.notifications.unshift({
+					id: notificationId,
+					title: rule.title,
+					body: rule.body,
+					priority: rule.priority,
+					source: 'automatic',
+					sourceLabel: rule.name,
+					audienceLabel: buildAudienceLabel(rule.audienceType, recipients, rule.targetDepartment, rule.targetRole),
+					actionLabel: rule.actionLabel,
+					actionTo: rule.actionTo,
+					createdAt: occurredAt,
+					sentAt: occurredAt,
+					createdBy: '系統自動通知',
+					recipients: recipients.map((user) => buildRecipient(user.id, occurredAt)),
+				})
+				this.deliveryClock = Date.now()
+			}
+			return {
+				notificationId,
+				emailRecipientCount: rule.deliveryChannels.includes('email') ? recipients.length : 0,
+			}
 		},
 	},
 })

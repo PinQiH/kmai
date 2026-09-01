@@ -1,9 +1,7 @@
 import type {
 	AlertEvent,
 	AlertRule,
-	EmailChannelSettings,
 	LogEntry,
-	RecipientGroup,
 	ServiceHealth,
 	ServiceMetric,
 } from '@/types'
@@ -97,12 +95,6 @@ export const logEntries: LogEntry[] = [
 	{ id: 'log-12', occurredAt: '2026-08-31T02:34:07.000Z', timestamp: '10:34:07', level: 'error', service: 'notification', message: 'SMTP 連線被拒，告警信改為稍後重送', traceId: 'trc-9f12c4', fields: { host: 'smtp.company.com', retryInMinutes: '5' } },
 ]
 
-export const recipientGroups: RecipientGroup[] = [
-	{ id: 'group-ops', name: '系統維運', description: '負責服務可用性與基礎設施', emails: ['ops@company.com', 'sre-oncall@company.com', 'kevin.lin@company.com'], severities: ['critical', 'warning'] },
-	{ id: 'group-km', name: '知識管理員', description: '負責內容處理與回答品質', emails: ['km.admin@company.com', 'yijun.lin@company.com'], severities: ['warning', 'info'] },
-	{ id: 'group-manager', name: '值班主管', description: '只在嚴重告警時通知', emails: ['it.manager@company.com'], severities: ['critical'] },
-]
-
 export const alertRules: AlertRule[] = [
 	{ id: 'rule-latency', name: '回答延遲過高', metricId: 'metric-answer-latency', metricLabel: '回答延遲 p95', comparison: '>', threshold: 4, unit: '秒', durationMinutes: 5, severity: 'warning', recipientGroupId: 'group-ops', isEnabled: true },
 	{ id: 'rule-error', name: '請求錯誤率異常', metricId: 'metric-error-rate', metricLabel: '請求錯誤率', comparison: '>', threshold: 3, unit: '%', durationMinutes: 10, severity: 'critical', recipientGroupId: 'group-ops', isEnabled: true },
@@ -119,17 +111,3 @@ export const alertEvents: AlertEvent[] = [
 	{ id: 'evt-05', occurredAt: '2026-08-30T14:41:00.000Z', ruleName: '文件處理積壓過高', severity: 'critical', status: 'resolved', observed: '16 件（門檻 15 件）', startedAt: '昨天 22:41', durationLabel: '35 分鐘後恢復', notifiedCount: 1, notifyResult: '寄送失敗' },
 	{ id: 'evt-06', occurredAt: '2026-08-30T07:07:00.000Z', ruleName: '回答延遲過高', severity: 'warning', status: 'resolved', observed: '4.1 秒（門檻 4 秒）', startedAt: '昨天 15:07', durationLabel: '9 分鐘後恢復', notifiedCount: 3, notifyResult: '已寄出' },
 ]
-
-export const emailChannelSettings: EmailChannelSettings = {
-	smtpHost: 'smtp.company.com',
-	smtpPort: 587,
-	encryption: 'TLS',
-	senderName: 'Syscom Cubi 營運監控',
-	senderAddress: 'no-reply@company.com',
-	repeatIntervalMinutes: 30,
-	groupWindowMinutes: 5,
-	notifyOnResolved: true,
-	isQuietHoursEnabled: false,
-	quietHoursStart: '22:00',
-	quietHoursEnd: '07:00',
-}

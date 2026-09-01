@@ -1,18 +1,14 @@
 import {
 	alertEvents,
 	alertRules,
-	emailChannelSettings,
 	logEntries,
-	recipientGroups,
 	serviceHealth,
 	serviceMetrics,
 } from '@/mocks/monitoring'
 import type {
 	AlertEvent,
 	AlertRule,
-	EmailChannelSettings,
 	LogEntry,
-	RecipientGroup,
 	ServiceHealth,
 	ServiceMetric,
 } from '@/types'
@@ -40,14 +36,4 @@ export function getAlertRulesSnapshot(): AlertRule[] {
 /** 取得告警事件快照。 */
 export function getAlertEventsSnapshot(): AlertEvent[] {
 	return alertEvents.map((event) => ({ ...event }))
-}
-
-/** 取得收件人群組快照。 */
-export function getRecipientGroupsSnapshot(): RecipientGroup[] {
-	return recipientGroups.map((group) => ({ ...group, emails: [...group.emails], severities: [...group.severities] }))
-}
-
-/** 取得電子郵件通知設定快照。 */
-export function getEmailChannelSettingsSnapshot(): EmailChannelSettings {
-	return { ...emailChannelSettings }
 }

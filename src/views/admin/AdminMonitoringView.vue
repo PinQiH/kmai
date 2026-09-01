@@ -8,13 +8,12 @@ import MetricSparkline from '@/components/MetricSparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
 import {
-	getEmailChannelSettingsSnapshot,
 	getLogEntriesSnapshot,
-	getRecipientGroupsSnapshot,
 	getServiceHealthSnapshot,
 	getServiceMetricsSnapshot,
 } from '@/repositories/monitoring.repository'
 import { useMonitoringStore } from '@/stores/monitoring'
+import { useNotificationsStore } from '@/stores/notifications'
 import type {
 	AlertComparison,
 	AlertEvent,
@@ -31,8 +30,6 @@ import {
 	countLogLevels,
 	describeAlertRule,
 	filterLogEntries,
-	isValidEmail,
-	parseEmailList,
 	summarizeAlertEvents,
 } from '@/utils/monitoring'
 
@@ -41,15 +38,15 @@ type FeedbackTone = 'success' | 'error'
 
 const route = useRoute()
 const monitoringStore = useMonitoringStore()
+const notificationsStore = useNotificationsStore()
 const { rules, events } = storeToRefs(monitoringStore)
 
 const metrics = ref(getServiceMetricsSnapshot())
 const services = ref(getServiceHealthSnapshot())
 const logs = ref(getLogEntriesSnapshot())
-const groups = ref(getRecipientGroupsSnapshot())
-const emailSettings = ref(getEmailChannelSettingsSnapshot())
+const groups = computed(() => notificationsStore.recipientGroups)
 
-const activeTab = ref('metrics')
+const activeTab = ref('overview')
 const feedbackMessage = ref('')
 const feedbackTone = ref<FeedbackTone>('success')
 const focusedEventId = computed(() => typeof route.query.eventId === 'string' ? route.query.eventId : null)
@@ -57,7 +54,7 @@ const focusedEventId = computed(() => typeof route.query.eventId === 'string' ? 
 watch(
 	() => route.query.tab,
 	(tab) => {
-		if (tab === 'alerts') activeTab.value = 'alerts'
+		if (['overview', 'alerts', 'metrics', 'logs', 'rules'].includes(String(tab))) activeTab.value = String(tab)
 	},
 	{ immediate: true },
 )
@@ -296,73 +293,10 @@ function testRule(rule: AlertRule): void {
 	notify(`已寄出「${rule.name}」的測試通知給 ${groupLabel(rule.recipientGroupId)}。`)
 }
 
-// > 電子郵件通知
-const recipientInput = ref<Record<string, string>>({})
-const recipientError = ref<Record<string, string>>({})
-
-const totalRecipients = computed(() => groups.value.reduce((total, group) => total + group.emails.length, 0))
-const isSenderValid = computed(() => isValidEmail(emailSettings.value.senderAddress))
-
-function addRecipients(groupId: string): void {
-	const group = groupById(groupId)
-	if (!group) return
-
-	const candidates = parseEmailList(recipientInput.value[groupId] ?? '')
-	const invalid = candidates.filter((email) => !isValidEmail(email))
-
-	if (candidates.length === 0 || invalid.length > 0) {
-		recipientError.value = {
-			...recipientError.value,
-			[groupId]: invalid.length > 0 ? `格式不正確：${invalid.join('、')}` : '請先輸入收件人電子郵件。',
-		}
-		return
-	}
-
-	const existing = new Set(group.emails.map((email) => email.toLowerCase()))
-	const added = candidates.filter((email) => !existing.has(email.toLowerCase()))
-	group.emails = [...group.emails, ...added]
-	recipientInput.value = { ...recipientInput.value, [groupId]: '' }
-	recipientError.value = { ...recipientError.value, [groupId]: '' }
-	notify(added.length > 0 ? `已將 ${added.length} 位收件人加入「${group.name}」。` : '這些收件人已在群組中。')
-}
-
-// @ 組字中的 Enter 是選字不是送出；沿用專案既有輸入框的規則
-function handleRecipientEnter(groupId: string, event: KeyboardEvent): void {
-	if (event.isComposing) return
-
-	event.preventDefault()
-	addRecipients(groupId)
-}
-
-function removeRecipient(groupId: string, email: string): void {
-	const group = groupById(groupId)
-	if (!group) return
-
-	group.emails = group.emails.filter((item) => item !== email)
-	notify(`已將 ${email} 移出「${group.name}」。`)
-}
-
-function updateGroupSeverities(groupId: string, severities: AlertSeverity[]): void {
-	const group = groupById(groupId)
-	if (!group) return
-
-	group.severities = severities
-}
-
-function saveEmailSettings(): void {
-	if (!isSenderValid.value) {
-		notify('寄件人電子郵件格式不正確，請確認後再儲存。', 'error')
-		return
-	}
-	notify('已更新電子郵件通知設定。')
-}
-
-function sendTestEmail(): void {
-	notify(`測試告警信已排入寄送佇列，共 ${totalRecipients.value} 位收件人（展示環境不會真的寄出）。`)
-}
-
 // > 告警紀錄
 const alertSummary = computed(() => summarizeAlertEvents(events.value))
+const healthyServiceCount = computed(() => services.value.filter((service) => service.status === 'good').length)
+const recentErrorCount = computed(() => logs.value.filter((entry) => entry.level === 'error').length)
 
 function silenceEvent(event: AlertEvent): void {
 	monitoringStore.silenceEvent(event.id)
@@ -386,7 +320,6 @@ onBeforeUnmount(() => {
 				<VBtn variant="outlined" prepend-icon="mdi-refresh" @click="refreshSnapshot(); notify('已重新取得監控資料。')">
 					重新整理
 				</VBtn>
-				<VBtn color="primary" prepend-icon="mdi-email-fast-outline" @click="sendTestEmail">寄送測試告警信</VBtn>
 			</template>
 		</PageHeader>
 
@@ -415,14 +348,44 @@ onBeforeUnmount(() => {
 		</VAlert>
 
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-5">
+			<VTab value="overview">系統概況</VTab>
+			<VTab value="alerts">目前告警</VTab>
 			<VTab value="metrics">服務指標</VTab>
 			<VTab value="logs">日誌查詢</VTab>
 			<VTab value="rules">告警規則</VTab>
-			<VTab value="notification">通知設定</VTab>
-			<VTab value="alerts">告警紀錄</VTab>
 		</VTabs>
 
 		<VWindow v-model="activeTab" class="monitoring-window">
+			<!-- > 系統概況：先回答現在是否需要處理，再引導到對應診斷頁籤 -->
+			<VWindowItem value="overview">
+				<VRow class="mb-6">
+					<VCol cols="12" md="4">
+						<VCard class="surface-border pa-5 h-100">
+							<p class="text-body-2 text-medium-emphasis">健康服務</p>
+							<p class="metric-value mt-2">{{ healthyServiceCount }} / {{ services.length }}</p>
+							<VBtn class="mt-3" variant="text" size="small" @click="activeTab = 'metrics'">查看服務指標</VBtn>
+						</VCard>
+					</VCol>
+					<VCol cols="12" md="4">
+						<VCard class="surface-border pa-5 h-100">
+							<p class="text-body-2 text-medium-emphasis">目前告警</p>
+							<p class="metric-value mt-2">{{ alertSummary.firing }}</p>
+							<VBtn class="mt-3" variant="text" size="small" @click="activeTab = 'alerts'">處理告警</VBtn>
+						</VCard>
+					</VCol>
+					<VCol cols="12" md="4">
+						<VCard class="surface-border pa-5 h-100">
+							<p class="text-body-2 text-medium-emphasis">目前快照錯誤日誌</p>
+							<p class="metric-value mt-2">{{ recentErrorCount }}</p>
+							<VBtn class="mt-3" variant="text" size="small" @click="activeTab = 'logs'; logLevel = 'error'">查詢日誌</VBtn>
+						</VCard>
+					</VCol>
+				</VRow>
+				<VAlert type="info" variant="tonal">
+					營運監控只處理系統健康、告警生命週期與技術日誌；Email 寄件服務請至「通知管理 → SMTP 設定」。
+				</VAlert>
+			</VWindowItem>
+
 			<!-- > 服務指標：流量、延遲、錯誤、飽和度四個訊號 + 各服務健康度 -->
 			<VWindowItem value="metrics">
 				<div class="monitoring-toolbar mb-5">
@@ -586,9 +549,12 @@ onBeforeUnmount(() => {
 								<VListItemTitle class="font-weight-bold">
 									{{ rule.name }}
 									<VChip size="x-small" variant="tonal" class="ml-2">{{ severityMeta[rule.severity].label }}</VChip>
+									<VChip size="x-small" variant="tonal" color="warning" prepend-icon="mdi-email-outline" class="ml-2">
+										Email
+									</VChip>
 								</VListItemTitle>
 								<VListItemSubtitle>
-									{{ describeAlertRule(rule) }} · 通知 {{ groupLabel(rule.recipientGroupId) }}
+									{{ describeAlertRule(rule) }} · Email 通知 {{ groupLabel(rule.recipientGroupId) }}
 								</VListItemSubtitle>
 								<template #append>
 									<div class="d-flex align-center ga-2">
@@ -610,129 +576,6 @@ onBeforeUnmount(() => {
 						</template>
 					</VList>
 				</VCard>
-			</VWindowItem>
-
-			<!-- > 通知設定：收件人群組、寄件設定與通知策略 -->
-			<VWindowItem value="notification">
-				<section aria-labelledby="recipient-title" class="mb-8">
-					<h2 id="recipient-title" class="section-heading mb-1">收件人群組</h2>
-					<p class="text-body-2 text-medium-emphasis mb-4">
-						告警規則指定群組，群組決定實際寄送對象與接收的嚴重度。
-					</p>
-					<VRow>
-						<VCol v-for="group in groups" :key="group.id" cols="12" lg="6">
-							<VCard class="surface-border pa-5 h-100">
-								<div class="d-flex align-center ga-2">
-									<div>
-										<p class="font-weight-bold">{{ group.name }}</p>
-										<p class="text-caption text-medium-emphasis">{{ group.description }}</p>
-									</div>
-									<VSpacer />
-									<VChip size="small" variant="tonal">{{ group.emails.length }} 位</VChip>
-								</div>
-
-								<div class="d-flex flex-wrap ga-2 mt-4">
-									<VChip
-										v-for="email in group.emails"
-										:key="email"
-										size="small"
-										variant="outlined"
-										closable
-										:close-label="`移除 ${email}`"
-										@click:close="removeRecipient(group.id, email)"
-									>
-										{{ email }}
-									</VChip>
-									<p v-if="group.emails.length === 0" class="text-caption text-error">
-										尚未設定收件人，這個群組的告警不會送出。
-									</p>
-								</div>
-
-								<div class="recipient-form mt-4">
-									<VTextField
-										:model-value="recipientInput[group.id] ?? ''"
-										label="新增收件人電子郵件"
-										placeholder="可一次貼上多筆，以逗號或空白分隔"
-										:error-messages="recipientError[group.id] ? [recipientError[group.id]] : []"
-										@update:model-value="recipientInput = { ...recipientInput, [group.id]: $event }"
-										@keydown.enter="handleRecipientEnter(group.id, $event)"
-									/>
-									<VBtn color="primary" variant="tonal" @click="addRecipients(group.id)">加入</VBtn>
-								</div>
-
-								<VSelect
-									:model-value="group.severities"
-									:items="severityOptions"
-									label="接收的嚴重度"
-									multiple
-									chips
-									hide-details
-									@update:model-value="updateGroupSeverities(group.id, $event)"
-								/>
-							</VCard>
-						</VCol>
-					</VRow>
-				</section>
-
-				<VRow>
-					<VCol cols="12" lg="6">
-						<VCard class="surface-border pa-5 h-100">
-							<h2 class="section-heading mb-1">寄件設定</h2>
-							<p class="text-body-2 text-medium-emphasis mb-4">
-								SMTP 帳號與密碼由後端安全保存，不在此介面顯示或編輯。
-							</p>
-							<VTextField v-model="emailSettings.smtpHost" label="SMTP 主機" />
-							<div class="smtp-row">
-								<VTextField v-model.number="emailSettings.smtpPort" label="連接埠" type="number" />
-								<VSelect v-model="emailSettings.encryption" :items="['TLS', 'SSL', '不加密']" label="加密方式" />
-							</div>
-							<VTextField v-model="emailSettings.senderName" label="寄件人名稱" />
-							<VTextField
-								v-model="emailSettings.senderAddress"
-								label="寄件人電子郵件"
-								type="email"
-								:error-messages="isSenderValid ? [] : ['電子郵件格式不正確']"
-							/>
-							<VBtn color="primary" @click="saveEmailSettings">儲存寄件設定</VBtn>
-							<VBtn class="ml-2" variant="outlined" @click="sendTestEmail">寄送測試信</VBtn>
-						</VCard>
-					</VCol>
-					<VCol cols="12" lg="6">
-						<VCard class="surface-border pa-5 h-100">
-							<h2 class="section-heading mb-1">通知策略</h2>
-							<p class="text-body-2 text-medium-emphasis mb-4">
-								控制同一個告警重複通知的頻率，以及維護時段是否靜音。
-							</p>
-							<VSelect
-								v-model.number="emailSettings.repeatIntervalMinutes"
-								:items="[10, 30, 60, 240]"
-								label="重複通知間隔（分鐘）"
-							/>
-							<VSelect
-								v-model.number="emailSettings.groupWindowMinutes"
-								:items="[1, 5, 15]"
-								label="彙整視窗（分鐘）"
-								hint="同一群組在視窗內的告警會合併成一封信"
-								persistent-hint
-							/>
-							<VSwitch
-								v-model="emailSettings.notifyOnResolved"
-								color="primary"
-								label="告警解除時也寄信通知"
-								class="mt-3"
-							/>
-							<VSwitch v-model="emailSettings.isQuietHoursEnabled" color="primary" label="啟用靜音時段" />
-							<div v-if="emailSettings.isQuietHoursEnabled" class="smtp-row">
-								<VTextField v-model="emailSettings.quietHoursStart" label="靜音開始" type="time" />
-								<VTextField v-model="emailSettings.quietHoursEnd" label="靜音結束" type="time" />
-							</div>
-							<VAlert v-if="emailSettings.isQuietHoursEnabled" type="info" variant="tonal" class="mb-4">
-								靜音時段仍會記錄告警，嚴重等級會在時段結束後補送。
-							</VAlert>
-							<VBtn color="primary" @click="saveEmailSettings">儲存通知策略</VBtn>
-						</VCard>
-					</VCol>
-				</VRow>
 			</VWindowItem>
 
 			<!-- > 告警紀錄：觸發、靜音與解除的完整過程 -->
@@ -845,7 +688,7 @@ onBeforeUnmount(() => {
 						<VTextField v-model.number="ruleDraft.durationMinutes" label="持續時間" type="number" suffix="分鐘" />
 					</div>
 					<VSelect v-model="ruleDraft.severity" :items="severityOptions" label="嚴重度" />
-					<VSelect v-model="ruleDraft.recipientGroupId" :items="groupOptions" label="通知收件人群組" />
+					<VSelect v-model="ruleDraft.recipientGroupId" :items="groupOptions" label="Email 通知對象" />
 					<VAlert type="info" variant="tonal" density="compact">
 						觸發條件：{{ describeAlertRule(ruleDraft) }}
 					</VAlert>
@@ -946,19 +789,6 @@ onBeforeUnmount(() => {
 	white-space: nowrap;
 }
 
-.recipient-form {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
-	gap: var(--space-sm);
-	align-items: start;
-}
-
-.smtp-row {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: var(--space-sm);
-}
-
 .rule-condition {
 	display: grid;
 	grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr);
@@ -999,9 +829,7 @@ onBeforeUnmount(() => {
 		width: 100%;
 	}
 
-	.rule-condition,
-	.recipient-form,
-	.smtp-row {
+	.rule-condition {
 		grid-template-columns: minmax(0, 1fr);
 	}
 }

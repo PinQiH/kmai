@@ -8,6 +8,7 @@ import {
 	redDarkTheme,
 	redLightTheme,
 	resolveThemeName,
+	systemRecordCategoryPalette,
 	themeAccentLabels,
 } from '../src/theme'
 import { contrastRatio, deltaE, relativeLuminance } from './helpers/color'
@@ -129,6 +130,29 @@ describe('圖譜焦點環', () => {
 		for (const { name, theme } of themes) {
 			const ratio = contrastRatio(colorOf(theme, 'on-surface'), colorOf(theme, 'surface'))
 			expect(ratio, `${name} 的外圈對畫布只有 ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3)
+		}
+	})
+})
+
+describe('系統事件類別色票', () => {
+	it('10. 每個事件類別都有獨立顏色，並與對應表面維持 AA 對比', () => {
+		const cases = [
+			{ name: '淺色', surface: colorOf(lightTheme, 'surface'), palette: systemRecordCategoryPalette.light },
+			{ name: '深色', surface: colorOf(darkTheme, 'surface'), palette: systemRecordCategoryPalette.dark },
+		]
+
+		for (const { name, surface, palette } of cases) {
+			const colors = Object.values(palette)
+			expect(new Set(colors).size, `${name}事件類別色不可重複`).toBe(colors.length)
+			for (const [category, color] of Object.entries(palette)) {
+				const colorChannels = color.match(/[a-f\d]{2}/gi)?.map((channel) => Number.parseInt(channel, 16)) ?? []
+				const surfaceChannels = surface.match(/[a-f\d]{2}/gi)?.map((channel) => Number.parseInt(channel, 16)) ?? []
+				const tonalSurface = `#${colorChannels
+					.map((channel, index) => Math.round(channel * 0.12 + (surfaceChannels[index] ?? 0) * 0.88).toString(16).padStart(2, '0'))
+					.join('')}`
+				const ratio = contrastRatio(color, tonalSurface)
+				expect(ratio, `${name} ${category} (${color}) 對 tonal surface ${tonalSurface} 僅 ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
+			}
 		}
 	})
 })

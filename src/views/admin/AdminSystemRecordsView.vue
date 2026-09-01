@@ -10,6 +10,7 @@ import { useAppStore } from '@/stores/app'
 import { useAssistantAuditStore } from '@/stores/assistantAudit'
 import { useMonitoringStore } from '@/stores/monitoring'
 import { useNotificationsStore } from '@/stores/notifications'
+import { systemRecordCategoryPalette } from '@/theme'
 import type {
 	AdminQuestionRecord,
 	AdminQuestionRecordStatus,
@@ -60,13 +61,13 @@ const categoryFilter = ref<CategoryFilter>('all')
 const levelFilter = ref<LevelFilter>('all')
 const eventTimeRangeFilter = ref<SystemRecordTimeRange>('all')
 
-const categoryMeta: Record<SystemRecordCategory, { label: string; color: string; icon: string }> = {
-	auth: { label: '登入登出', color: 'primary', icon: 'mdi-login-variant' },
-	ai: { label: 'AI 問答', color: 'secondary', icon: 'mdi-creation-outline' },
-	job: { label: '排程工作', color: 'info', icon: 'mdi-calendar-clock-outline' },
-	audit: { label: '操作稽核', color: 'deep-orange', icon: 'mdi-clipboard-text-search-outline' },
-	notification: { label: '通知', color: 'primary', icon: 'mdi-bell-outline' },
-	alert: { label: '告警', color: 'error', icon: 'mdi-alert-outline' },
+const categoryMeta: Record<SystemRecordCategory, { label: string; icon: string }> = {
+	auth: { label: '登入登出', icon: 'mdi-login-variant' },
+	ai: { label: 'AI 問答', icon: 'mdi-creation-outline' },
+	job: { label: '排程工作', icon: 'mdi-calendar-clock-outline' },
+	audit: { label: '操作稽核', icon: 'mdi-clipboard-text-search-outline' },
+	notification: { label: '通知', icon: 'mdi-bell-outline' },
+	alert: { label: '告警', icon: 'mdi-alert-outline' },
 }
 const levelMeta: Record<SystemRecordLevel, { label: string; color: string }> = {
 	info: { label: '資訊', color: 'info' },
@@ -552,7 +553,12 @@ watch(
 							{{ formatNotificationTimestamp(item.occurredAt) }}
 						</template>
 						<template #item.category="{ item }">
-							<VChip :color="categoryMeta[item.category].color" size="small" variant="tonal">
+							<VChip
+								:color="systemRecordCategoryPalette[appStore.themeMode][item.category]"
+								size="small"
+								variant="tonal"
+								:data-event-category="item.category"
+							>
 								<VIcon :icon="categoryMeta[item.category].icon" start size="18" aria-hidden="true" />
 								{{ categoryMeta[item.category].label }}
 							</VChip>
@@ -626,7 +632,7 @@ watch(
 			<template v-if="selectedQuestion">
 				<div class="drawer-header px-5 py-4">
 					<div>
-						<p class="text-overline text-medium-emphasis">AI 問答詳情</p>
+						<p class="drawer-kicker text-overline font-weight-bold">AI 問答詳情</p>
 						<h2 class="text-h6">{{ selectedQuestion.userName }}的提問</h2>
 					</div>
 					<VBtn icon="mdi-close" variant="text" aria-label="關閉問答詳情" @click="closeQuestionDrawer()" />
@@ -816,7 +822,12 @@ watch(
 .detail-grid span,
 .identifiers dt {
 	font-size: 0.75rem;
-	color: rgb(var(--v-theme-on-surface-variant));
+	font-weight: 600;
+	color: rgb(var(--v-theme-on-surface));
+}
+
+.drawer-kicker {
+	color: rgb(var(--v-theme-on-surface));
 }
 
 .detail-section + .detail-section {

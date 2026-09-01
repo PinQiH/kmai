@@ -13,6 +13,30 @@ export const clusterPalette = {
 	dark: ['#8fb6e0', '#c99bc6', '#e39b94', '#8fc9a8', '#d8bd7e'],
 }
 
+/*
+ * > 系統事件類別色票
+ * @ 每一類保留獨立色相，搭配既有圖示與文字標籤，不以顏色作為唯一識別方式。
+ * !! 類別文字會直接顯示在 tonal chip 上，色票需通過各自主題 surface 的 AA 對比測試。
+ */
+export const systemRecordCategoryPalette = {
+	light: {
+		auth: '#315C91',
+		ai: '#7D4E7A',
+		job: '#28724F',
+		audit: '#8A5A00',
+		notification: '#0F6B73',
+		alert: '#B42318',
+	},
+	dark: {
+		auth: '#8FB6E0',
+		ai: '#D2A6CF',
+		job: '#94D6B4',
+		audit: '#D8BD7E',
+		notification: '#7CCBD0',
+		alert: '#FFB4AB',
+	},
+} as const
+
 const lightColors = {
 	background: '#F5F4F0',
 	surface: '#FFFFFF',

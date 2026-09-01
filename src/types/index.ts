@@ -262,6 +262,7 @@ export type NotificationPriority = 'normal' | 'important' | 'urgent'
 export type NotificationSource = 'manual' | 'automatic'
 export type NotificationAudienceType = 'all' | 'department' | 'role' | 'selected'
 export type NotificationRole = 'user' | 'knowledge-admin' | 'system-admin'
+export type NotificationDeliveryChannel = 'in-app' | 'email'
 export type NotificationEventType =
 	| 'document-ready'
 	| 'document-failed'
@@ -270,6 +271,8 @@ export type NotificationEventType =
 	| 'notebook-shared'
 	| 'notebook-mentioned'
 	| 'permission-granted'
+	| 'system-alert-triggered'
+	| 'system-alert-resolved'
 	| 'system-maintenance'
 
 export interface NotificationUser {
@@ -323,6 +326,7 @@ export interface AutomaticNotificationRule {
 	targetUserIds: string[]
 	actionLabel: string | null
 	actionTo: string | null
+	deliveryChannels: NotificationDeliveryChannel[]
 	isEnabled: boolean
 }
 
@@ -350,7 +354,13 @@ export interface NotificationRuleInput {
 	targetUserIds: string[]
 	actionLabel: string | null
 	actionTo: string | null
+	deliveryChannels: NotificationDeliveryChannel[]
 	isEnabled: boolean
+}
+
+export interface AutomaticNotificationTriggerResult {
+	notificationId: string | null
+	emailRecipientCount: number
 }
 
 export interface NotificationPerformance {

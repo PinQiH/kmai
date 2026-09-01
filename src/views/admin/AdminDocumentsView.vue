@@ -69,7 +69,18 @@ function approveSelected(): void {
 				<VDataTable v-model="selected" :headers="headers" :items="visibleDocuments" item-value="id" show-select hover>
 					<template #item.title="{ item }"><div class="py-2"><p class="font-weight-bold">{{ item.title }}</p><p class="text-caption text-medium-emphasis">{{ item.owner }} · {{ item.visibility }}</p></div></template>
 					<template #item.status="{ item }"><StatusChip :status="item.status" /></template>
-					<template #item.actions="{ item }"><VBtn icon="mdi-dots-horizontal" variant="text" :aria-label="`管理 ${item.title}`"><VMenu activator="parent"><VList><VListItem :to="`/documents/${item.id}`" title="查看文件" prepend-icon="mdi-eye-outline" /><VListItem :to="`/admin/documents/${item.id}/manage`" title="管理文件" prepend-icon="mdi-pencil-outline" /><VListItem title="刪除文件" prepend-icon="mdi-delete-outline" base-color="error" @click="openDeleteDialog(item.id)" /></VList></VMenu></VBtn></template>
+					<template #item.actions="{ item }">
+						<VMenu location="bottom end">
+							<template #activator="{ props: menuProps }">
+								<VBtn v-bind="menuProps" color="primary" variant="tonal" size="small" append-icon="mdi-chevron-down" :aria-label="`開啟 ${item.title} 的操作選單`">操作</VBtn>
+							</template>
+							<VList density="compact">
+								<VListItem :to="`/documents/${item.id}`" title="查看文件" prepend-icon="mdi-eye-outline" />
+								<VListItem :to="`/admin/documents/${item.id}/manage`" title="管理文件" prepend-icon="mdi-pencil-outline" />
+								<VListItem title="刪除文件" prepend-icon="mdi-delete-outline" base-color="error" @click="openDeleteDialog(item.id)" />
+							</VList>
+						</VMenu>
+					</template>
 				</VDataTable>
 			</div>
 		</VCard>

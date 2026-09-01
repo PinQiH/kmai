@@ -51,7 +51,10 @@ describe('admin notification management views', () => {
 
 		const router = createRouter({
 			history: createMemoryHistory(),
-			routes: [{ path: '/admin/notifications', component: AdminNotificationsView }],
+			routes: [
+				{ path: '/admin/notifications', component: AdminNotificationsView },
+				{ path: '/admin/monitoring', component: { template: '<div />' } },
+			],
 		})
 		await router.push(`/admin/notifications?notificationId=${notification!.id}`)
 		await router.isReady()
@@ -97,6 +100,10 @@ describe('admin notification management views', () => {
 
 		expect(wrapper.get('[data-testid="system-event-table"]').text()).toContain('通知')
 		expect(wrapper.get('[data-testid="system-event-table"]').text()).toContain('告警')
+		const eventCategories = wrapper
+			.findAll('[data-event-category]')
+			.map((chip) => chip.attributes('data-event-category'))
+		expect(new Set(eventCategories).size).toBeGreaterThanOrEqual(5)
 		expect(wrapper.text()).toContain('服務原始日誌請至「營運監控 → 日誌查詢」')
 	})
 

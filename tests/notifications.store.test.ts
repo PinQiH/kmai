@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 import { CURRENT_NOTIFICATION_USER_ID } from '../src/mocks/notifications'
+import { useMonitoringStore } from '../src/stores/monitoring'
 import { useNotificationsStore } from '../src/stores/notifications'
 import type { NotificationRuleInput, SendNotificationInput } from '../src/types'
 
@@ -33,6 +34,7 @@ function buildRuleInput(overrides: Partial<NotificationRuleInput> = {}): Notific
 		targetUserIds: [],
 		actionLabel: '查看說明',
 		actionTo: 'https://example.com/guide',
+		deliveryChannels: ['in-app'],
 		isEnabled: true,
 		...overrides,
 	}
@@ -157,13 +159,34 @@ describe('notifications store', () => {
 		expect(enabledRule).toBeDefined()
 
 		expect(store.triggerAutomaticRule(disabledRule!.id, '2026-08-31T05:20:00.000Z')).toBeNull()
-		const notificationId = store.triggerAutomaticRule(enabledRule!.id, '2026-08-31T05:21:00.000Z')
-		const notification = store.notifications.find((item) => item.id === notificationId)
+		const result = store.triggerAutomaticRule(enabledRule!.id, '2026-08-31T05:21:00.000Z')
+		const notification = store.notifications.find((item) => item.id === result?.notificationId)
 
 		expect(notification?.source).toBe('automatic')
 		expect(notification?.sourceLabel).toBe(enabledRule?.name)
-		expect(store.currentUserNotifications.some((item) => item.id === notificationId)).toBe(true)
+		expect(store.currentUserNotifications.some((item) => item.id === result?.notificationId)).toBe(true)
+		expect(result?.emailRecipientCount).toBe(0)
 		expect(store.triggerAutomaticRule(enabledRule!.id, 'not-a-date')).toBeNull()
+	})
+
+	it('should let one automatic rule send email without creating an in-app notification', () => {
+		const store = useNotificationsStore()
+		const originalNotificationCount = store.notifications.length
+		const ruleId = store.createRule(buildRuleInput({ deliveryChannels: ['email'] }))
+
+		expect(ruleId).not.toBeNull()
+		const result = store.triggerAutomaticRule(ruleId!, '2026-08-31T05:22:00.000Z')
+
+		expect(result?.notificationId).toBeNull()
+		expect(result?.emailRecipientCount).toBe(store.users.length)
+		expect(store.notifications).toHaveLength(originalNotificationCount)
+	})
+
+	it('should default mock rules to in-app delivery and reject a rule with no channel', () => {
+		const store = useNotificationsStore()
+
+		expect(store.rules.every((rule) => rule.deliveryChannels.includes('in-app'))).toBe(true)
+		expect(store.createRule(buildRuleInput({ deliveryChannels: [] }))).toBeNull()
 	})
 
 	it('should create update and delete a rule without deleting notification history', () => {
@@ -198,11 +221,42 @@ describe('notifications store', () => {
 		expect(store.createRule(buildRuleInput({ audienceType: 'role', targetRole: null }))).toBeNull()
 	})
 
-	it('should support the expanded fixed event types', () => {
+	it('should support system alert lifecycle event types', () => {
 		const store = useNotificationsStore()
-		const ruleId = store.createRule(buildRuleInput({ eventType: 'system-maintenance' }))
+		const triggeredRuleId = store.createRule(buildRuleInput({ eventType: 'system-alert-triggered' }))
+		const resolvedRuleId = store.createRule(buildRuleInput({ eventType: 'system-alert-resolved' }))
 
-		expect(store.rules.find((rule) => rule.id === ruleId)?.eventLabel).toBe('系統維護時段即將開始')
+		expect(store.rules.find((rule) => rule.id === triggeredRuleId)?.eventLabel).toBe('營運監控產生新的系統告警')
+		expect(store.rules.find((rule) => rule.id === resolvedRuleId)?.eventLabel).toBe('營運監控的系統告警已解除')
+	})
+
+	it('should keep recipient group IDs stable while editing delivery targets', () => {
+		const store = useNotificationsStore()
+		const monitoringStore = useMonitoringStore()
+		const group = store.recipientGroups[0]
+		expect(group).toBeDefined()
+		const rule = monitoringStore.rules.find((item) => item.recipientGroupId === group?.id)
+
+		const addedCount = store.addRecipientEmails(group!.id, ['new.operator@company.com'])
+		store.updateRecipientGroupSeverities(group!.id, ['critical', 'warning'])
+
+		expect(addedCount).toBe(1)
+		expect(group?.emails).toContain('new.operator@company.com')
+		expect(group?.severities).toEqual(['critical', 'warning'])
+		expect(rule?.recipientGroupId).toBe(group?.id)
+	})
+
+	it('should save non-secret email channel settings without SMTP credentials', () => {
+		const store = useNotificationsStore()
+		store.saveEmailSettings({
+			...store.emailSettings,
+			senderName: 'Cubi 系統通知',
+			repeatIntervalMinutes: 60,
+		})
+
+		expect(store.emailSettings.senderName).toBe('Cubi 系統通知')
+		expect(store.emailSettings.repeatIntervalMinutes).toBe(60)
+		expect(Object.keys(store.emailSettings)).not.toContain('password')
 	})
 
 	it('should return false when viewing or toggling a missing record', () => {

@@ -15,9 +15,9 @@ const metricColor = { good: 'success', warning: 'warning', critical: 'error' } a
 			<template #actions><VBtn color="primary" prepend-icon="mdi-upload" to="/admin/documents/upload">新增文件</VBtn></template>
 		</PageHeader>
 
-		<VAlert type="warning" variant="tonal" class="mb-7" title="有 5 個項目需要處理">
-			3 份文件等待審核超過兩天，另有 2 筆高優先 AI 回饋。
-			<template #append><VBtn variant="text" to="/admin/feedback">查看待辦</VBtn></template>
+		<VAlert type="warning" variant="tonal" class="mb-7" title="有文件處理工作需要介入">
+			目前有失敗與等待過久的文件工作，請先確認原因再重新執行或取消。
+			<template #append><VBtn variant="text" to="/admin/processing">前往需要處理</VBtn></template>
 		</VAlert>
 
 		<section aria-labelledby="health-title" class="mb-10">
@@ -36,7 +36,7 @@ const metricColor = { good: 'success', warning: 'warning', critical: 'error' } a
 		<VRow>
 			<VCol cols="12" lg="7">
 				<VCard class="surface-border pa-5 h-100">
-					<div class="d-flex align-center mb-4"><h2 class="section-heading">近期活動</h2><VSpacer /><VBtn variant="text" size="small" to="/admin/logs">查看紀錄</VBtn></div>
+					<div class="d-flex align-center mb-4"><h2 class="section-heading">近期活動</h2><VSpacer /><VBtn variant="text" size="small" to="/admin/logs?tab=events">查看系統事件</VBtn></div>
 					<VList lines="two">
 						<template v-for="(activity, index) in recentActivities" :key="activity.id">
 							<VListItem :title="activity.title" :subtitle="`${activity.detail} · ${activity.time}`" :prepend-icon="activity.type === 'document' ? 'mdi-file-document-outline' : activity.type === 'question' ? 'mdi-message-alert-outline' : 'mdi-cog-sync-outline'" />
@@ -53,6 +53,8 @@ const metricColor = { good: 'success', warning: 'warning', critical: 'error' } a
 						<VBtn variant="tonal" prepend-icon="mdi-reload-alert" to="/admin/processing">重跑失敗工作 <VChip class="ml-2" size="x-small">3</VChip></VBtn>
 						<VBtn variant="tonal" prepend-icon="mdi-comment-alert-outline" to="/admin/feedback">處理使用者回饋 <VChip class="ml-2" size="x-small">8</VChip></VBtn>
 						<VBtn variant="tonal" prepend-icon="mdi-bell-ring-outline" to="/admin/monitoring">查看營運告警 <VChip class="ml-2" size="x-small" color="error">2</VChip></VBtn>
+						<VBtn variant="tonal" prepend-icon="mdi-message-text-outline" to="/admin/logs?tab=questions">查詢全員 AI 問答</VBtn>
+						<VBtn variant="tonal" prepend-icon="mdi-email-cog-outline" to="/admin/notifications?tab=delivery">設定 SMTP</VBtn>
 					</div>
 				</VCard>
 			</VCol>

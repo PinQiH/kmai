@@ -139,7 +139,7 @@ const routes: RouteRecordRaw[] = [
 		path: "/admin/processing",
 		name: "admin-processing",
 		component: () => import("@/views/admin/AdminProcessingView.vue"),
-		meta: { admin: true, title: "處理監控" },
+		meta: { admin: true, title: "文件處理" },
 	},
 	{
 		path: "/admin/monitoring",

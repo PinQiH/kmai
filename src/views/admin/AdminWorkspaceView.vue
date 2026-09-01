@@ -56,16 +56,6 @@ const workspaceConfigs: Record<string, WorkspaceConfig> = {
 			{ title: '產品事業群', description: '4 個子群組 · 86 位成員 · 繼承 2 個角色', status: '群組', action: '展開群組' },
 		],
 	},
-	logs: {
-		eyebrow: '可追溯性',
-		description: '查詢登入、AI 問答、背景排程與管理操作，協助診斷與稽核。',
-		tabs: ['登入登出', 'AI 問答', '排程', '操作稽核'],
-		items: [
-			{ title: '登入成功：employee@company.com', description: '10.20.1.18 · 今天 10:42', status: '成功', action: '查看詳情' },
-			{ title: 'AI 問答：差旅住宿費用上限', description: 'gpt-4.1-mini · 2.4 秒 · 2 筆引用', status: '完成', action: '查看內容' },
-			{ title: '文件處理排程', description: '24 份成功 · 1 份失敗 · 18 分 32 秒', status: '部分成功', action: '查看階段' },
-		],
-	},
 	settings: {
 		eyebrow: '產品與治理',
 		description: '維護品牌外觀、版本公告、隱私權政策與全公司預設配色。',
@@ -105,12 +95,6 @@ const workspaceTabItems: Record<string, WorkspaceItem[][]> = {
 		[{ title: '王小明', description: 'employee@company.com · 產品企劃部', status: '已啟用', action: '管理帳號' }, { title: '林怡君', description: 'km.admin@company.com · 知識管理部', status: '已啟用', action: '管理帳號' }],
 		[{ title: '一般使用者', description: '1,024 位成員 · 搜尋、閱讀與問答', status: '系統角色', action: '查看權限' }, { title: '知識管理員', description: '8 位成員 · 文件、審核與回饋', status: '系統角色', action: '查看權限' }, { title: '部門內容維護者', description: '32 位成員 · 限所屬部門文件', status: '自訂角色', action: '編輯權限' }],
 		[{ title: '公司', description: '6 個事業群 · 1,064 位成員', status: '根群組', action: '展開群組' }, { title: '產品事業群', description: '4 個子群組 · 86 位成員', status: '群組', action: '管理角色' }],
-	],
-	logs: [
-		[{ title: '登入成功：employee@company.com', description: '10.20.1.18 · 今天 10:42', status: '成功', action: '查看詳情' }, { title: '登入失敗：admin@company.com', description: '10.20.1.77 · 今天 10:38 · 密碼錯誤', status: '失敗', action: '查看詳情' }],
-		[{ title: '差旅住宿費用上限', description: '問答 · gpt-4.1-mini · 2.4 秒 · 2 筆引用', status: '完成', action: '查看內容' }, { title: '比較 3.1 與 3.2 版', description: '比較 · gpt-4.1-mini · 4.8 秒', status: '完成', action: '查看內容' }],
-		[{ title: '文件處理排程', description: '24 成功 · 1 失敗 · 18 分 32 秒', status: '部分成功', action: '查看階段' }, { title: '圖譜社群分析', description: '今天 03:10 · 38 個社群', status: '成功', action: '查看階段' }],
-		[{ title: 'PATCH /admin/documents/doc-001', description: '林怡君 · 200 · 今天 10:12', status: '成功', action: '查看差異' }, { title: 'DELETE /admin/users/user-28', description: '系統管理員 · 403 · 今天 09:48', status: '拒絕', action: '查看詳情' }],
 	],
 	settings: [
 		[{ title: '品牌外觀', description: '系統名稱、Logo、瀏覽器標題與圖示', status: '已發布', action: '編輯外觀' }],

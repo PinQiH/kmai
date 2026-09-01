@@ -1,4 +1,10 @@
-import type { AppNotification, AutomaticNotificationRule, NotificationUser } from '@/types'
+import type {
+	AppNotification,
+	AutomaticNotificationRule,
+	EmailChannelSettings,
+	NotificationUser,
+	RecipientGroup,
+} from '@/types'
 
 export const CURRENT_NOTIFICATION_USER_ID = 'user-current'
 
@@ -108,6 +114,7 @@ export const automaticNotificationRules: AutomaticNotificationRule[] = [
 		targetUserIds: [CURRENT_NOTIFICATION_USER_ID],
 		actionLabel: '前往知識庫',
 		actionTo: '/library',
+		deliveryChannels: ['in-app'],
 		isEnabled: true,
 	},
 	{
@@ -124,6 +131,7 @@ export const automaticNotificationRules: AutomaticNotificationRule[] = [
 		targetUserIds: [CURRENT_NOTIFICATION_USER_ID, 'user-km-admin'],
 		actionLabel: '前往知識庫',
 		actionTo: '/library',
+		deliveryChannels: ['in-app'],
 		isEnabled: true,
 	},
 	{
@@ -140,6 +148,28 @@ export const automaticNotificationRules: AutomaticNotificationRule[] = [
 		targetUserIds: [CURRENT_NOTIFICATION_USER_ID],
 		actionLabel: '前往個人筆記本',
 		actionTo: '/notebooks',
+		deliveryChannels: ['in-app'],
 		isEnabled: false,
 	},
 ]
+
+export const recipientGroups: RecipientGroup[] = [
+	{ id: 'group-ops', name: '系統維運', description: '負責服務可用性與基礎設施', emails: ['ops@company.com', 'sre-oncall@company.com', 'kevin.lin@company.com'], severities: ['critical', 'warning'] },
+	{ id: 'group-km', name: '知識管理員', description: '負責內容處理與回答品質', emails: ['km.admin@company.com', 'yijun.lin@company.com'], severities: ['warning', 'info'] },
+	{ id: 'group-manager', name: '值班主管', description: '只在嚴重告警時通知', emails: ['it.manager@company.com'], severities: ['critical'] },
+]
+
+// @ SMTP 帳號與密碼刻意不放進前端 Mock，只呈現可交由後端保存的非機密設定。
+export const emailChannelSettings: EmailChannelSettings = {
+	smtpHost: 'smtp.company.com',
+	smtpPort: 587,
+	encryption: 'TLS',
+	senderName: 'Syscom Cubi 營運監控',
+	senderAddress: 'no-reply@company.com',
+	repeatIntervalMinutes: 30,
+	groupWindowMinutes: 5,
+	notifyOnResolved: true,
+	isQuietHoursEnabled: false,
+	quietHoursStart: '22:00',
+	quietHoursEnd: '07:00',
+}

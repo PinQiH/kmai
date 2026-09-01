@@ -32,42 +32,43 @@ const employeeItems: NavigationItem[] = [
   { title: "我的收藏", icon: "mdi-bookmark-outline", to: "/favorites" },
 ]
 
+const adminOverviewItem: NavigationItem = {
+	title: "管理總覽",
+	icon: "mdi-view-dashboard-outline",
+	to: "/admin",
+}
+
+const adminNavigationGroups: Array<{ title: string; items: NavigationItem[] }> = [
+	{
+		title: "內容與知識",
+		items: [
+			{ title: "文件管理", icon: "mdi-file-document-multiple-outline", to: "/admin/documents" },
+			{ title: "文件處理", icon: "mdi-progress-wrench", to: "/admin/processing" },
+			{ title: "圖譜管理", icon: "mdi-vector-polyline", to: "/admin/graph" },
+			{ title: "回饋與問題", icon: "mdi-comment-alert-outline", to: "/admin/feedback" },
+		],
+	},
+	{
+		title: "營運與治理",
+		items: [
+			{ title: "營運監控", icon: "mdi-chart-timeline-variant", to: "/admin/monitoring" },
+			{ title: "通知管理", icon: "mdi-bell-cog-outline", to: "/admin/notifications" },
+			{ title: "系統紀錄", icon: "mdi-text-box-search-outline", to: "/admin/logs" },
+		],
+	},
+	{
+		title: "系統管理",
+		items: [
+			{ title: "AI 與檢索設定", icon: "mdi-tune-variant", to: "/admin/ai-settings" },
+			{ title: "使用者與存取", icon: "mdi-account-group-outline", to: "/admin/access" },
+			{ title: "系統設定", icon: "mdi-cog-outline", to: "/admin/settings" },
+		],
+	},
+]
+
 const adminItems: NavigationItem[] = [
-  { title: "管理總覽", icon: "mdi-view-dashboard-outline", to: "/admin" },
-  {
-    title: "文件管理",
-    icon: "mdi-file-document-multiple-outline",
-    to: "/admin/documents",
-  },
-  { title: "處理監控", icon: "mdi-progress-wrench", to: "/admin/processing" },
-  {
-    title: "營運監控",
-    icon: "mdi-chart-timeline-variant",
-    to: "/admin/monitoring",
-  },
-  {
-    title: "通知管理",
-    icon: "mdi-bell-cog-outline",
-    to: "/admin/notifications",
-  },
-  { title: "圖譜管理", icon: "mdi-vector-polyline", to: "/admin/graph" },
-  {
-    title: "回饋與問題",
-    icon: "mdi-comment-alert-outline",
-    to: "/admin/feedback",
-  },
-  {
-    title: "AI 與檢索設定",
-    icon: "mdi-tune-variant",
-    to: "/admin/ai-settings",
-  },
-  {
-    title: "使用者與存取",
-    icon: "mdi-account-group-outline",
-    to: "/admin/access",
-  },
-  { title: "系統紀錄", icon: "mdi-text-box-search-outline", to: "/admin/logs" },
-  { title: "系統設定", icon: "mdi-cog-outline", to: "/admin/settings" },
+	adminOverviewItem,
+	...adminNavigationGroups.flatMap((group) => group.items),
 ]
 
 const route = useRoute()
@@ -183,21 +184,42 @@ async function handleLogout(): Promise<void> {
         class="navigation-list px-3"
         :aria-label="isAdminWorkspace ? '管理後台導覽' : '員工前台導覽'"
       >
-        <VListItem
-          v-for="item in isAdminWorkspace ? navigationItems : primaryNavigationItems"
-          :key="item.title"
-          :to="item.action ? undefined : item.to"
-          :prepend-icon="item.icon"
-          :title="item.title"
-          @click="item.action ? handleNavigate(item) : undefined"
-        >
-          <template v-if="item.hint && !isRailMode" #append>
-            <kbd class="nav-hint">{{ item.hint }}</kbd>
-          </template>
-          <VTooltip v-if="isRailMode" activator="parent" location="right">{{
-            item.title
-          }}</VTooltip>
-        </VListItem>
+		<template v-if="isAdminWorkspace">
+			<VListItem
+				:to="adminOverviewItem.to"
+				:prepend-icon="adminOverviewItem.icon"
+				:title="adminOverviewItem.title"
+			>
+				<VTooltip v-if="isRailMode" activator="parent" location="right">{{ adminOverviewItem.title }}</VTooltip>
+			</VListItem>
+			<template v-for="group in adminNavigationGroups" :key="group.title">
+				<VListSubheader v-if="!isRailMode" class="admin-nav-group">{{ group.title }}</VListSubheader>
+				<VListItem
+					v-for="item in group.items"
+					:key="item.title"
+					:to="item.to"
+					:prepend-icon="item.icon"
+					:title="item.title"
+				>
+					<VTooltip v-if="isRailMode" activator="parent" location="right">{{ item.title }}</VTooltip>
+				</VListItem>
+			</template>
+		</template>
+		<template v-else>
+			<VListItem
+				v-for="item in primaryNavigationItems"
+				:key="item.title"
+				:to="item.action ? undefined : item.to"
+				:prepend-icon="item.icon"
+				:title="item.title"
+				@click="item.action ? handleNavigate(item) : undefined"
+			>
+				<template v-if="item.hint && !isRailMode" #append>
+					<kbd class="nav-hint">{{ item.hint }}</kbd>
+				</template>
+				<VTooltip v-if="isRailMode" activator="parent" location="right">{{ item.title }}</VTooltip>
+			</VListItem>
+		</template>
       </VList>
 
 			<VList v-if="isRailMode && !isAdminWorkspace" nav density="compact" class="navigation-list px-3" aria-label="其他功能">
@@ -365,6 +387,13 @@ async function handleLogout(): Promise<void> {
 .navigation-list :deep(.v-list-item) {
 	min-height: 36px;
 	margin-block: 2px;
+}
+
+.admin-nav-group {
+	min-height: 30px;
+	padding-top: var(--space-sm);
+	font-size: 0.7rem;
+	letter-spacing: 0.08em;
 }
 
 .secondary-navigation {
