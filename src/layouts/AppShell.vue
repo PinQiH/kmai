@@ -8,10 +8,15 @@ import AdminAssistantWidget from "@/components/AdminAssistantWidget.vue"
 import ConversationHistoryPanel from "@/components/ConversationHistoryPanel.vue"
 import ConversationSearchDialog from "@/components/ConversationSearchDialog.vue"
 import NotificationMenu from "@/components/NotificationMenu.vue"
+import UserAccountMenu from "@/components/UserAccountMenu.vue"
 import { useConversationStore } from "@/stores/conversation"
 import { useAppStore } from "@/stores/app"
 import { useAdminAssistantStore } from "@/stores/adminAssistant"
 import type { NavigationItem } from "@/types"
+import {
+	getWorkspaceWindowName,
+	getWorkspaceSwitchWindowName,
+} from "@/utils/adminWorkspaceWindow"
 
 const employeeItems: NavigationItem[] = [
   { title: "首頁", icon: "mdi-home-outline", to: "/" },
@@ -81,6 +86,11 @@ const assistantStore = useAdminAssistantStore()
 const isPublicPage = computed(() => Boolean(route.meta.public))
 const isAdminWorkspace = computed(() => Boolean(route.meta.admin))
 const isCompactLayout = computed(() => display.smAndDown.value)
+const currentUserRoleLabel = computed(() => {
+  if (appStore.adminRole === "system-admin") return "系統管理員"
+  if (appStore.adminRole === "knowledge-admin") return "知識管理員"
+  return "一般使用者"
+})
 const navigationItems = computed(() =>
   isAdminWorkspace.value ? adminItems : employeeItems,
 )
@@ -90,8 +100,11 @@ const workspaceSwitchLabel = computed(() =>
 const workspaceSwitchIcon = computed(() =>
   isAdminWorkspace.value ? "mdi-arrow-left" : "mdi-shield-account-outline",
 )
+const workspaceSwitchHref = computed(() =>
+	router.resolve(isAdminWorkspace.value ? "/" : "/admin").href,
+)
 const workspaceSwitchTarget = computed(() =>
-  isAdminWorkspace.value ? "/" : "/admin",
+	getWorkspaceSwitchWindowName(isAdminWorkspace.value),
 )
 const navigationModel = computed({
   get: () => (isCompactLayout.value ? appStore.isNavigationOpen : true),
@@ -120,6 +133,13 @@ watch(
   },
 )
 
+watch(
+	[isPublicPage, isAdminWorkspace],
+	([isPublic, isAdmin]) => {
+		window.name = isPublic ? "" : getWorkspaceWindowName(isAdmin)
+	},
+	{ immediate: true },
+)
 
 const conversationStore = useConversationStore()
 const isSearchOpen = ref(false)
@@ -273,7 +293,8 @@ async function handleLogout(): Promise<void> {
         v-if="appStore.isAdmin && !isCompactLayout"
         variant="tonal"
         :prepend-icon="workspaceSwitchIcon"
-        :to="workspaceSwitchTarget"
+		:href="workspaceSwitchHref"
+		:target="workspaceSwitchTarget"
       >
         {{ workspaceSwitchLabel }}
       </VBtn>
@@ -281,7 +302,8 @@ async function handleLogout(): Promise<void> {
         v-else-if="appStore.isAdmin"
         :icon="workspaceSwitchIcon"
         :aria-label="workspaceSwitchLabel"
-        :to="workspaceSwitchTarget"
+		:href="workspaceSwitchHref"
+		:target="workspaceSwitchTarget"
       >
         <VTooltip activator="parent">{{ workspaceSwitchLabel }}</VTooltip>
       </VBtn>
@@ -298,21 +320,13 @@ async function handleLogout(): Promise<void> {
         "
         @click="appStore.toggleTheme(theme)"
       />
-      <VBtn
-        icon="mdi-help-circle-outline"
-        aria-label="問題回報"
-        to="/account?tab=support"
+      <UserAccountMenu
+        name="王小明"
+        department="產品企劃部"
+        email="employee@company.com"
+        :role-label="currentUserRoleLabel"
+        @logout="handleLogout"
       />
-			<VMenu location="bottom end">
-				<template #activator="{ props: menuProps }">
-					<VBtn v-bind="menuProps" icon="mdi-account-circle-outline" aria-label="開啟使用者選單" />
-				</template>
-				<VList min-width="240" lines="two">
-					<VListItem prepend-icon="mdi-account-circle-outline" title="王小明" subtitle="產品企劃部" to="/account" />
-					<VDivider />
-					<VListItem prepend-icon="mdi-logout" title="登出" @click="handleLogout" />
-				</VList>
-			</VMenu>
     </VAppBar>
 
     <VMain id="main-content" class="app-main" tabindex="-1">
