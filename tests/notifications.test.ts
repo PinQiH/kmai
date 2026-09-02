@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { AppNotification } from '../src/types'
 import {
 	formatElapsedTime,
+	formatNotificationMenuTimestamp,
 	formatNotificationScheduleInput,
 	formatNotificationTimestamp,
 	getNotificationActionTargetKind,
@@ -134,6 +135,15 @@ describe('notification action target validation', () => {
 })
 
 describe('notification time formatting', () => {
+	it('should omit the year and seconds when formatting a menu timestamp', () => {
+		expect(formatNotificationMenuTimestamp('2026-08-31T02:15:08.000Z')).toBe('08/31 10:15')
+	})
+
+	it('should return a dash when a menu timestamp is missing or invalid', () => {
+		expect(formatNotificationMenuTimestamp(null)).toBe('—')
+		expect(formatNotificationMenuTimestamp('invalid')).toBe('—')
+	})
+
 	it('should include seconds when formatting a valid timestamp', () => {
 		const formatted = formatNotificationTimestamp('2026-08-31T02:15:08.000Z')
 

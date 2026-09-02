@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { CURRENT_NOTIFICATION_USER_ID } from '@/mocks/notifications'
 import { useNotificationsStore } from '@/stores/notifications'
 import type { NotificationPriority } from '@/types'
-import { formatNotificationTimestamp } from '@/utils/notifications'
+import { formatNotificationMenuTimestamp, formatNotificationTimestamp } from '@/utils/notifications'
 
 const notificationsStore = useNotificationsStore()
 
@@ -71,9 +71,19 @@ function isUnread(notificationId: string): boolean {
 								:aria-label="priorityMeta[notification.priority].label"
 							/>
 						</template>
-						<VListItemTitle class="font-weight-medium">{{ notification.title }}</VListItemTitle>
-						<VListItemSubtitle>
-							{{ notification.sourceLabel }} · {{ formatNotificationTimestamp(notification.sentAt) }}
+						<VListItemTitle>{{ notification.title }}</VListItemTitle>
+						<VListItemSubtitle class="notification-meta">
+							<span class="notification-source" :title="notification.sourceLabel">
+								{{ notification.sourceLabel }}
+							</span>
+							<time
+								class="notification-time"
+								:datetime="notification.sentAt"
+								:title="formatNotificationTimestamp(notification.sentAt)"
+								:aria-label="formatNotificationTimestamp(notification.sentAt)"
+							>
+								{{ formatNotificationMenuTimestamp(notification.sentAt) }}
+							</time>
 						</VListItemSubtitle>
 						<template #append>
 							<span v-if="isUnread(notification.id)" class="unread-dot" aria-label="未讀" />
@@ -97,9 +107,41 @@ function isUnread(notificationId: string): boolean {
 
 <style scoped>
 .notification-menu {
-	width: min(420px, calc(100vw - 24px));
-	max-height: min(620px, calc(100vh - 80px));
+	width: min(360px, calc(100vw - 24px));
+	max-height: min(480px, calc(100vh - 80px));
 	overflow-y: auto;
+}
+
+.notification-menu :deep(.v-list-item-title) {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.4;
+	white-space: normal;
+}
+
+.notification-menu :deep(.notification-meta) {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: var(--space-sm);
+	font-size: 0.75rem;
+	line-height: 1.4;
+}
+
+.notification-source {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.notification-time {
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
 }
 
 .is-unread {

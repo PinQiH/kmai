@@ -24,11 +24,18 @@ export interface DocumentVersionEntry {
 
 export interface Citation {
 	id: string
+	chunkId?: string
 	documentId: string
 	title: string
 	section: string
 	excerpt: string
 	confidence: number
+}
+
+export interface DocumentContentSection {
+	id: string
+	heading: string
+	body: string
 }
 
 export interface ConversationMessage {
@@ -61,6 +68,14 @@ export interface AnswerTrace {
 }
 
 export type AnswerSegment = { type: 'text'; value: string } | { type: 'citation'; index: number }
+
+export type AnswerStyleId = 'balanced' | 'concise' | 'step-by-step'
+export type AnswerModelId = 'gpt-4.1-mini' | 'llama3.1:8b'
+
+export interface AnswerSettings {
+	answerStyleId: AnswerStyleId
+	answerModelId: AnswerModelId
+}
 
 export type KnowledgeSourceKind = 'model' | 'knowledge-base' | 'notebook'
 

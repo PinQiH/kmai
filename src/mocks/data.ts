@@ -1,4 +1,4 @@
-import type { ActivityItem, Citation, ConversationSummary, DocumentVersionEntry, HealthMetric, KnowledgeDocument } from '@/types'
+import type { ActivityItem, AnswerTrace, Citation, ConversationMessage, ConversationSummary, DocumentVersionEntry, HealthMetric, KnowledgeDocument } from '@/types'
 
 // TODO(api-integration): 串接文件查詢 API 後移除此 Mock 資料。
 export const documents: KnowledgeDocument[] = [
@@ -104,6 +104,7 @@ export const documentVersionHistoryById: Record<string, DocumentVersionEntry[]> 
 export const citations: Citation[] = [
 	{
 		id: 'cite-1',
+		chunkId: 'doc-001-chunk-0042',
 		documentId: 'doc-001',
 		title: '員工差旅與費用報支辦法',
 		section: '4.2 住宿費用',
@@ -112,6 +113,7 @@ export const citations: Citation[] = [
 	},
 	{
 		id: 'cite-2',
+		chunkId: 'doc-001-chunk-0061',
 		documentId: 'doc-001',
 		title: '員工差旅與費用報支辦法',
 		section: '6.1 核銷期限',
@@ -119,6 +121,66 @@ export const citations: Citation[] = [
 		confidence: 0.91,
 	},
 ]
+
+const onboardingCitation: Citation = {
+	id: 'cite-onboarding-first-week',
+	chunkId: 'doc-002-chunk-0018',
+	documentId: 'doc-002',
+	title: '新進同仁到職指南',
+	section: '二、第一週任務（資訊安全訓練）',
+	excerpt: '完成公司帳號啟用、設備點交與到職會談；資訊安全訓練應於到職後五個工作天內完成，紀錄同步至新人報到清單。',
+	confidence: 0.93,
+}
+
+const travelVersionAccommodationCitation: Citation = {
+	id: 'cite-travel-version-accommodation',
+	chunkId: 'doc-001-chunk-0073',
+	documentId: 'doc-001',
+	title: '員工差旅與費用報支辦法',
+	section: '3.2 版修訂摘要',
+	excerpt: '3.2 版將國內住宿每晚原則上限調整為新台幣 3,000 元。',
+	confidence: 0.96,
+}
+
+const travelVersionReimbursementCitation: Citation = {
+	id: 'cite-travel-version-reimbursement',
+	chunkId: 'doc-001-chunk-0074',
+	documentId: 'doc-001',
+	title: '員工差旅與費用報支辦法',
+	section: '3.2 版修訂摘要',
+	excerpt: '3.2 版將核銷期限調整為出差結束後十個工作天，並新增旺季例外申請欄位。',
+	confidence: 0.95,
+}
+
+const customerDataCitation: Citation = {
+	id: 'cite-customer-data-access',
+	chunkId: 'doc-003-chunk-0024',
+	documentId: 'doc-003',
+	title: '客戶資料存取與分享規範',
+	section: '二、存取與分享',
+	excerpt: '客戶資料應依分級提出權限申請；對外分享前須確認接收者、使用目的與保存期限。',
+	confidence: 0.92,
+}
+
+const procurementCitation: Citation = {
+	id: 'cite-procurement-attachments',
+	chunkId: 'doc-004-chunk-0031',
+	documentId: 'doc-004',
+	title: '採購請款標準作業流程',
+	section: '五、請款附件',
+	excerpt: '請款時應檢附驗收單、發票或收據，以及完成簽核的採購申請單。',
+	confidence: 0.95,
+}
+
+const performanceAppealCitation: Citation = {
+	id: 'cite-performance-appeal',
+	chunkId: 'doc-005-chunk-0029',
+	documentId: 'doc-005',
+	title: '年度績效評核常見問題',
+	section: '三、評等與申覆',
+	excerpt: '評等公布後十個工作天內可向人力資源部提出申覆，逾期不再受理。',
+	confidence: 0.9,
+}
 
 // TODO(api-integration): 串接歷史對話 API 後移除此 Mock 資料。
 export const conversationHistory: ConversationSummary[] = [
@@ -177,6 +239,107 @@ export const conversationHistory: ConversationSummary[] = [
 		isArchived: true,
 	},
 ]
+
+type MockConversationMessage = Pick<ConversationMessage, 'role' | 'content' | 'citations'>
+
+function createHistoryTrace(messageCitations: Citation[]): AnswerTrace {
+	return {
+		documentCount: new Set(messageCitations.map((citation) => citation.documentId)).size,
+		citationCount: messageCitations.length,
+		retrievedCount: 1284,
+		elapsedMs: 1780,
+		stages: [
+			{ id: 'parse', label: '解析問題', detail: '拆解語意、時間範圍與適用對象', status: 'done', elapsedMs: 220 },
+			{ id: 'retrieve', label: '檢索知識庫', detail: '從可搜尋文件中找出相關內容', status: 'done', elapsedMs: 760 },
+			{ id: 'compare', label: '比對版本', detail: '確認生效版本與適用範圍', status: 'done', elapsedMs: 420 },
+			{ id: 'generate', label: '生成回答', detail: '整理內容並標註引用來源', status: 'done', elapsedMs: 380 },
+		],
+	}
+}
+
+function createHistoryMessages({
+	conversationId,
+	updatedAt,
+	messages,
+}: {
+	conversationId: string
+	updatedAt: string
+	messages: MockConversationMessage[]
+}): ConversationMessage[] {
+	return messages.map(({ citations: messageCitations = [], ...message }, index) => {
+		const clonedCitations = messageCitations.map((citation) => ({ ...citation }))
+		return {
+			...message,
+			id: `${conversationId}-message-${index + 1}`,
+			createdAt: updatedAt,
+			...(message.role === 'assistant'
+				? {
+					citations: clonedCitations,
+					trace: createHistoryTrace(clonedCitations),
+				}
+				: {}),
+		}
+	})
+}
+
+// TODO(api-integration): 串接歷史對話 API 後，改由後端依對話 ID 取回完整訊息。
+export const conversationMessagesById: Record<string, ConversationMessage[]> = {
+	'conv-001': createHistoryMessages({
+		conversationId: 'conv-001',
+		updatedAt: '2026-08-17T10:42:00',
+		messages: [
+			{ role: 'user', content: '國內出差住宿費用上限是多少？' },
+			{ role: 'assistant', content: '依目前有效的差旅辦法，國內住宿每晚原則上限為新台幣 3,000 元 [1]。', citations: [citations[0]] },
+		],
+	}),
+	'conv-002': createHistoryMessages({
+		conversationId: 'conv-002',
+		updatedAt: '2026-08-16T15:08:00',
+		messages: [
+			{ role: 'user', content: '新進同仁第一週要完成哪些事情？' },
+			{ role: 'assistant', content: '新進同仁第一週應完成公司帳號啟用、設備點交、資訊安全訓練及主管安排的到職會談 [1]。', citations: [onboardingCitation] },
+			{ role: 'user', content: '資訊安全訓練需要在第幾天前完成？' },
+			{ role: 'assistant', content: '請在到職後五個工作天內完成，完成紀錄會同步到新人報到清單 [1]。', citations: [onboardingCitation] },
+		],
+	}),
+	'conv-003': createHistoryMessages({
+		conversationId: 'conv-003',
+		updatedAt: '2026-08-14T09:20:00',
+		messages: [
+			{ role: 'user', content: '如何申請客戶資料存取權限？' },
+			{ role: 'assistant', content: '客戶資料需依分級申請存取權限，對外分享前必須確認接收者、用途與保存期限 [1]。', citations: [customerDataCitation] },
+		],
+	}),
+	'conv-004': createHistoryMessages({
+		conversationId: 'conv-004',
+		updatedAt: '2026-08-13T16:26:00',
+		messages: [
+			{ role: 'user', content: '比較差旅辦法 3.1 與 3.2 版差異' },
+			{ role: 'assistant', content: '3.2 版調整了國內住宿上限 [1] 與核銷期限 [2]，並新增旺季例外的申請欄位。', citations: [travelVersionAccommodationCitation, travelVersionReimbursementCitation] },
+			{ role: 'user', content: '住宿上限調整成多少？' },
+			{ role: 'assistant', content: '國內住宿每晚原則上限調整為新台幣 3,000 元 [1]。', citations: [travelVersionAccommodationCitation] },
+			{ role: 'user', content: '核銷期限也有變更嗎？' },
+			{ role: 'assistant', content: '有，3.2 版要求在出差結束後十個工作天內完成核銷 [1]。', citations: [travelVersionReimbursementCitation] },
+		],
+	}),
+	'conv-005': createHistoryMessages({
+		conversationId: 'conv-005',
+		updatedAt: '2026-08-11T11:03:00',
+		messages: [
+			{ role: 'user', content: '採購請款需要哪些附件？' },
+			{ role: 'assistant', content: '請款需檢附驗收單、發票或收據，以及完成簽核的採購申請單 [1]。', citations: [procurementCitation] },
+		],
+	}),
+	'conv-006': createHistoryMessages({
+		conversationId: 'conv-006',
+		updatedAt: '2026-08-08T14:47:00',
+		messages: [
+			{ role: 'user', content: '年度績效申覆的時間限制' },
+			{ role: 'assistant', content: '評等公布後十個工作天內可提出申覆，逾期不再受理 [1]。', citations: [performanceAppealCitation] },
+			{ role: 'user', content: '申覆需要由主管提出嗎？' },
+		],
+	}),
+}
 
 export const healthMetrics: HealthMetric[] = [
 	{ label: '可搜尋文件', value: '1,284', detail: '近 7 天新增 36 份', status: 'good' },

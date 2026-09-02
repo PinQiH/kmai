@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+
 import type { OutlineItem } from '@/types'
 
 interface ComponentProps {
@@ -6,9 +8,26 @@ interface ComponentProps {
 	activeId: string | null
 }
 
-defineProps<ComponentProps>()
+const props = defineProps<ComponentProps>()
 
 const emit = defineEmits<{ select: [messageId: string] }>()
+const previewItemId = ref<string | null>(null)
+const previewTop = ref(0)
+const previewRight = ref(0)
+
+const previewItem = computed(() => props.items.find((item) => item.id === previewItemId.value) ?? null)
+
+function showPreview({ itemId, event }: { itemId: string; event: MouseEvent | FocusEvent }): void {
+	if (!(event.currentTarget instanceof HTMLElement)) return
+	const rect = event.currentTarget.getBoundingClientRect()
+	previewItemId.value = itemId
+	previewTop.value = rect.top + rect.height / 2
+	previewRight.value = window.innerWidth - rect.left + 8
+}
+
+function hidePreview(itemId: string): void {
+	if (previewItemId.value === itemId) previewItemId.value = null
+}
 </script>
 
 <template>
@@ -19,19 +38,37 @@ const emit = defineEmits<{ select: [messageId: string] }>()
 					type="button"
 					class="rail-item"
 					:class="{ 'is-active': item.id === activeId }"
-					:aria-label="`跳到第 ${item.seq} 個問題：${item.text}`"
+					:aria-label="`跳到第 ${item.seq} 個問題：${item.text}${item.summary ? `，回答摘要：${item.summary}` : ''}`"
 					:aria-current="item.id === activeId ? 'true' : undefined"
+					@mouseenter="showPreview({ itemId: item.id, event: $event })"
+					@mouseleave="hidePreview(item.id)"
+					@focus="showPreview({ itemId: item.id, event: $event })"
+					@blur="hidePreview(item.id)"
 					@click="emit('select', item.id)"
 				>
 					<span class="rail-marker" aria-hidden="true" />
-					<span class="rail-tip" role="tooltip">
-						<strong class="tip-question">{{ item.text }}</strong>
-						<span v-if="item.summary" class="tip-summary">{{ item.summary }}</span>
-					</span>
 				</button>
 			</li>
 		</ul>
 	</nav>
+
+	<Teleport to="body">
+		<span
+			v-if="previewItem"
+			class="rail-tip"
+			role="tooltip"
+			:style="{ top: `${previewTop}px`, right: `${previewRight}px` }"
+		>
+			<span class="tip-section">
+				<span class="tip-label">問題</span>
+				<strong class="tip-question">{{ previewItem.text }}</strong>
+			</span>
+			<span v-if="previewItem.summary" class="tip-section">
+				<span class="tip-label">回答</span>
+				<span class="tip-summary">{{ previewItem.summary }}</span>
+			</span>
+		</span>
+	</Teleport>
 </template>
 
 <style scoped>
@@ -40,17 +77,18 @@ const emit = defineEmits<{ select: [messageId: string] }>()
  * @ 平時只顯示導覽刻度，hover 或鍵盤聚焦時才浮出問題與答案摘要。
  */
 .outline-rail {
-	/*
-	 * @ 不用 sticky：這裡的父層不是捲動容器，sticky 不會生效。
-	 *   改為垂直置中並限制高度，題目很多時軌道自己捲，不會撐破版面。
-	 */
-	align-self: center;
+	/* @ 軌道位於捲動容器內，固定在可視區中央，捲軸因此能保持在最外側。 */
+	position: sticky;
+	z-index: var(--z-tooltip);
+	top: 50%;
+	align-self: start;
 	flex: 0 0 auto;
 	width: 40px;
-	max-height: 100%;
+	max-height: min(60vh, calc(100dvh - 196px));
 	padding: var(--space-sm) 0;
 	overflow-y: auto;
 	scrollbar-width: none;
+	transform: translateY(-50%);
 }
 
 .outline-rail::-webkit-scrollbar {
@@ -117,10 +155,7 @@ const emit = defineEmits<{ select: [messageId: string] }>()
 
 /* > 浮出的預覽：實心表面 + 邊框，文字維持全不透明以確保對比 */
 .rail-tip {
-	display: none;
-	position: absolute;
-	top: 50%;
-	right: calc(100% + var(--space-sm));
+	position: fixed;
 	z-index: var(--z-tooltip);
 	width: 288px;
 	padding: var(--space-sm) var(--space-md);
@@ -129,13 +164,25 @@ const emit = defineEmits<{ select: [messageId: string] }>()
 	background: rgb(var(--v-theme-surface));
 	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 	color: rgb(var(--v-theme-on-surface));
+	pointer-events: none;
 	text-align: left;
 	transform: translateY(-50%);
 }
 
-.rail-item:hover .rail-tip,
-.rail-item:focus-visible .rail-tip {
-	display: block;
+.tip-section {
+	display: grid;
+	gap: 2px;
+}
+
+.tip-section + .tip-section {
+	margin-top: var(--space-sm);
+}
+
+.tip-label {
+	color: var(--ink-subtle);
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
 }
 
 .tip-question,
@@ -154,7 +201,6 @@ const emit = defineEmits<{ select: [messageId: string] }>()
 }
 
 .tip-summary {
-	margin-top: var(--space-xs);
 	color: var(--ink-muted);
 	font-size: 0.78rem;
 	line-height: 1.55;

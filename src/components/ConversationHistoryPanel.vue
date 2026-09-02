@@ -339,6 +339,40 @@ function cancelRename(): void {
 	color: rgb(var(--v-theme-primary));
 }
 
+/* @ VMenu 會傳送到 body，因此用 global 精準縮小這個清單，不影響其他選單。 */
+:global(.row-menu.v-list) {
+	width: 148px;
+	min-width: 148px;
+	padding: 4px;
+	border: 1px solid rgb(var(--v-theme-outline));
+	border-radius: var(--radius-sm);
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+:global(.row-menu .v-list-item) {
+	min-height: 32px;
+	padding-inline: 8px;
+	border-radius: 6px;
+}
+
+:global(.row-menu .v-list-item__prepend) {
+	width: auto;
+	margin-inline-end: 6px;
+}
+
+:global(.row-menu .v-list-item__spacer) {
+	width: 0;
+}
+
+:global(.row-menu .v-icon) {
+	font-size: 15px;
+}
+
+:global(.row-menu .v-list-item-title) {
+	font-size: 0.75rem;
+	line-height: 1.35;
+}
+
 /* > Hover 預覽：實心表面、文字全不透明，浮在側邊欄右側 */
 .history-preview {
 	display: none;

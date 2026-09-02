@@ -69,6 +69,35 @@ export function isNotificationScheduled(notification: AppNotification, now = new
 }
 
 /**
+ * 將 ISO 時間轉成通知選單使用的精簡台灣日期時間。
+ * @param isoTimestamp ISO 8601 時間字串。
+ * @returns 月日與時分；無效值回傳破折號。
+ */
+export function formatNotificationMenuTimestamp(isoTimestamp: string | null): string {
+	if (!isoTimestamp) return '—'
+
+	const date = new Date(isoTimestamp)
+	if (Number.isNaN(date.getTime())) return '—'
+
+	const parts = new Intl.DateTimeFormat('zh-TW', {
+		timeZone: 'Asia/Taipei',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		hourCycle: 'h23',
+	}).formatToParts(date)
+	const getPart = (type: Intl.DateTimeFormatPartTypes): string | undefined =>
+		parts.find((part) => part.type === type)?.value
+	const month = getPart('month')
+	const day = getPart('day')
+	const hour = getPart('hour')
+	const minute = getPart('minute')
+
+	return month && day && hour && minute ? `${month}/${day} ${hour}:${minute}` : '—'
+}
+
+/**
  * 計算單則通知的查看成效。
  * @param notification 要統計的通知。
  * @returns 目標人數、查看率與平均查看秒數。

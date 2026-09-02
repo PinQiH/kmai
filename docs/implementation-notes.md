@@ -5,7 +5,7 @@
 目前前端以記憶體 Mock 完成可操作流程。串接後端時依下列邊界替換，不要讓頁面直接呼叫 HTTP：
 
 - `src/repositories/knowledge.repository.ts`：替換文件搜尋與文件詳情，保留員工端發布狀態與 ACL 防線。
-- `src/stores/conversation.ts`：替換 AI 串流回答，保留 `try/finally`、引用資料與錯誤狀態。
+- `src/stores/conversation.ts`：AI 串流回答與歷史訊息目前都保存在 Pinia 記憶體；從搜尋結果或歷史清單開啟對話時會還原已保存的問答、引用與搜尋步驟，但不重新執行檢索。正式串接時需分別替換回答串流與歷史對話查詢，並保留 `try/finally`、引用資料與錯誤狀態。
 - `src/views/LoginView.vue`、`ChangePasswordView.vue`：串接登入與首次密碼變更，從 API 回傳建立使用者角色。
 - `src/views/AccountView.vue`：串接個人資料與問題回報。
 - `src/views/admin/AdminUploadView.vue`：串接單筆／批次上傳與逐檔處理結果。
@@ -41,6 +41,16 @@
 - 手動結束、閒置逾時、離開管理後台或登出會清除使用者可見內容；未重新整理前，系統紀錄仍可依 Session ID 查看稽核副本。
 - 稽核保留一般問答原文，但 `sanitizeAuditContent` 會遮蔽明確的密碼、API Key、Access Token 與 Bearer Token；介面只用 Vue 文字插值，不使用 `v-html`。
 - 目前權限、保存期限與稽核完整性皆為 UI 示範，不構成安全邊界。正式版必須由後端驗證管理者權限、保存不可竄改稽核、執行遮蔽並支援跨裝置查詢。
+
+## 前台 AI 問答來源與引用檢視
+
+- 員工前台 `/ask` 不提供過度寬泛的「全公司知識」，預設使用「公司制度」；知識來源彈窗只顯示可選來源名稱，選取後立即套用並關閉。後台短效 AI 小幫手仍沿用自己的來源選項，不受此限制。
+- 回答中的引用角標第一次點擊只展開引用清單、定位並聚焦對應項目；使用者再次點擊引用項目後，才會開啟右側資料來源欄。
+- `Citation.chunkId` 是前台顯示檢索片段識別碼的選填欄位；正式 API 應提供穩定且可追蹤的 CHUNK ID、文件 ID、章節、引用內容與關聯度。
+- `src/mocks/documentContent.ts` 是文件詳情頁與引用來源欄共用的全文 Mock。正式串接時應改由具備員工文件 ACL 驗證的全文 API 載入，不可只依前端 `documentId` 直接回傳內容。
+- 寬螢幕以並排欄位顯示資料來源；窄螢幕改為右側覆蓋面板。關閉後焦點會回到原引用項目，並支援 Escape 關閉。
+- 問答工具列的「設定」以錨定式輕量選單提供回答風格與 LLM；選項暫存在 conversation Pinia store，不使用 LocalStorage。選單採草稿後套用，取消、Escape 或點擊外部不會改變目前設定。
+- 回答風格與 LLM 目前皆為前端 Mock 設定，尚未送入模型請求。LLM 預設使用 `gpt-4.1-mini`，另提供 `llama3.1:8b`，不提供自動選擇。正式串接時應由回答設定 API 提供可用選項，並保留基準選項作為空資料 fallback。
 
 ## 安全邊界
 

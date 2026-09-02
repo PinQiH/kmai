@@ -4,18 +4,19 @@ import { useRoute } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
 import AnswerMessage from '@/components/AnswerMessage.vue'
+import AnswerSettingsMenu from '@/components/AnswerSettingsMenu.vue'
+import CitationSourcePanel from '@/components/CitationSourcePanel.vue'
 import ConversationOutline from '@/components/ConversationOutline.vue'
 import ThinkingTrace from '@/components/ThinkingTrace.vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useNotebooksStore } from '@/stores/notebooks'
 import type { Citation, OutlineItem } from '@/types'
-import { buildKnowledgeSourceOptions, MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
+import { buildAskKnowledgeSourceGroups, MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
 
 // > 起手問題依知識來源分組；切換來源會換掉整組題目，讓來源選擇的影響立即可見
 const SOURCE_STARTERS: Record<string, string[]> = {
 	[MODEL_ONLY_SOURCE_ID]: ['這個頁面可以怎麼操作？', '幫我整理這個問題的處理步驟', '有哪些常見風險要注意？'],
-	company: ['公司請假流程是什麼？', '差旅費用怎麼申請？', '最新版的資安規範有哪些重點？'],
 	policy: ['加班與補休怎麼計算？', '採購金額到多少需要主管簽核？', '離職交接必須繳回哪些項目？'],
 	benefits: ['年度健康檢查補助多少？', '育嬰留職停薪最長可以請多久？', '團體保險的理賠怎麼申請？'],
 }
@@ -32,16 +33,19 @@ const question = ref('')
 const selectedCitation = ref<Citation | null>(null)
 const isCitationOpen = ref(false)
 const isScopeOpen = ref(false)
-const isSettingsOpen = ref(false)
 const feedbackMessage = ref('')
 const messageEnd = ref<HTMLElement>()
 const scrollArea = ref<HTMLElement>()
 const composerField = ref<HTMLTextAreaElement>()
+const scopeTrigger = ref<HTMLButtonElement>()
 const activeQuestionId = ref<string | null>(null)
+const citationTriggerId = ref<string | null>(null)
 
 const COMPOSER_MAX_HEIGHT = 120
 
-const knowledgeSources = computed(() => buildKnowledgeSourceOptions(notebooksStore.notebooks))
+const knowledgeSourceGroups = computed(() => buildAskKnowledgeSourceGroups(notebooksStore.notebooks))
+const visibleKnowledgeSourceGroups = computed(() => knowledgeSourceGroups.value.filter((group) => group.sources.length > 0))
+const knowledgeSources = computed(() => knowledgeSourceGroups.value.flatMap((group) => group.sources))
 
 // - 目前選到的個人筆記本；選到公司來源時為 null
 const selectedNotebook = computed(() => notebooksStore.notebooks.find((notebook) => notebook.id === conversationStore.selectedKnowledgeSourceId) ?? null)
@@ -54,18 +58,22 @@ const starterQuestions = computed<string[]>(() => {
 	if (preset) return preset
 
 	const notebook = selectedNotebook.value
-	if (!notebook) return SOURCE_STARTERS.company
+	if (!notebook) return SOURCE_STARTERS.policy
 
 	const [firstDocument] = notebook.documents
 	if (!firstDocument) return []
 	return [`${notebook.name}裡有哪些重點？`, `幫我整理${notebook.name}的重要結論`, `${firstDocument.name} 提到什麼？`]
 })
 
-function selectKnowledgeSource(sourceId: string | null): void {
-	if (!sourceId) return
+function selectKnowledgeSource(sourceId: string): void {
 	const source = knowledgeSources.value.find((item) => item.id === sourceId)
 	if (!source) return
 	conversationStore.selectKnowledgeSource(source)
+	isScopeOpen.value = false
+}
+
+function focusKnowledgeSourceTrigger(): void {
+	scopeTrigger.value?.focus({ preventScroll: true })
 }
 
 function toggleWebSearch(): void {
@@ -78,7 +86,8 @@ const visibleQuestionIds = new Set<string>()
 let orderedQuestionIds: string[] = []
 
 const isEmptyState = computed(() => conversationStore.messages.length === 0 && !conversationStore.isResponding)
-const showOutline = computed(() => display.mdAndUp.value && !isEmptyState.value)
+const isCitationOverlay = computed(() => display.width.value <= 1180)
+const showOutline = computed(() => display.mdAndUp.value && !isEmptyState.value && !isCitationOpen.value)
 
 function truncateText({ text, max }: { text: string; max: number }): string {
 	const normalized = text.replace(/\s+/g, ' ').trim()
@@ -130,6 +139,12 @@ function focusComposer(): void {
 	window.requestAnimationFrame(() => composerField.value?.focus())
 }
 
+function focusAnswerSettings(): void {
+	window.requestAnimationFrame(() => {
+		window.requestAnimationFrame(() => document.getElementById('answer-settings-button')?.focus())
+	})
+}
+
 watch(question, async () => {
 	await nextTick()
 	resizeComposer()
@@ -167,9 +182,17 @@ async function submitQuestion(value = question.value): Promise<void> {
 	messageEnd.value?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
 }
 
-function openCitation(citation: Citation): void {
+function openCitation(citation: Citation, triggerId: string): void {
 	selectedCitation.value = citation
+	citationTriggerId.value = triggerId
 	isCitationOpen.value = true
+}
+
+async function closeCitation(): Promise<void> {
+	isCitationOpen.value = false
+	await nextTick()
+	if (!citationTriggerId.value) return
+	document.getElementById(citationTriggerId.value)?.focus({ preventScroll: true })
 }
 
 function recordFeedback(isHelpful: boolean): void {
@@ -265,157 +288,215 @@ watch(() => route.query.q, (nextQuestion) => {
 		@ 歷史對話已移到全域側邊欄，這裡維持單欄，版面才不易跑掉。
 	-->
 	<div class="ask-page" :class="{ 'is-empty': isEmptyState }">
-		<div class="ask-body">
-			<div ref="scrollArea" class="ask-scroll">
-				<div class="ask-content">
-					<VAlert v-if="conversationStore.errorMessage" type="error" variant="tonal" density="compact" class="mb-4">{{ conversationStore.errorMessage }}</VAlert>
+		<div class="ask-workspace">
+			<div class="ask-main">
+				<div class="ask-body">
+					<div ref="scrollArea" class="ask-scroll">
+						<div class="ask-scroll-layout" :class="{ 'has-outline': showOutline }">
+							<div class="ask-content">
+								<VAlert v-if="conversationStore.errorMessage" type="error" variant="tonal" density="compact" class="mb-4">{{ conversationStore.errorMessage }}</VAlert>
 
-					<!-- @ 空狀態刻意左對齊並貼齊輸入框：標題→輸入框→建議題目形成一條可讀的直欄，而非置中的 AI 首屏 -->
-					<div v-if="isEmptyState" class="ask-empty">
-						<h2 class="empty-title">向「{{ conversationStore.selectedScope }}」提問</h2>
-						<p class="empty-description">回答會標註引用來源與適用版本，可以展開原文逐句核對。換一個知識來源，檢索範圍與建議題目也會跟著換。</p>
-						<VAlert v-if="emptyNotebook" type="info" variant="tonal" density="compact" class="empty-notice">
-							「{{ emptyNotebook.name }}」還沒有文件，現在提問不會有可查證的引用。
-							<div class="mt-2">
-								<VBtn :to="`/notebooks/${emptyNotebook.id}`" variant="tonal" size="small">開啟筆記本上傳文件</VBtn>
+								<!-- @ 空狀態刻意左對齊並貼齊輸入框：標題→輸入框→建議題目形成一條可讀的直欄，而非置中的 AI 首屏 -->
+								<div v-if="isEmptyState" class="ask-empty">
+									<h2 class="empty-title">向「{{ conversationStore.selectedScope }}」提問</h2>
+									<p class="empty-description">回答會標註引用來源與適用版本，可以展開原文逐句核對。換一個知識來源，檢索範圍與建議題目也會跟著換。</p>
+									<VAlert v-if="emptyNotebook" type="info" variant="tonal" density="compact" class="empty-notice">
+										「{{ emptyNotebook.name }}」還沒有文件，現在提問不會有可查證的引用。
+										<div class="mt-2">
+											<VBtn :to="`/notebooks/${emptyNotebook.id}`" variant="tonal" size="small">開啟筆記本上傳文件</VBtn>
+										</div>
+									</VAlert>
+								</div>
+
+								<div v-else class="message-list">
+									<template v-for="message in conversationStore.messages" :key="message.id">
+										<div v-if="message.role === 'user'" :id="`message-${message.id}`" class="user-message">{{ message.content }}</div>
+										<AnswerMessage
+											v-else
+											:message="message"
+											:is-favorite="favoritesStore.isFavorite(message.id)"
+											@open-citation="openCitation"
+											@feedback="recordFeedback"
+											@toggle-favorite="toggleFavorite(message.id, message.content)"
+										/>
+									</template>
+									<ThinkingTrace
+										v-if="conversationStore.isResponding && !conversationStore.streamingMessage"
+										:stages="conversationStore.thinkingStages"
+										:retrieved-count="conversationStore.retrievedCount"
+									/>
+									<div ref="messageEnd" />
+								</div>
+
+								<VAlert v-if="feedbackMessage" type="success" variant="tonal" density="compact" closable class="mt-4" @click:close="feedbackMessage = ''">{{ feedbackMessage }}</VAlert>
 							</div>
-						</VAlert>
-					</div>
 
-					<div v-else class="message-list">
-						<template v-for="message in conversationStore.messages" :key="message.id">
-							<div v-if="message.role === 'user'" :id="`message-${message.id}`" class="user-message">{{ message.content }}</div>
-							<AnswerMessage
-								v-else
-								:message="message"
-								:is-favorite="favoritesStore.isFavorite(message.id)"
-								@open-citation="openCitation"
-								@feedback="recordFeedback"
-								@toggle-favorite="toggleFavorite(message.id, message.content)"
-							/>
-						</template>
-						<ThinkingTrace
-							v-if="conversationStore.isResponding && !conversationStore.streamingMessage"
-							:stages="conversationStore.thinkingStages"
-							:retrieved-count="conversationStore.retrievedCount"
+							<ConversationOutline v-if="showOutline" :items="outlineItems" :active-id="activeQuestionId" @select="jumpToQuestion" />
+						</div>
+					</div>
+				</div>
+
+				<form class="composer" @submit.prevent="submitQuestion()">
+					<div class="composer-input">
+						<textarea
+							ref="composerField"
+							v-model="question"
+							class="composer-field"
+							rows="1"
+							placeholder="請輸入問題…"
+							aria-label="輸入你的問題"
+							:disabled="conversationStore.isResponding"
+							@keydown.enter.exact="handleComposerEnter"
 						/>
-						<div ref="messageEnd" />
+						<button type="submit" class="send-button" aria-label="送出問題" :disabled="!question.trim() || conversationStore.isResponding">
+							<VProgressCircular v-if="conversationStore.isResponding" indeterminate size="16" width="2" />
+							<VIcon v-else icon="mdi-arrow-up" size="18" />
+						</button>
 					</div>
 
-					<VAlert v-if="feedbackMessage" type="success" variant="tonal" density="compact" closable class="mt-4" @click:close="feedbackMessage = ''">{{ feedbackMessage }}</VAlert>
+					<div class="composer-tools">
+						<button
+							id="knowledge-source-trigger"
+							ref="scopeTrigger"
+							type="button"
+							class="tool-chip is-scope"
+							aria-haspopup="dialog"
+							:aria-expanded="isScopeOpen"
+							aria-controls="knowledge-source-dialog"
+							@click="isScopeOpen = true"
+						>
+							<VIcon icon="mdi-filter-variant" size="13" aria-hidden="true" />{{ conversationStore.selectedScope }}
+						</button>
+						<button
+							type="button"
+							class="tool-chip"
+							:class="{ 'is-enabled': conversationStore.isWebSearchEnabled }"
+							:disabled="!conversationStore.canUseWebSearch"
+							:aria-pressed="conversationStore.isWebSearchEnabled"
+							:title="conversationStore.webSearchSettingSource === 'default' ? '使用知識來源的預設值' : '你已覆寫知識來源的預設值'"
+							@click="toggleWebSearch"
+						>
+							<VIcon icon="mdi-web" size="13" aria-hidden="true" />網路搜尋：{{ conversationStore.canUseWebSearch ? (conversationStore.isWebSearchEnabled ? '開' : '關') : '不可用' }}
+							<span v-if="conversationStore.canUseWebSearch" class="setting-origin">{{ conversationStore.webSearchSettingSource === 'default' ? '預設' : '已調整' }}</span>
+						</button>
+						<AnswerSettingsMenu
+							:selected-answer-style-id="conversationStore.selectedAnswerStyleId"
+							:selected-answer-model-id="conversationStore.selectedAnswerModelId"
+							:is-responding="conversationStore.isResponding"
+							@apply="conversationStore.applyAnswerSettings"
+							@closed="focusAnswerSettings"
+						>
+							<template #activator="{ activatorProps, isOpen }">
+								<button
+									v-bind="activatorProps"
+									id="answer-settings-button"
+									type="button"
+									class="tool-chip settings-tool"
+									aria-haspopup="dialog"
+									:aria-expanded="isOpen"
+									:aria-label="`設定，目前為${conversationStore.answerStyleLabel}，${conversationStore.answerModelLabel}`"
+								>
+									<VIcon icon="mdi-tune-variant" size="13" aria-hidden="true" />
+									<span>設定</span>
+									<span class="settings-summary">{{ conversationStore.answerStyleLabel }} · {{ conversationStore.answerModelShortLabel }}</span>
+								</button>
+							</template>
+						</AnswerSettingsMenu>
+						<span class="composer-hint">Enter 送出 · Shift + Enter 換行</span>
+					</div>
+				</form>
+
+				<!-- @ 建議題目放在輸入框「之後」：DOM 順序＝視覺順序＝Tab 順序，先給輸入再給範例 -->
+				<div v-if="isEmptyState && starterQuestions.length > 0" class="ask-starters">
+					<span id="starter-label" class="starters-label">可以試著問</span>
+					<div class="starters-list" role="group" aria-labelledby="starter-label">
+						<button v-for="starter in starterQuestions" :key="starter" type="button" class="suggestion-chip" @click="submitQuestion(starter)">
+							{{ starter }}
+						</button>
+					</div>
 				</div>
 			</div>
 
-			<ConversationOutline v-if="showOutline" :items="outlineItems" :active-id="activeQuestionId" @select="jumpToQuestion" />
-		</div>
-
-		<form class="composer" @submit.prevent="submitQuestion()">
-			<div class="composer-input">
-				<textarea
-					ref="composerField"
-					v-model="question"
-					class="composer-field"
-					rows="1"
-					placeholder="請輸入問題…"
-					aria-label="輸入你的問題"
-					:disabled="conversationStore.isResponding"
-					@keydown.enter.exact="handleComposerEnter"
+			<button v-if="isCitationOpen" type="button" tabindex="-1" class="source-panel-scrim" aria-label="關閉資料來源遮罩" @click="closeCitation" />
+			<Transition name="source-panel">
+				<CitationSourcePanel
+					v-if="isCitationOpen && selectedCitation"
+					:citation="selectedCitation"
+					:is-modal="isCitationOverlay"
+					@close="closeCitation"
 				/>
-				<button type="submit" class="send-button" aria-label="送出問題" :disabled="!question.trim() || conversationStore.isResponding">
-					<VProgressCircular v-if="conversationStore.isResponding" indeterminate size="16" width="2" />
-					<VIcon v-else icon="mdi-arrow-up" size="18" />
-				</button>
-			</div>
-
-			<div class="composer-tools">
-				<button type="button" class="tool-chip is-scope" @click="isScopeOpen = true">
-					<VIcon icon="mdi-filter-variant" size="13" aria-hidden="true" />{{ conversationStore.selectedScope }}
-				</button>
-				<button
-					type="button"
-					class="tool-chip"
-					:class="{ 'is-enabled': conversationStore.isWebSearchEnabled }"
-					:disabled="!conversationStore.canUseWebSearch"
-					:aria-pressed="conversationStore.isWebSearchEnabled"
-					:title="conversationStore.webSearchSettingSource === 'default' ? '使用知識來源的預設值' : '你已覆寫知識來源的預設值'"
-					@click="toggleWebSearch"
-				>
-					<VIcon icon="mdi-web" size="13" aria-hidden="true" />網路搜尋：{{ conversationStore.canUseWebSearch ? (conversationStore.isWebSearchEnabled ? '開' : '關') : '不可用' }}
-					<span v-if="conversationStore.canUseWebSearch" class="setting-origin">{{ conversationStore.webSearchSettingSource === 'default' ? '預設' : '已調整' }}</span>
-				</button>
-				<button type="button" class="tool-chip" @click="isSettingsOpen = true">
-					<VIcon icon="mdi-tune-variant" size="13" aria-hidden="true" />回答設定
-				</button>
-				<span class="composer-hint">Enter 送出 · Shift + Enter 換行</span>
-			</div>
-		</form>
-
-		<!-- @ 建議題目放在輸入框「之後」：DOM 順序＝視覺順序＝Tab 順序，先給輸入再給範例 -->
-		<div v-if="isEmptyState && starterQuestions.length > 0" class="ask-starters">
-			<span id="starter-label" class="starters-label">可以試著問</span>
-			<div class="starters-list" role="group" aria-labelledby="starter-label">
-				<button v-for="starter in starterQuestions" :key="starter" type="button" class="suggestion-chip" @click="submitQuestion(starter)">
-					{{ starter }}
-				</button>
-			</div>
+			</Transition>
 		</div>
 
-		<VDialog v-model="isCitationOpen" max-width="560">
-			<VCard class="pa-6">
-				<div class="d-flex align-center mb-5">
-					<h2 class="section-heading">引用內容</h2>
-					<VSpacer />
-					<VBtn icon="mdi-close" variant="text" aria-label="關閉引用內容" @click="isCitationOpen = false" />
+		<VDialog
+			v-model="isScopeOpen"
+			max-width="380"
+			:content-props="{ id: 'knowledge-source-dialog', 'aria-labelledby': 'knowledge-source-title' }"
+			@after-leave="focusKnowledgeSourceTrigger"
+		>
+			<VCard class="source-dialog">
+				<div class="source-dialog-head">
+					<h2 id="knowledge-source-title" class="section-heading">知識來源</h2>
+					<VBtn icon="mdi-close" variant="text" size="small" aria-label="關閉知識來源" @click="isScopeOpen = false" />
 				</div>
-				<template v-if="selectedCitation">
-					<p class="font-weight-bold">{{ selectedCitation.title }}</p>
-					<p class="citation-meta">{{ selectedCitation.section }} · 關聯度 <span class="mono">{{ Math.round(selectedCitation.confidence * 100) }}%</span></p>
-					<blockquote class="citation-quote">{{ selectedCitation.excerpt }}</blockquote>
-					<VBtn class="mt-6" color="primary" variant="tonal" :to="`/documents/${selectedCitation.documentId}`">開啟完整文件</VBtn>
-				</template>
-			</VCard>
-		</VDialog>
-
-		<VDialog v-model="isScopeOpen" max-width="480">
-			<VCard class="pa-6">
-				<h2 class="section-heading mb-2">知識來源</h2>
-				<p class="dialog-hint mb-4">切換來源會套用該來源的網路搜尋預設值，你仍可在輸入框下方自行調整。</p>
-				<VRadioGroup :model-value="conversationStore.selectedKnowledgeSourceId" hide-details @update:model-value="selectKnowledgeSource">
-					<VRadio v-for="source in knowledgeSources" :key="source.id" :value="source.id">
-						<template #label><div><strong>{{ source.name }}</strong><div class="source-description">{{ source.description }} · {{ source.supportsWebSearch ? `預設${source.defaultWebSearchEnabled ? '搜尋網路' : '不搜尋網路'}` : '不使用網路搜尋' }}</div></div></template>
-					</VRadio>
+				<VRadioGroup
+					:model-value="conversationStore.selectedKnowledgeSourceId"
+					class="source-options"
+					aria-labelledby="knowledge-source-title"
+					hide-details
+				>
+					<section
+						v-for="group in visibleKnowledgeSourceGroups"
+						:key="group.id"
+						class="source-group"
+						role="group"
+						:aria-labelledby="`knowledge-source-group-${group.id}`"
+					>
+						<h3 :id="`knowledge-source-group-${group.id}`" class="source-group-label">{{ group.label }}</h3>
+						<VRadio
+							v-for="source in group.sources"
+							:key="source.id"
+							:label="source.name"
+							:value="source.id"
+							class="source-option"
+							:class="{ 'is-selected': source.id === conversationStore.selectedKnowledgeSourceId }"
+							:data-testid="`knowledge-source-${source.id}`"
+							@click="selectKnowledgeSource(source.id)"
+						/>
+					</section>
 				</VRadioGroup>
-				<div class="d-flex justify-end mt-6"><VBtn color="primary" variant="tonal" @click="isScopeOpen = false">完成</VBtn></div>
 			</VCard>
 		</VDialog>
 
-		<VDialog v-model="isSettingsOpen" max-width="480">
-			<VCard class="pa-6">
-				<h2 class="section-heading mb-2">回答設定</h2>
-				<p class="dialog-hint mb-4">調整回答的詳盡程度與引用數量。</p>
-				<!-- TODO(api-integration): 串接回答設定 API 後改為實際生效的參數。 -->
-				<VSelect label="回答長度" :items="['精簡', '標準', '詳盡']" model-value="標準" hide-details class="mb-4" />
-				<VSelect label="最多引用數" :items="['3', '6', '10']" model-value="6" hide-details />
-				<div class="d-flex justify-end mt-6"><VBtn color="primary" variant="tonal" @click="isSettingsOpen = false">完成</VBtn></div>
-			</VCard>
-		</VDialog>
 	</div>
 </template>
 
 <style scoped>
 /*
- * > 版面：單欄對話 + 右側 40px 大綱軌 + 底部 composer。
- * @ 全部用 flex（不巢狀 grid），高度鏈單純：
- *   ask-page 固定高 → ask-body 吃剩餘 → ask-scroll 自己捲。
+ * > 版面：主要問答工作區 + 可按需展開的資料來源欄。
+ * @ ask-workspace 控制左右欄，ask-main 內維持對話、大綱與 composer 的高度鏈。
  */
 .ask-page {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-md);
 	height: calc(100vh - 64px);
 	height: calc(100dvh - 64px);
 	min-height: 0;
 	padding: var(--space-md) clamp(var(--space-md), 2vw, var(--space-lg));
+}
+
+.ask-workspace {
+	display: flex;
+	gap: var(--space-md);
+	height: 100%;
+	min-height: 0;
+}
+
+.ask-main {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: var(--space-md);
+	min-width: 0;
+	min-height: 0;
 }
 
 .ask-body {
@@ -431,10 +512,44 @@ watch(() => route.query.q, (nextQuestion) => {
 	min-height: 0;
 	overflow-y: auto;
 	padding-right: var(--space-sm);
+	scrollbar-color: rgba(var(--v-theme-on-surface), 0.34) transparent;
+	scrollbar-gutter: stable;
+	scrollbar-width: thin;
+}
+
+.ask-scroll::-webkit-scrollbar {
+	width: 8px;
+}
+
+.ask-scroll::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.ask-scroll::-webkit-scrollbar-thumb {
+	border: 2px solid transparent;
+	border-radius: 999px;
+	background: rgba(var(--v-theme-on-surface), 0.28);
+	background-clip: padding-box;
+}
+
+.ask-scroll:hover::-webkit-scrollbar-thumb {
+	background: rgba(var(--v-theme-on-surface), 0.44);
+	background-clip: padding-box;
+}
+
+.ask-scroll-layout {
+	min-height: 100%;
+}
+
+.ask-scroll-layout.has-outline {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 40px;
+	gap: var(--space-sm);
 }
 
 /* @ 內容置中並限制閱讀寬度，捲軸仍貼在最外緣 */
 .ask-content {
+	width: 100%;
 	max-width: 860px;
 	margin-inline: auto;
 }
@@ -444,7 +559,7 @@ watch(() => route.query.q, (nextQuestion) => {
  * @ 沒有第二個 composer；只切換 .ask-page 的對齊方式，
  *   輸入框仍是同一個 DOM 節點，送出後不會失焦或掉字。
  */
-.ask-page.is-empty {
+.ask-page.is-empty .ask-main {
 	justify-content: center;
 	gap: var(--space-lg);
 }
@@ -452,6 +567,21 @@ watch(() => route.query.q, (nextQuestion) => {
 /* @ 空狀態的說明不需要佔滿剩餘高度，但仍允許在矮視窗中壓縮並自行捲動 */
 .ask-page.is-empty .ask-body {
 	flex: 0 1 auto;
+}
+
+.source-panel-enter-active,
+.source-panel-leave-active {
+	transition: opacity var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-out);
+}
+
+.source-panel-enter-from,
+.source-panel-leave-to {
+	opacity: 0;
+	transform: translateX(16px);
+}
+
+.source-panel-scrim {
+	display: none;
 }
 
 /* @ 沒有捲軸時取消預留的捲軸間距，說明文字才會與輸入框左右對齊 */
@@ -691,6 +821,23 @@ watch(() => route.query.q, (nextQuestion) => {
 	color: rgb(var(--v-theme-primary));
 }
 
+.settings-tool {
+	max-width: min(240px, 44vw);
+}
+
+.settings-summary {
+	overflow: hidden;
+	color: var(--ink-subtle);
+	font-size: 0.64rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings-summary::before {
+	margin-right: 3px;
+	content: '·';
+}
+
 .suggestion-chip:focus-visible,
 .tool-chip:focus-visible,
 .send-button:focus-visible {
@@ -705,11 +852,66 @@ watch(() => route.query.q, (nextQuestion) => {
 	opacity: 0.75;
 }
 
-.source-description {
-	margin-top: 2px;
-	color: var(--ink-muted);
-	font-size: 0.75rem;
-	font-weight: 400;
+.source-dialog {
+	padding: var(--space-md);
+}
+
+.source-dialog-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-md);
+}
+
+.source-options {
+	display: grid;
+	gap: var(--space-sm);
+	margin-top: var(--space-sm);
+}
+
+.source-group {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.source-group + .source-group {
+	padding-top: var(--space-sm);
+	border-top: 1px solid rgb(var(--v-theme-outline));
+}
+
+.source-group-label {
+	margin: 0;
+	padding-inline: var(--space-sm);
+	color: var(--ink-subtle);
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+}
+
+.source-option {
+	min-height: 44px;
+	padding-inline: var(--space-sm);
+	border-radius: var(--radius-sm);
+	transition: background-color var(--motion-fast) var(--ease-standard);
+}
+
+.source-option:hover {
+	background: var(--tint-hover);
+}
+
+.source-option.is-selected {
+	background: var(--tint-active);
+}
+
+.source-option :deep(.v-label) {
+	overflow: hidden;
+	color: var(--ink-strong);
+	font-size: 0.9rem;
+	font-weight: 500;
+	opacity: 1;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .composer-hint {
@@ -718,36 +920,35 @@ watch(() => route.query.q, (nextQuestion) => {
 	font-size: 0.68rem;
 }
 
-.citation-meta {
-	margin-top: var(--space-xs);
-	color: var(--ink-muted);
-	font-size: 0.78rem;
-}
+@media (max-width: 1180px) {
+	.source-panel-scrim {
+		position: fixed;
+		z-index: var(--z-sticky);
+		display: block;
+		inset: 64px 0 0;
+		border: 0;
+		background: rgba(0, 0, 0, 0.28);
+		cursor: default;
+	}
 
-.citation-quote {
-	margin-top: var(--space-lg);
-	padding: var(--space-md);
-	border: 1px solid rgb(var(--v-theme-outline));
-	border-radius: var(--radius-sm);
-	background: rgb(var(--v-theme-surface-variant));
-	font-size: 1rem;
-	line-height: 1.7;
-}
-
-.dialog-hint {
-	color: var(--ink-muted);
-	font-size: 0.875rem;
-	line-height: 1.6;
+	.ask-workspace :deep(.source-panel) {
+		position: fixed;
+		z-index: var(--z-drawer);
+		top: 76px;
+		right: 12px;
+		bottom: 12px;
+		width: min(400px, calc(100vw - 24px));
+		height: auto;
+	}
 }
 
 @media (max-width: 960px) {
 	.ask-page {
-		gap: var(--space-sm);
 		padding: var(--space-sm) var(--space-md) var(--space-md);
 	}
 
-	/* @ .ask-page.is-empty 的權重高於上面的 .ask-page，必須在此另外收窄 */
-	.ask-page.is-empty {
+	/* @ .ask-page.is-empty .ask-main 的權重較高，必須在此另外收窄 */
+	.ask-page.is-empty .ask-main {
 		gap: var(--space-md);
 	}
 
@@ -771,6 +972,21 @@ watch(() => route.query.q, (nextQuestion) => {
 
 	.suggestion-chip {
 		min-height: 44px;
+	}
+}
+
+@media (max-width: 600px) {
+	.settings-summary {
+		display: none;
+	}
+
+	.ask-workspace :deep(.source-panel) {
+		top: 64px;
+		right: 0;
+		bottom: 0;
+		width: 100vw;
+		border: 0;
+		border-radius: 0;
 	}
 }
 </style>

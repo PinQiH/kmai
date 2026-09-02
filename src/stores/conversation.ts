@@ -1,8 +1,17 @@
 import { defineStore } from 'pinia'
 
-import { citations, conversationHistory } from '@/mocks/data'
-import type { AnswerSegment, ConversationMessage, ConversationSummary, ThinkingStage } from '@/types'
-import { MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
+import { citations, conversationHistory, conversationMessagesById } from '@/mocks/data'
+import type {
+	AnswerModelId,
+	AnswerSegment,
+	AnswerSettings,
+	AnswerStyleId,
+	ConversationMessage,
+	ConversationSummary,
+	ThinkingStage,
+} from '@/types'
+import { DEFAULT_ANSWER_MODEL_ID, DEFAULT_ANSWER_STYLE_ID, getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
+import { DEFAULT_ASK_SOURCE_ID, MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
 
 interface ConversationState {
 	messages: ConversationMessage[]
@@ -11,10 +20,13 @@ interface ConversationState {
 	selectedKnowledgeSourceId: string
 	selectedSourceDefaultWebSearch: boolean
 	webSearchOverride: boolean | null
+	selectedAnswerStyleId: AnswerStyleId
+	selectedAnswerModelId: AnswerModelId
 	errorMessage: string
 	thinkingStages: ThinkingStage[]
 	retrievedCount: number
 	conversations: ConversationSummary[]
+	conversationMessagesById: Record<string, ConversationMessage[]>
 	activeConversationId: string | null
 	historyKeyword: string
 	onlyArchived: boolean
@@ -44,6 +56,28 @@ function comparePinnedFirst(left: ConversationSummary, right: ConversationSummar
 function matchesKeyword({ conversation, keyword }: { conversation: ConversationSummary; keyword: string }): boolean {
 	const normalized = keyword.toLowerCase()
 	return conversation.title.toLowerCase().includes(normalized) || conversation.previewAnswer.toLowerCase().includes(normalized)
+}
+
+function cloneConversationMessages(messages: ConversationMessage[]): ConversationMessage[] {
+	return messages.map(({ citations: messageCitations, isStreaming, trace, ...message }) => ({
+		...message,
+		...(messageCitations ? { citations: messageCitations.map((citation) => ({ ...citation })) } : {}),
+		...(isStreaming !== undefined ? { isStreaming: false } : {}),
+		...(trace
+			? {
+				trace: {
+					...trace,
+					stages: trace.stages.map((stage) => ({ ...stage })),
+				},
+			}
+			: {}),
+	}))
+}
+
+function cloneConversationHistory(history: Record<string, ConversationMessage[]>): Record<string, ConversationMessage[]> {
+	return Object.fromEntries(
+		Object.entries(history).map(([conversationId, messages]) => [conversationId, cloneConversationMessages(messages)]),
+	)
 }
 
 function createStagePlan(usesRetrieval = true): ThinkingStage[] {
@@ -129,14 +163,17 @@ export const useConversationStore = defineStore('conversation', {
 		messages: [],
 		isResponding: false,
 		// @ 必須與 selectedKnowledgeSourceId 的預設值同義，否則來源晶片與來源對話框會顯示不一致
-		selectedScope: '全公司知識',
-		selectedKnowledgeSourceId: 'company',
+		selectedScope: '公司制度',
+		selectedKnowledgeSourceId: DEFAULT_ASK_SOURCE_ID,
 		selectedSourceDefaultWebSearch: false,
 		webSearchOverride: null,
+		selectedAnswerStyleId: DEFAULT_ANSWER_STYLE_ID,
+		selectedAnswerModelId: DEFAULT_ANSWER_MODEL_ID,
 		errorMessage: '',
 		thinkingStages: [],
 		retrievedCount: 0,
 		conversations: conversationHistory.map((conversation) => ({ ...conversation })),
+		conversationMessagesById: cloneConversationHistory(conversationMessagesById),
 		activeConversationId: null,
 		historyKeyword: '',
 		onlyArchived: false,
@@ -151,6 +188,15 @@ export const useConversationStore = defineStore('conversation', {
 		},
 		webSearchSettingSource(state): 'default' | 'override' {
 			return state.webSearchOverride === null ? 'default' : 'override'
+		},
+		answerStyleLabel(state): string {
+			return getAnswerStyleLabel(state.selectedAnswerStyleId)
+		},
+		answerModelLabel(state): string {
+			return getAnswerModelLabel(state.selectedAnswerModelId)
+		},
+		answerModelShortLabel(state): string {
+			return getAnswerModelLabel(state.selectedAnswerModelId, true)
 		},
 		// - 目前正在串流的回答訊息，用來決定顯示完整流程或收合摘要
 		streamingMessage(state): ConversationMessage | null {
@@ -198,6 +244,10 @@ export const useConversationStore = defineStore('conversation', {
 		},
 		resetWebSearchToDefault(): void {
 			this.webSearchOverride = null
+		},
+		applyAnswerSettings({ answerStyleId, answerModelId }: AnswerSettings): void {
+			this.selectedAnswerStyleId = answerStyleId
+			this.selectedAnswerModelId = answerModelId
 		},
 		async askQuestion(question: string): Promise<void> {
 			const trimmedQuestion = question.trim()
@@ -282,6 +332,7 @@ export const useConversationStore = defineStore('conversation', {
 				existing.messageCount = this.messages.length
 				existing.previewAnswer = answer
 				existing.updatedAt = new Date().toISOString()
+				this.conversationMessagesById[existing.id] = cloneConversationMessages(this.messages)
 				return
 			}
 
@@ -295,24 +346,23 @@ export const useConversationStore = defineStore('conversation', {
 				isArchived: false,
 			}
 			this.conversations.unshift(created)
+			this.conversationMessagesById[created.id] = cloneConversationMessages(this.messages)
 			this.activeConversationId = created.id
 		},
 		/**
-		 * 開啟既有對話。
-		 * @ 後端還沒有對話儲存 API，目前以重新提問模擬取回內容。
+		 * 從前端 Mock 歷史載入既有對話，不重新執行檢索或生成回答。
 		 * @param conversationId 對話識別碼。
 		 */
-		async openConversation(conversationId: string): Promise<void> {
+		openConversation(conversationId: string): void {
 			const target = this.conversations.find((conversation) => conversation.id === conversationId)
-			if (!target || this.isResponding) return
+			const savedMessages = this.conversationMessagesById[conversationId]
+			if (!target || !savedMessages || this.isResponding) return
 
 			this.activeConversationId = conversationId
-			this.messages = []
+			this.messages = cloneConversationMessages(savedMessages)
 			this.thinkingStages = []
 			this.retrievedCount = 0
 			this.errorMessage = ''
-			// TODO(api-integration): 改為向後端取回該對話的完整訊息，而非重新提問。
-			await this.askQuestion(target.title)
 		},
 		startNewConversation(): void {
 			this.messages = []

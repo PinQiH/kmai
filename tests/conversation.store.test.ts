@@ -9,6 +9,28 @@ describe('conversation store', () => {
 		vi.stubGlobal('crypto', { randomUUID: vi.fn(() => `message-${Math.random()}`) })
 	})
 
+	it('should default to a specific Syscom library source instead of all-company knowledge', () => {
+		const store = useConversationStore()
+
+		expect(store.selectedKnowledgeSourceId).toBe('policy')
+		expect(store.selectedScope).toBe('公司制度')
+	})
+
+	it('should apply answer style and LLM settings with readable labels', () => {
+		const store = useConversationStore()
+
+		expect(store.answerStyleLabel).toBe('標準')
+		expect(store.selectedAnswerModelId).toBe('gpt-4.1-mini')
+		expect(store.answerModelShortLabel).toBe('gpt-4.1-mini')
+
+		store.applyAnswerSettings({ answerStyleId: 'step-by-step', answerModelId: 'llama3.1:8b' })
+
+		expect(store.selectedAnswerStyleId).toBe('step-by-step')
+		expect(store.selectedAnswerModelId).toBe('llama3.1:8b')
+		expect(store.answerStyleLabel).toBe('步驟式')
+		expect(store.answerModelLabel).toBe('llama3.1:8b')
+	})
+
 	it('should apply knowledge source web-search defaults and allow an override', () => {
 		const store = useConversationStore()
 
@@ -148,7 +170,86 @@ describe('conversation store', () => {
 		expect(store.conversations).toHaveLength(originalCount + 1)
 		expect(store.conversations[0]?.title).toBe('住宿費用上限是多少？')
 		expect(store.activeConversationId).toBe(store.conversations[0]?.id)
+		expect(store.conversationMessagesById[store.conversations[0]!.id]).toEqual(store.messages)
 		vi.useRealTimers()
+	})
+
+	it('should load saved messages without asking again when conversation history is opened', () => {
+		const store = useConversationStore()
+		const target = store.conversations.find((conversation) => conversation.id === 'conv-004')!
+		const originalUpdatedAt = target.updatedAt
+		const askQuestionSpy = vi.spyOn(store, 'askQuestion')
+
+		store.openConversation(target.id)
+
+		expect(askQuestionSpy).not.toHaveBeenCalled()
+		expect(store.activeConversationId).toBe(target.id)
+		expect(store.messages).toHaveLength(target.messageCount)
+		expect(store.messages[0]?.content).toBe(target.title)
+		expect(store.messages.at(-1)?.content).toBe('有，3.2 版要求在出差結束後十個工作天內完成核銷 [1]。')
+		expect(store.messages.filter((message) => message.role === 'assistant').every((message) => message.trace)).toBe(true)
+		expect(store.isResponding).toBe(false)
+		expect(store.thinkingStages).toHaveLength(0)
+		expect(target.updatedAt).toBe(originalUpdatedAt)
+	})
+
+	it('should reopen a newly created conversation with saved retrieval stages without asking again', async () => {
+		vi.useFakeTimers()
+		const store = useConversationStore()
+		const request = store.askQuestion('住宿費用上限是多少？')
+
+		await vi.runAllTimersAsync()
+		await request
+
+		const conversationId = store.activeConversationId!
+		const savedAnswer = store.messages.find((message) => message.role === 'assistant')!
+		expect(savedAnswer.trace).toBeDefined()
+		store.startNewConversation()
+		const askQuestionSpy = vi.spyOn(store, 'askQuestion')
+
+		store.openConversation(conversationId)
+
+		const reopenedAnswer = store.messages.find((message) => message.role === 'assistant')!
+		expect(askQuestionSpy).not.toHaveBeenCalled()
+		expect(store.messages).toHaveLength(2)
+		expect(reopenedAnswer.content).toBe(savedAnswer.content)
+		expect(reopenedAnswer.citations).toEqual(savedAnswer.citations)
+		expect(reopenedAnswer.citations).not.toBe(savedAnswer.citations)
+		expect(reopenedAnswer.trace).toEqual(savedAnswer.trace)
+		expect(reopenedAnswer.trace).not.toBe(savedAnswer.trace)
+		expect(store.thinkingStages).toHaveLength(0)
+		vi.useRealTimers()
+	})
+
+	it('should keep saved message history aligned with every conversation summary', () => {
+		const store = useConversationStore()
+
+		for (const conversation of store.conversations) {
+			const savedMessages = store.conversationMessagesById[conversation.id]
+
+			expect(savedMessages).toHaveLength(conversation.messageCount)
+			expect(savedMessages?.[0]).toMatchObject({ role: 'user', content: conversation.title })
+			const hasMatchingPreview = savedMessages?.some((message) => {
+				if (message.role !== 'assistant') return false
+				const answerWithoutCitationMarkers = message.content.replace(/\s*\[\d+\]\s*/g, '')
+				return answerWithoutCitationMarkers === conversation.previewAnswer
+			})
+			expect(hasMatchingPreview, `history preview mismatch: ${conversation.id}`).toBe(true)
+			expect(savedMessages?.filter((message) => message.role === 'assistant').every((message) => message.trace)).toBe(true)
+			expect(savedMessages?.filter((message) => message.role === 'assistant').every((message) => message.trace?.stages.every((stage) => stage.status === 'done'))).toBe(true)
+
+			for (const message of savedMessages?.filter((item) => item.role === 'assistant') ?? []) {
+				const citationIndexes = parseAnswerSegments({ content: message.content })
+					.filter((segment) => segment.type === 'citation')
+					.map((segment) => segment.index)
+				const messageCitations = message.citations ?? []
+				const documentCount = new Set(messageCitations.map((citation) => citation.documentId)).size
+
+				expect(citationIndexes).toEqual(messageCitations.map((_, index) => index + 1))
+				expect(message.trace?.citationCount).toBe(messageCitations.length)
+				expect(message.trace?.documentCount).toBe(documentCount)
+			}
+		}
 	})
 
 	it('should reset the active conversation when a new one starts', () => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
 import ThinkingTrace from '@/components/ThinkingTrace.vue'
 import { parseAnswerSegments } from '@/stores/conversation'
@@ -13,13 +13,14 @@ interface ComponentProps {
 const props = withDefaults(defineProps<ComponentProps>(), { isFavorite: false })
 
 const emit = defineEmits<{
-	openCitation: [citation: Citation]
+	openCitation: [citation: Citation, triggerId: string]
 	feedback: [isHelpful: boolean]
 	toggleFavorite: []
 }>()
 
 const isTraceOpen = ref(false)
 const isCitationListOpen = ref(false)
+const targetedCitationId = ref<string | null>(null)
 
 const segments = computed(() => parseAnswerSegments({ content: props.message.content }))
 const elapsedText = computed(() => `${((props.message.trace?.elapsedMs ?? 0) / 1000).toFixed(1)}s`)
@@ -29,9 +30,29 @@ function findCitation({ index }: { index: number }): Citation | undefined {
 	return props.message.citations?.[index - 1]
 }
 
-function handleCitationClick({ index }: { index: number }): void {
+function citationEntryId(citation: Citation): string {
+	return `citation-${props.message.id}-${citation.id}`
+}
+
+function prefersReducedMotion(): boolean {
+	return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+async function handleCitationClick({ index }: { index: number }): Promise<void> {
 	const citation = findCitation({ index })
-	if (citation) emit('openCitation', citation)
+	if (!citation) return
+
+	isCitationListOpen.value = true
+	targetedCitationId.value = citation.id
+	await nextTick()
+	const target = document.getElementById(citationEntryId(citation))
+	target?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'nearest' })
+	target?.focus({ preventScroll: true })
+}
+
+function openCitationDetail(citation: Citation): void {
+	targetedCitationId.value = citation.id
+	emit('openCitation', citation, citationEntryId(citation))
 }
 </script>
 
@@ -64,7 +85,9 @@ function handleCitationClick({ index }: { index: number }): void {
 					type="button"
 					class="citation-ref"
 					:disabled="!findCitation({ index: segment.index })"
-					:aria-label="`開啟引用 ${segment.index}`"
+					:aria-label="`展開並前往引用 ${segment.index}`"
+					:aria-controls="`citation-list-${message.id}`"
+					:aria-expanded="isCitationListOpen"
 					@click="handleCitationClick({ index: segment.index })"
 				>[{{ segment.index }}]</button>
 			</template><span v-if="message.isStreaming" class="stream-caret" aria-hidden="true" />
@@ -76,9 +99,16 @@ function handleCitationClick({ index }: { index: number }): void {
 				<VIcon :icon="isCitationListOpen ? 'mdi-chevron-up' : 'mdi-chevron-down'" size="20" aria-hidden="true" />
 			</button>
 			<VExpandTransition>
-				<ul v-if="isCitationListOpen" class="citation-list">
+				<ul v-if="isCitationListOpen" :id="`citation-list-${message.id}`" class="citation-list">
 					<li v-for="(citation, index) in message.citations" :key="citation.id" class="rise-in" :style="{ '--rise-index': index }">
-						<button type="button" class="citation-entry" @click="emit('openCitation', citation)">
+						<button
+							:id="citationEntryId(citation)"
+							type="button"
+							class="citation-entry"
+							:class="{ 'is-targeted': targetedCitationId === citation.id }"
+							:data-testid="`citation-entry-${index + 1}`"
+							@click="openCitationDetail(citation)"
+						>
 							<span class="citation-index mono">[{{ index + 1 }}]</span>
 							<span class="citation-body">
 								<span class="citation-title">{{ citation.title }}</span>
@@ -247,6 +277,11 @@ function handleCitationClick({ index }: { index: number }): void {
 .citation-entry:hover {
 	border-color: rgb(var(--v-theme-primary));
 	background: var(--tint-hover);
+}
+
+.citation-entry.is-targeted {
+	border-color: rgba(var(--v-theme-primary), 0.62);
+	background: var(--tint-active);
 }
 
 .citation-index {
