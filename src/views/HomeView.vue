@@ -7,18 +7,27 @@ import DocumentCard from '@/components/DocumentCard.vue'
 import KnowledgeConstellation from '@/components/KnowledgeConstellation.vue'
 import SearchInput from '@/components/SearchInput.vue'
 import { getEmployeeDocumentsSnapshot } from '@/repositories/knowledge.repository'
+import { COMPANY_KNOWLEDGE_SOURCES } from '@/utils/knowledgeSources'
 
 const suggestedQuestions = ['國內出差住宿費用上限是多少？', '新進同仁第一週要完成哪些事情？', '如何申請客戶資料存取權限？']
-const topics = [
-	{ title: '公司制度', count: 128, icon: 'mdi-domain' },
-	{ title: '人事與福利', count: 96, icon: 'mdi-account-heart-outline' },
-	{ title: '作業流程', count: 214, icon: 'mdi-transit-connection-variant' },
-	{ title: '產品與客戶', count: 175, icon: 'mdi-package-variant-closed' },
-]
+const knowledgeBaseIcons: Record<string, string> = {
+	policy: 'mdi-domain',
+	benefits: 'mdi-account-heart-outline',
+	'information-security': 'mdi-shield-lock-outline',
+	operations: 'mdi-transit-connection-variant',
+}
 
 const router = useRouter()
 const query = ref('')
-const recentDocuments = getEmployeeDocumentsSnapshot().slice(0, 3)
+const employeeDocuments = getEmployeeDocumentsSnapshot()
+const recentDocuments = employeeDocuments.slice(0, 3)
+const knowledgeBases = COMPANY_KNOWLEDGE_SOURCES
+	.filter((source) => source.id !== 'company')
+	.map((source) => ({
+		...source,
+		icon: knowledgeBaseIcons[source.id] ?? 'mdi-bookshelf',
+		count: employeeDocuments.filter((document) => document.knowledgeSourceId === source.id).length,
+	}))
 
 // - 首頁的提問入口一律進 AI 問答；純關鍵字檢索由側邊欄的搜尋頁負責
 async function handleSearch(value = query.value): Promise<void> {
@@ -58,19 +67,19 @@ async function handleTopicSelect(label: string): Promise<void> {
 			</div>
 		</section>
 
-		<section class="mb-12" aria-labelledby="topic-title">
+		<section class="mb-12" aria-labelledby="knowledge-base-title">
 			<div class="d-flex align-center mb-4">
-				<h2 id="topic-title" class="section-heading">依主題瀏覽</h2>
+				<h2 id="knowledge-base-title" class="section-heading">依知識庫瀏覽</h2>
 				<VSpacer />
-				<VBtn to="/library" variant="text" append-icon="mdi-arrow-right">全部主題</VBtn>
+				<VBtn to="/library" variant="text" append-icon="mdi-arrow-right" data-testid="all-knowledge-documents">瀏覽全部文件</VBtn>
 			</div>
 			<VRow>
-				<VCol v-for="(topic, index) in topics" :key="topic.title" cols="12" sm="6" lg="3">
-					<VCard class="topic-row surface-border pa-4 rise-in" :style="{ '--rise-index': index }" to="/library">
-						<VIcon :icon="topic.icon" color="primary" aria-hidden="true" />
+				<VCol v-for="(knowledgeBase, index) in knowledgeBases" :key="knowledgeBase.id" cols="12" sm="6" lg="3">
+					<VCard class="knowledge-base-row surface-border pa-4 rise-in" :style="{ '--rise-index': index }" :to="{ path: '/library', query: { source: knowledgeBase.id } }" :data-testid="`home-knowledge-base-${knowledgeBase.id}`">
+						<VIcon :icon="knowledgeBase.icon" color="primary" aria-hidden="true" />
 						<div>
-							<p class="font-weight-bold">{{ topic.title }}</p>
-							<p class="text-caption text-medium-emphasis"><AnimatedNumber :value="topic.count" /> 份文件</p>
+							<p class="font-weight-bold">{{ knowledgeBase.name }}</p>
+							<p class="text-caption text-medium-emphasis"><AnimatedNumber :value="knowledgeBase.count" /> 份文件</p>
 						</div>
 					</VCard>
 				</VCol>
@@ -80,8 +89,6 @@ async function handleTopicSelect(label: string): Promise<void> {
 		<section aria-labelledby="recent-title">
 			<div class="d-flex align-center mb-4">
 				<h2 id="recent-title" class="section-heading">最近更新</h2>
-				<VSpacer />
-				<VBtn to="/library" variant="text" append-icon="mdi-arrow-right">查看知識庫</VBtn>
 			</div>
 			<VRow>
 				<VCol v-for="(document, index) in recentDocuments" :key="document.id" cols="12" md="4">
@@ -140,7 +147,7 @@ async function handleTopicSelect(label: string): Promise<void> {
 	gap: 4px;
 }
 
-.topic-row {
+.knowledge-base-row {
 	display: flex;
 	align-items: center;
 	gap: 14px;

@@ -43,9 +43,57 @@ describe('conversation store', () => {
 		expect(store.webSearchSettingSource).toBe('override')
 		store.syncSelectedSourceDefault({ id: 'notebook-1', defaultWebSearchEnabled: false })
 		expect(store.isWebSearchEnabled).toBe(false)
+		store.syncSelectedSourceName({ id: 'notebook-1', name: '市場洞察筆記' })
+		expect(store.selectedScope).toBe('市場洞察筆記')
+		store.syncSelectedSourceName({ id: 'another-notebook', name: '不應套用' })
+		expect(store.selectedScope).toBe('市場洞察筆記')
 
 		store.resetWebSearchToDefault()
 		expect(store.isWebSearchEnabled).toBe(false)
+	})
+
+	it('should keep a deduplicated document scope only for the selected source', () => {
+		const store = useConversationStore()
+		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記', defaultWebSearchEnabled: false })
+
+		store.setSelectedDocuments({
+			sourceId: 'notebook-1',
+			documents: [
+				{ id: 'doc-1', name: '市場分析.pdf' },
+				{ id: 'doc-1', name: '市場分析.pdf' },
+				{ id: '', name: '無效文件.pdf' },
+			],
+		})
+		store.setSelectedDocuments({ sourceId: 'another-notebook', documents: [{ id: 'doc-2', name: '不應套用.pdf' }] })
+
+		expect(store.selectedDocuments).toEqual([{ id: 'doc-1', name: '市場分析.pdf' }])
+
+		store.selectKnowledgeSource({ id: 'benefits', name: '人事流程', defaultWebSearchEnabled: true })
+
+		expect(store.selectedDocuments).toEqual([])
+	})
+
+	it('should report the selected document count when answering within a limited scope', async () => {
+		vi.useFakeTimers()
+		const store = useConversationStore()
+		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記', defaultWebSearchEnabled: false })
+		store.setSelectedDocuments({
+			sourceId: 'notebook-1',
+			documents: [
+				{ id: 'doc-1', name: '市場分析.pdf' },
+				{ id: 'doc-2', name: '訪談摘要.docx' },
+			],
+		})
+
+		const request = store.askQuestion('有哪些主要發現？')
+		await vi.runAllTimersAsync()
+		await request
+
+		expect(store.messages[1]?.content).toContain('限定 2 份文件')
+		expect(store.messages[1]?.citations?.map((citation) => citation.documentId)).toEqual(['doc-1', 'doc-2'])
+		expect(store.messages[1]?.citations?.map((citation) => citation.title)).toEqual(['市場分析.pdf', '訪談摘要.docx'])
+		expect(store.messages[1]?.trace?.retrievedCount).toBe(2)
+		vi.useRealTimers()
 	})
 
 	it('should ignore blank questions', async () => {
@@ -219,6 +267,38 @@ describe('conversation store', () => {
 		expect(reopenedAnswer.trace).not.toBe(savedAnswer.trace)
 		expect(store.thinkingStages).toHaveLength(0)
 		vi.useRealTimers()
+	})
+
+	it('should save, reopen, and clear answer feedback for the active conversation', () => {
+		const store = useConversationStore()
+		const conversationId = 'conv-004'
+		store.openConversation(conversationId)
+		const answer = store.messages.find((message) => message.role === 'assistant')!
+
+		expect(store.setAnswerFeedback({ messageId: answer.id, value: 'unhelpful', reason: '  引用的規定版本不正確。  ' })).toBe(true)
+		expect(answer.feedback).toMatchObject({ value: 'unhelpful', reason: '引用的規定版本不正確。' })
+		expect(store.conversationMessagesById[conversationId]?.find((message) => message.id === answer.id)?.feedback).toEqual(answer.feedback)
+
+		const savedFeedback = answer.feedback
+		store.startNewConversation()
+		store.openConversation(conversationId)
+		const reopenedAnswer = store.messages.find((message) => message.id === answer.id)!
+		expect(reopenedAnswer.feedback).toEqual(savedFeedback)
+		expect(reopenedAnswer.feedback).not.toBe(store.conversationMessagesById[conversationId]?.find((message) => message.id === answer.id)?.feedback)
+
+		expect(store.setAnswerFeedback({ messageId: answer.id, value: null })).toBe(true)
+		expect(reopenedAnswer.feedback).toBeUndefined()
+		expect(store.conversationMessagesById[conversationId]?.find((message) => message.id === answer.id)?.feedback).toBeUndefined()
+	})
+
+	it('should reject unhelpful feedback when its reason is blank or too long', () => {
+		const store = useConversationStore()
+		store.openConversation('conv-004')
+		const answer = store.messages.find((message) => message.role === 'assistant')!
+
+		expect(store.setAnswerFeedback({ messageId: answer.id, value: 'unhelpful', reason: '   ' })).toBe(false)
+		expect(store.setAnswerFeedback({ messageId: answer.id, value: 'unhelpful', reason: '原因'.repeat(251) })).toBe(false)
+		expect(answer.feedback).toBeUndefined()
 	})
 
 	it('should keep saved message history aligned with every conversation summary', () => {

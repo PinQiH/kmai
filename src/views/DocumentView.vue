@@ -3,14 +3,19 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import DocumentKnowledgeGraph from '@/components/DocumentKnowledgeGraph.vue'
+import DocumentSourcePreview from '@/components/DocumentSourcePreview.vue'
 import StatePanel from '@/components/StatePanel.vue'
 import { documentVersionHistoryById } from '@/mocks/data'
 import { getDocumentKnowledgeContext, getDocumentVersionDetail } from '@/mocks/documentDetails'
 import { getDocumentById } from '@/repositories/knowledge.repository'
+import { useConversationStore } from '@/stores/conversation'
 import type { DocumentVersionEntry, KnowledgeDocument } from '@/types'
+import { getDocumentSourceLabel } from '@/utils/documentSources'
+import { getCompanyKnowledgeSourceForDocument } from '@/utils/knowledgeSources'
 
 const route = useRoute()
 const router = useRouter()
+const conversationStore = useConversationStore()
 const document = ref<KnowledgeDocument>()
 const isLoading = ref(true)
 const errorMessage = ref('')
@@ -48,12 +53,6 @@ const selectedVersionDetail = computed(() => {
 })
 const documentKnowledge = computed(() => getDocumentKnowledgeContext(document.value?.id ?? ''))
 const attachment = computed(() => attachmentByDocumentId[document.value?.id ?? ''])
-const askRoute = computed(() => ({
-	path: '/ask',
-	query: {
-		q: `請根據「${document.value?.title ?? ''}」第 ${selectedVersion.value?.version ?? ''} 版回答`,
-	},
-}))
 
 async function loadDocument(): Promise<void> {
 	isLoading.value = true
@@ -89,6 +88,20 @@ function downloadDocument(): void {
 	link.click()
 	URL.revokeObjectURL(url)
 }
+
+async function askDocument(): Promise<void> {
+	const currentDocument = document.value
+	if (!currentDocument) return
+	const source = getCompanyKnowledgeSourceForDocument(currentDocument)
+	if (!source) return
+	conversationStore.startNewConversation()
+	conversationStore.selectKnowledgeSource(source)
+	conversationStore.setSelectedDocuments({
+		sourceId: source.id,
+		documents: [{ id: currentDocument.id, name: currentDocument.title }],
+	})
+	await router.push('/ask')
+}
 </script>
 
 <template>
@@ -112,7 +125,7 @@ function downloadDocument(): void {
 				</div>
 				<div class="document-actions">
 					<VBtn variant="outlined" prepend-icon="mdi-download" @click="downloadDocument">下載此版本</VBtn>
-					<VBtn color="primary" prepend-icon="mdi-message-text-outline" :to="askRoute">詢問這份文件</VBtn>
+					<VBtn color="primary" prepend-icon="mdi-message-text-outline" data-testid="ask-document" @click="askDocument">詢問這份文件</VBtn>
 				</div>
 			</header>
 
@@ -168,12 +181,14 @@ function downloadDocument(): void {
 							<li v-for="change in selectedVersion.changes" :key="change">{{ change }}</li>
 						</ul>
 					</div>
-					<article class="document-content">
-						<section v-for="section in selectedVersionDetail.sections" :key="section.id">
-							<h3>{{ section.heading }}</h3>
-							<p>{{ section.body }}</p>
-						</section>
-					</article>
+					<DocumentSourcePreview
+						class="knowledge-source-preview"
+						:source="document.source"
+						:title="document.title"
+						:sections="selectedVersionDetail.sections"
+						:show-header="false"
+						:show-source-content="Boolean(selectedVersion.isCurrent)"
+					/>
 				</section>
 
 				<aside class="insight-rail" aria-label="文件閱讀輔助">
@@ -198,6 +213,7 @@ function downloadDocument(): void {
 					<section class="document-info-panel surface-border" aria-labelledby="document-info-heading">
 						<h2 id="document-info-heading">文件資訊</h2>
 						<dl>
+							<div><dt>資料來源</dt><dd>{{ getDocumentSourceLabel(document.source.type) }}</dd></div>
 							<div><dt>適用範圍</dt><dd>{{ document.visibility }}</dd></div>
 							<div><dt>發布狀態</dt><dd>{{ document.status }}</dd></div>
 							<div><dt>維護單位</dt><dd>{{ document.department }}</dd></div>
@@ -412,28 +428,9 @@ function downloadDocument(): void {
 	color: var(--ink-muted);
 }
 
-.document-content {
-	max-width: var(--reading-max-width);
-	padding: var(--space-xl) clamp(24px, 5vw, 56px) 56px;
-	font-size: 1.02rem;
-	line-height: 1.85;
-}
-
-.document-content section + section {
-	margin-top: var(--space-xl);
-}
-
-.document-content h3 {
-	margin-bottom: 10px;
-	font-size: 1.18rem;
-	font-weight: 700;
-	line-height: 1.45;
-}
-
-.document-content p {
-	margin: 0;
-	color: var(--ink-strong);
-	text-wrap: pretty;
+.knowledge-source-preview {
+	border: 0;
+	border-radius: 0;
 }
 
 .insight-rail {
@@ -607,10 +604,6 @@ function downloadDocument(): void {
 		grid-template-columns: 1fr;
 		flex-direction: column;
 		padding-inline: var(--space-lg);
-	}
-
-	.document-content {
-		padding: var(--space-lg) var(--space-lg) var(--space-xl);
 	}
 
 	.insight-rail {

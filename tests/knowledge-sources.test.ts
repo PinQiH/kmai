@@ -13,8 +13,8 @@ describe('buildAskKnowledgeSourceGroups', () => {
 		const notebookGroup = groups.find((group) => group.id === 'personal-notebooks')
 		const allSources = groups.flatMap((group) => group.sources)
 
-		expect(syscomGroup?.label).toBe('後台知識庫')
-		expect(syscomGroup?.sources.map((source) => source.id)).toEqual(['policy', 'benefits'])
+		expect(syscomGroup?.label).toBe('凌群知識庫')
+		expect(syscomGroup?.sources.map((source) => source.id)).toEqual(['policy', 'benefits', 'information-security', 'operations'])
 		expect(notebookGroup?.label).toBe('我的筆記本')
 		expect(notebookGroup?.sources.every((source) => source.kind === 'notebook')).toBe(true)
 		expect(allSources.some((source) => source.name === '全公司知識')).toBe(false)

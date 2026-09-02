@@ -8,13 +8,15 @@ import type { Citation, ConversationMessage } from '@/types'
 interface ComponentProps {
 	message: ConversationMessage
 	isFavorite?: boolean
+	savedNotebookCount?: number
 }
 
-const props = withDefaults(defineProps<ComponentProps>(), { isFavorite: false })
+const props = withDefaults(defineProps<ComponentProps>(), { isFavorite: false, savedNotebookCount: 0 })
 
 const emit = defineEmits<{
 	openCitation: [citation: Citation, triggerId: string]
 	feedback: [isHelpful: boolean]
+	saveToNotebook: []
 	toggleFavorite: []
 }>()
 
@@ -24,6 +26,9 @@ const targetedCitationId = ref<string | null>(null)
 
 const segments = computed(() => parseAnswerSegments({ content: props.message.content }))
 const elapsedText = computed(() => `${((props.message.trace?.elapsedMs ?? 0) / 1000).toFixed(1)}s`)
+const saveToNotebookLabel = computed(() => props.savedNotebookCount > 0
+	? `已存入 ${props.savedNotebookCount} 本筆記本，可繼續新增`
+	: '將這個回答存入筆記本')
 
 // - 依上標編號取出對應引用，編號從 1 起算
 function findCitation({ index }: { index: number }): Citation | undefined {
@@ -124,8 +129,38 @@ function openCitationDetail(citation: Citation): void {
 		<template v-if="!message.isStreaming && message.trace">
 			<div class="answer-actions">
 				<span class="text-caption text-medium-emphasis mr-2">這個回答有幫助嗎？</span>
-				<VBtn icon="mdi-thumb-up-outline" size="small" variant="text" aria-label="這個回答有幫助" @click="emit('feedback', true)" />
-				<VBtn icon="mdi-thumb-down-outline" size="small" variant="text" aria-label="這個回答沒有幫助" @click="emit('feedback', false)" />
+				<VBtn
+					:icon="message.feedback?.value === 'helpful' ? 'mdi-thumb-up' : 'mdi-thumb-up-outline'"
+					size="small"
+					variant="text"
+					:color="message.feedback?.value === 'helpful' ? 'primary' : undefined"
+					aria-label="這個回答有幫助"
+					:aria-pressed="message.feedback?.value === 'helpful'"
+					@click="emit('feedback', true)"
+				/>
+				<VBtn
+					:id="`feedback-down-${message.id}`"
+					:icon="message.feedback?.value === 'unhelpful' ? 'mdi-thumb-down' : 'mdi-thumb-down-outline'"
+					size="small"
+					variant="text"
+					:color="message.feedback?.value === 'unhelpful' ? 'error' : undefined"
+					aria-label="這個回答沒有幫助"
+					:aria-pressed="message.feedback?.value === 'unhelpful'"
+					@click="emit('feedback', false)"
+				/>
+				<span class="save-notebook-action">
+					<VBtn
+						:id="`save-notebook-${message.id}`"
+						:icon="savedNotebookCount > 0 ? 'mdi-notebook-check' : 'mdi-notebook-plus-outline'"
+						size="small"
+						variant="text"
+						:color="savedNotebookCount > 0 ? 'primary' : undefined"
+						:aria-label="saveToNotebookLabel"
+						:title="saveToNotebookLabel"
+						@click="emit('saveToNotebook')"
+					/>
+					<span v-if="savedNotebookCount > 0" class="save-notebook-count" aria-hidden="true">{{ savedNotebookCount }}</span>
+				</span>
 				<VBtn
 					:icon="isFavorite ? 'mdi-bookmark' : 'mdi-bookmark-outline'"
 					size="small"
@@ -316,5 +351,29 @@ function openCitationDetail(citation: Citation): void {
 	align-items: center;
 	gap: var(--space-xs);
 	margin-top: var(--space-md);
+}
+
+.save-notebook-action {
+	position: relative;
+	display: inline-flex;
+}
+
+.save-notebook-count {
+	position: absolute;
+	top: -2px;
+	right: -2px;
+	display: grid;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	place-items: center;
+	border: 2px solid rgb(var(--v-theme-surface));
+	border-radius: 999px;
+	background: rgb(var(--v-theme-primary));
+	color: rgb(var(--v-theme-on-primary));
+	font-size: 0.62rem;
+	font-weight: 700;
+	line-height: 1;
+	pointer-events: none;
 }
 </style>

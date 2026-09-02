@@ -1,5 +1,7 @@
 export interface KnowledgeDocument {
 	id: string
+	knowledgeSourceId: string
+	source: UserDocumentSource
 	title: string
 	summary: string
 	department: string
@@ -38,14 +40,60 @@ export interface DocumentContentSection {
 	body: string
 }
 
+export type DocumentSourceType = 'file' | 'text' | 'url' | 'ai-answer'
+export type TextDocumentFormat = 'plain-text' | 'markdown'
+
+export interface FileDocumentSource {
+	type: 'file'
+	fileName: string
+	mimeType: string
+	extension: string
+	previewText?: string
+	previewTruncated?: boolean
+}
+
+export interface TextDocumentSource {
+	type: 'text'
+	format: TextDocumentFormat
+	content: string
+}
+
+export interface UrlDocumentSource {
+	type: 'url'
+	url: string
+	domain: string
+	capturedAt: string
+	snapshot: string
+}
+
+export interface AiAnswerDocumentSource {
+	type: 'ai-answer'
+	answerId: string
+	question: string
+	content: string
+	citations: Citation[]
+}
+
+export type UserDocumentSource = FileDocumentSource | TextDocumentSource | UrlDocumentSource
+export type DocumentSource = UserDocumentSource | AiAnswerDocumentSource
+
 export interface ConversationMessage {
 	id: string
 	role: 'user' | 'assistant'
 	content: string
 	createdAt: string
 	citations?: Citation[]
+	feedback?: AnswerFeedback
 	isStreaming?: boolean
 	trace?: AnswerTrace
+}
+
+export type AnswerFeedbackValue = 'helpful' | 'unhelpful'
+
+export interface AnswerFeedback {
+	value: AnswerFeedbackValue
+	reason?: string
+	submittedAt: string
 }
 
 export type ThinkingStageStatus = 'pending' | 'active' | 'done'
@@ -454,6 +502,7 @@ export interface NotebookDocument {
 	size: string
 	uploadedAt: string
 	status: 'ready' | 'processing' | 'failed'
+	source: DocumentSource
 }
 
 export interface Notebook {

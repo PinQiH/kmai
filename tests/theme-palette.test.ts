@@ -103,6 +103,19 @@ describe('主題語意色', () => {
 		expect(themeAccentLabels.indigo).toBe('Cubi 藍')
 		expect(themeAccentLabels.red).toBe('Syscom 紅')
 	})
+
+	it('08. 每個主題的 surface variant 文字都達到文字的 AA 門檻', () => {
+		for (const { name, theme } of themes) {
+			const surfaceVariant = colorOf(theme, 'surface-variant')
+			const onSurfaceVariant = colorOf(theme, 'on-surface-variant')
+			const ratio = contrastRatio(onSurfaceVariant, surfaceVariant)
+
+			expect(
+				ratio,
+				`${name} 的 on-surface-variant (${onSurfaceVariant}) 對 ${surfaceVariant} 只有 ${ratio.toFixed(2)}:1`,
+			).toBeGreaterThanOrEqual(4.5)
+		}
+	})
 })
 
 /*
@@ -112,7 +125,7 @@ describe('主題語意色', () => {
  *   改成內圈 surface、外圈 on-surface 後與節點顏色無關，這裡把該前提釘死。
  */
 describe('圖譜焦點環', () => {
-	it('08. 內圈（surface）對每個群組色都達到非文字元素的 AA 門檻', () => {
+	it('09. 內圈（surface）對每個群組色都達到非文字元素的 AA 門檻', () => {
 		const cases = [
 			{ name: '淺色', surface: colorOf(lightTheme, 'surface'), palette: clusterPalette.light },
 			{ name: '深色', surface: colorOf(darkTheme, 'surface'), palette: clusterPalette.dark },
@@ -126,7 +139,7 @@ describe('圖譜焦點環', () => {
 		}
 	})
 
-	it('09. 外圈（on-surface）對畫布背景達到非文字元素的 AA 門檻', () => {
+	it('10. 外圈（on-surface）對畫布背景達到非文字元素的 AA 門檻', () => {
 		for (const { name, theme } of themes) {
 			const ratio = contrastRatio(colorOf(theme, 'on-surface'), colorOf(theme, 'surface'))
 			expect(ratio, `${name} 的外圈對畫布只有 ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3)
@@ -135,7 +148,7 @@ describe('圖譜焦點環', () => {
 })
 
 describe('系統事件類別色票', () => {
-	it('10. 每個事件類別都有獨立顏色，並與對應表面維持 AA 對比', () => {
+	it('11. 每個事件類別都有獨立顏色，並與對應表面維持 AA 對比', () => {
 		const cases = [
 			{ name: '淺色', surface: colorOf(lightTheme, 'surface'), palette: systemRecordCategoryPalette.light },
 			{ name: '深色', surface: colorOf(darkTheme, 'surface'), palette: systemRecordCategoryPalette.dark },

@@ -39,4 +39,5 @@ withDefaults(defineProps<ComponentProps>(), { showStatus: false })
 	border-color: rgb(var(--v-theme-primary));
 	background: rgba(var(--v-theme-primary), 0.03);
 }
+
 </style>

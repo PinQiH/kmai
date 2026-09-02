@@ -9,6 +9,13 @@ import type { KnowledgeDocument } from '@/types'
 
 const document: KnowledgeDocument = {
 	id: 'doc-test',
+	knowledgeSourceId: 'policy',
+	source: {
+		type: 'file',
+		fileName: '測試文件.pdf',
+		mimeType: 'application/pdf',
+		extension: 'pdf',
+	},
 	title: '測試文件',
 	summary: '確認文件卡片能載入 Vuetify 與狀態元件。',
 	department: '資訊部',

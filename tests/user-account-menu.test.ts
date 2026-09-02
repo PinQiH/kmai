@@ -34,7 +34,7 @@ Object.defineProperty(globalThis, 'visualViewport', {
 
 let wrapper: VueWrapper | null = null
 
-async function mountMenu(): Promise<VueWrapper> {
+async function mountMenu(initialRoute = '/'): Promise<VueWrapper> {
 	const router = createRouter({
 		history: createMemoryHistory(),
 		routes: [
@@ -42,7 +42,7 @@ async function mountMenu(): Promise<VueWrapper> {
 			{ path: '/account', component: { template: '<div>個人設定</div>' } },
 		],
 	})
-	await router.push('/')
+	await router.push(initialRoute)
 	await router.isReady()
 
 	wrapper = mount(UserAccountMenu, {
@@ -99,6 +99,13 @@ describe('UserAccountMenu', () => {
 			expect(link, `${tab} 應顯示在使用者選單`).toBeInstanceOf(HTMLAnchorElement)
 			expect((link as HTMLAnchorElement).href).toContain(`/account?tab=${tab}`)
 		}
+	})
+
+	it('should not show route-active backgrounds on account menu items', async () => {
+		const menuWrapper = await mountMenu('/account?tab=profile')
+		await openMenu(menuWrapper)
+
+		expect(document.querySelectorAll('.user-account-menu .v-list-item--active')).toHaveLength(0)
 	})
 
 	it('should emit logout when the logout action is selected', async () => {

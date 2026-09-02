@@ -87,6 +87,7 @@ const supportItems: AccountMenuItem[] = [
 				<VListItem
 					v-for="item in accountItems"
 					:key="item.tab"
+					:active="false"
 					:prepend-icon="item.icon"
 					:title="item.title"
 					:to="{ path: '/account', query: { tab: item.tab } }"
@@ -96,6 +97,7 @@ const supportItems: AccountMenuItem[] = [
 				<VListItem
 					v-for="item in supportItems"
 					:key="item.tab"
+					:active="false"
 					:prepend-icon="item.icon"
 					:title="item.title"
 					:to="{ path: '/account', query: { tab: item.tab } }"

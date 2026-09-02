@@ -50,6 +50,7 @@ const lightColors = {
 	info: '#315C91',
 	'on-background': '#202428',
 	'on-surface': '#202428',
+	'on-surface-variant': '#202428',
 	outline: '#D7D5CE',
 }
 
@@ -66,6 +67,7 @@ const darkColors = {
 	info: '#A9C8EC',
 	'on-background': '#F0F2F4',
 	'on-surface': '#F0F2F4',
+	'on-surface-variant': '#F0F2F4',
 	outline: '#707D89',
 }
 

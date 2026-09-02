@@ -22,6 +22,17 @@ const message: ConversationMessage = {
 	citations: [citation],
 }
 
+const completedMessage: ConversationMessage = {
+	...message,
+	trace: {
+		documentCount: 1,
+		citationCount: 1,
+		retrievedCount: 1,
+		elapsedMs: 1200,
+		stages: [],
+	},
+}
+
 describe('AnswerMessage', () => {
 	beforeEach(() => {
 		vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
@@ -75,5 +86,105 @@ describe('AnswerMessage', () => {
 		await wrapper.get('[data-testid="citation-entry-1"]').trigger('click')
 
 		expect(wrapper.emitted('openCitation')?.[0]).toEqual([citation, 'citation-answer-1-cite-1'])
+	})
+
+	it('should render selected icons and pressed states when helpful feedback is present', () => {
+		const wrapper = mount(AnswerMessage, {
+			props: {
+				message: {
+					...completedMessage,
+					feedback: {
+						value: 'helpful',
+						submittedAt: '2026-09-01T09:01:00.000Z',
+					},
+				},
+			},
+			global: {
+				stubs: {
+					ThinkingTrace: true,
+					VBtn: true,
+					VExpandTransition: { template: '<div><slot /></div>' },
+					VIcon: true,
+				},
+			},
+		})
+
+		const helpfulButton = wrapper.get('[aria-label="這個回答有幫助"]')
+		const unhelpfulButton = wrapper.get('[aria-label="這個回答沒有幫助"]')
+
+		expect(helpfulButton.attributes('icon')).toBe('mdi-thumb-up')
+		expect(helpfulButton.attributes('color')).toBe('primary')
+		expect(helpfulButton.attributes('aria-pressed')).toBe('true')
+		expect(unhelpfulButton.attributes('icon')).toBe('mdi-thumb-down-outline')
+		expect(unhelpfulButton.attributes('aria-pressed')).toBe('false')
+	})
+
+	it('should render the unhelpful icon and pressed state when unhelpful feedback is present', () => {
+		const wrapper = mount(AnswerMessage, {
+			props: {
+				message: {
+					...completedMessage,
+					feedback: {
+						value: 'unhelpful',
+						reason: '內容不夠完整',
+						submittedAt: '2026-09-01T09:01:00.000Z',
+					},
+				},
+			},
+			global: {
+				stubs: {
+					ThinkingTrace: true,
+					VBtn: true,
+					VExpandTransition: { template: '<div><slot /></div>' },
+					VIcon: true,
+				},
+			},
+		})
+
+		const helpfulButton = wrapper.get('[aria-label="這個回答有幫助"]')
+		const unhelpfulButton = wrapper.get('[aria-label="這個回答沒有幫助"]')
+
+		expect(helpfulButton.attributes('icon')).toBe('mdi-thumb-up-outline')
+		expect(helpfulButton.attributes('aria-pressed')).toBe('false')
+		expect(unhelpfulButton.attributes('icon')).toBe('mdi-thumb-down')
+		expect(unhelpfulButton.attributes('color')).toBe('error')
+		expect(unhelpfulButton.attributes('aria-pressed')).toBe('true')
+	})
+
+	it('should emit feedback values when feedback buttons are clicked', async () => {
+		const wrapper = mount(AnswerMessage, {
+			props: { message: completedMessage },
+			global: {
+				stubs: {
+					ThinkingTrace: true,
+					VBtn: true,
+					VExpandTransition: { template: '<div><slot /></div>' },
+					VIcon: true,
+				},
+			},
+		})
+
+		await wrapper.get('[aria-label="這個回答有幫助"]').trigger('click')
+		await wrapper.get('[aria-label="這個回答沒有幫助"]').trigger('click')
+
+		expect(wrapper.emitted('feedback')).toEqual([[true], [false]])
+	})
+
+	it('should emit saveToNotebook when the notebook button is clicked', async () => {
+		const wrapper = mount(AnswerMessage, {
+			props: { message: completedMessage },
+			global: {
+				stubs: {
+					ThinkingTrace: true,
+					VBtn: true,
+					VExpandTransition: { template: '<div><slot /></div>' },
+					VIcon: true,
+				},
+			},
+		})
+
+		await wrapper.get('[aria-label="將這個回答存入筆記本"]').trigger('click')
+
+		expect(wrapper.emitted('saveToNotebook')).toEqual([[]])
 	})
 })

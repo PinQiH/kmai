@@ -2,7 +2,7 @@ import { documents, healthMetrics, recentActivities } from '@/mocks/data'
 import type { ActivityItem, HealthMetric, KnowledgeDocument } from '@/types'
 
 function cloneDocument(document: KnowledgeDocument): KnowledgeDocument {
-	return { ...document, tags: [...document.tags] }
+	return { ...document, source: { ...document.source }, tags: [...document.tags] }
 }
 
 /** 取得管理端文件快照。 */

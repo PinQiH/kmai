@@ -1,5 +1,5 @@
 import { documents } from '@/mocks/data'
-import type { KnowledgeDocument } from '@/types'
+import type { KnowledgeDocument, UserDocumentSource } from '@/types'
 
 const MOCK_DELAY_MS = 320
 
@@ -7,12 +7,33 @@ function canEmployeeReadDocument(document: KnowledgeDocument): boolean {
 	return document.status === '已發布' && document.visibility === '全公司'
 }
 
+function cloneDocumentSource(source: UserDocumentSource): UserDocumentSource {
+	switch (source.type) {
+		case 'file':
+			return { ...source }
+		case 'text':
+			return { ...source }
+		case 'url':
+			return { ...source }
+	}
+}
+
+function cloneKnowledgeDocument(document: KnowledgeDocument): KnowledgeDocument {
+	return {
+		...document,
+		source: cloneDocumentSource(document.source),
+		tags: [...document.tags],
+	}
+}
+
 /** 取得員工目前可見的文件快照，避免 View 直接依賴 Mock 資料來源。 */
 export function getEmployeeDocumentsSnapshot(): KnowledgeDocument[] {
-	return documents.filter(canEmployeeReadDocument).map((document) => ({
-		...document,
-		tags: [...document.tags],
-	}))
+	return documents.filter(canEmployeeReadDocument).map(cloneKnowledgeDocument)
+}
+
+/** 取得員工在指定公司知識庫中目前可用的文件。 */
+export function getEmployeeDocumentsBySourceId(sourceId: string): KnowledgeDocument[] {
+	return getEmployeeDocumentsSnapshot().filter((document) => document.knowledgeSourceId === sourceId)
 }
 
 /**
@@ -49,5 +70,6 @@ export async function searchDocuments(query: string): Promise<KnowledgeDocument[
 export async function getDocumentById(documentId: string): Promise<KnowledgeDocument | undefined> {
 	// TODO(api-integration): 改為呼叫後端文件詳情 API。
 	await new Promise((resolve) => window.setTimeout(resolve, MOCK_DELAY_MS))
-	return documents.find((document) => document.id === documentId && canEmployeeReadDocument(document))
+	const document = documents.find((item) => item.id === documentId && canEmployeeReadDocument(item))
+	return document ? cloneKnowledgeDocument(document) : undefined
 }

@@ -25,11 +25,9 @@ type TypeFilter = GraphNodeType | typeof ALL_TYPES
  * > 視覺編碼
  * @ 顏色 = 所屬主題群，半徑 = 關聯數（重要度）。
  * !! 先前用「形狀」編碼類型是失敗的設計：8~13px 下三角形與菱形分辨不出來，
- *    資訊沒傳達到，只讓畫面碎成一地雜點。類型改由 hover 標籤與右側面板用文字表達。
+ *    資訊沒傳達到，只讓畫面碎成一地雜點。類型改由無障礙名稱與右側面板用文字表達。
  */
-const LABEL_DEGREE_THRESHOLD = 3
-const LABEL_FONT_SIZE = 12
-const LABEL_LINE_HEIGHT = 16
+const LABEL_OFFSET_Y = 16
 
 const route = useRoute()
 const theme = useTheme()
@@ -81,7 +79,7 @@ const links: ForceLink[] = graphEdges
 	}))
 	.filter((link) => link.source >= 0 && link.target >= 0)
 
-// > 關聯數：決定節點大小與是否常駐標籤
+// > 關聯數：決定節點大小
 const degreeById = new Map<string, number>(graphNodes.map((node) => [node.id, 0]))
 const neighborIds = new Map<string, Set<string>>(graphNodes.map((node) => [node.id, new Set<string>()]))
 for (const edge of graphEdges) {
@@ -98,8 +96,6 @@ const nodeStyles = graphNodes.map((node) => {
 		degree,
 		clusterIndex: clusterIndexOf.get(node.cluster) ?? 0,
 		radius: Math.min(11, 4 + degree * 1.5),
-		// @ 關聯數高者是樞紐，值得常駐標籤；其餘靠 hover 或選取顯示
-		isHub: degree >= LABEL_DEGREE_THRESHOLD,
 	}
 })
 
@@ -186,79 +182,27 @@ const edgeViews = computed(() => {
 })
 
 /*
- * - 標籤配置：以貪婪演算法避開彼此重疊
- * !! 這是前一版最主要的醜源——32 個中文標籤無條件全顯示，必然撞成一團。
- * @ 收斂期間完全不顯示常駐標籤：節點還在移動時碰撞結果每幀都不同，
- *   標籤會不斷閃現又消失。改成圖先長出來、穩定後標籤才浮現。
+ * - 排列穩定後顯示所有節點標籤
+ * @ 排列期間只保留互動中的節點標籤，避免重新排列時所有文字一起抖動。
  */
 const labelViews = computed(() => {
 	const views = nodeViews.value
 	const settled = isSettled.value
 	const active = selectedId.value
 	const hover = hoveredId.value
-	const neighbors = active ? neighborIds.get(active) : undefined
 
-	interface Placed {
-		left: number
-		right: number
-		top: number
-		bottom: number
-	}
-
-	const placed: Placed[] = []
-	const result: { id: string, label: string, x: number, y: number, clusterIndex: number, emphasis: boolean }[] = []
-
-	function tryPlace(view: typeof views[number], emphasis: boolean, force: boolean): void {
-		if (view.dimmed) return
-		// @ 中文字寬約等於字級，估算足夠精確
-		const width = view.node.label.length * LABEL_FONT_SIZE
-		const top = view.y + view.radius + 4
-		const box: Placed = {
-			left: view.x - width / 2,
-			right: view.x + width / 2,
-			top,
-			bottom: top + LABEL_LINE_HEIGHT,
-		}
-
-		if (!force) {
-			const overlaps = placed.some(
-				(other) => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top,
-			)
-			if (overlaps) return
-		}
-
-		placed.push(box)
-		result.push({
+	return views
+		.filter((view) => !view.dimmed)
+		.filter((view) => settled || Boolean(active) || view.node.id === hover)
+		.map((view) => ({
 			id: view.node.id,
 			label: view.node.label,
 			x: view.x,
-			y: top + LABEL_FONT_SIZE,
+			y: view.y + view.radius + LABEL_OFFSET_Y,
 			clusterIndex: view.clusterIndex,
-			emphasis,
-		})
-	}
-
-	// > 必顯示的優先佔位：選取節點、它的鄰居、目前 hover 的節點
-	for (const view of views) {
-		const mustShow = view.node.id === active || view.node.id === hover
-		if (mustShow) tryPlace(view, true, true)
-	}
-	if (neighbors) {
-		for (const view of views) {
-			if (neighbors.has(view.node.id)) tryPlace(view, true, false)
-		}
-	}
-
-	// > 其餘樞紐節點在佈局穩定後才填入剩餘空間
-	if (settled && !active) {
-		const hubs = views.filter((view) => view.isHub).sort((a, b) => b.degree - a.degree)
-		for (const view of hubs) {
-			if (view.node.id === hover) continue
-			tryPlace(view, false, false)
-		}
-	}
-
-	return result
+			emphasis: view.node.id === active || view.node.id === hover,
+			faded: view.faded,
+		}))
 })
 
 // - 建立佈局；尺寸改變時沿用既有位置只做 resize
@@ -529,7 +473,10 @@ onBeforeUnmount(() => {
 								v-for="label in labelViews"
 								:key="label.id"
 								class="node-label"
-								:class="[`cluster-${label.clusterIndex}`, { 'is-emphasis': label.emphasis }]"
+								:class="[
+									`cluster-${label.clusterIndex}`,
+									{ 'is-emphasis': label.emphasis, 'is-faded': label.faded },
+								]"
 								:x="label.x"
 								:y="label.y"
 							>{{ label.label }}</text>
@@ -807,6 +754,14 @@ onBeforeUnmount(() => {
 .node-label.is-emphasis {
 	fill: rgb(var(--v-theme-on-surface));
 	font-weight: 700;
+}
+
+.node-label.is-faded {
+	opacity: 0.22;
+}
+
+.is-dark .node-label.is-faded {
+	opacity: 0.3;
 }
 
 @keyframes label-appear {

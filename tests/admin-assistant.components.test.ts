@@ -128,7 +128,7 @@ describe('admin assistant panel', () => {
 
 		store.selectKnowledgeSource(sources.find((source) => source.id === 'benefits')!)
 		await wrapper.vm.$nextTick()
-		expect(sourceControl.text()).toContain('人事與福利')
+		expect(sourceControl.text()).toContain('人事流程')
 		expect(webSearchControl.text()).toContain('網路搜尋：開')
 		expect(webSearchControl.text()).toContain('預設')
 

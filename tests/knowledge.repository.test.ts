@@ -34,6 +34,21 @@ describe('knowledge repository', () => {
 		vi.useRealTimers()
 	})
 
+	it('should return a defensive copy of source metadata', async () => {
+		vi.useFakeTimers()
+		const firstRequest = getDocumentById('doc-002')
+		await vi.runAllTimersAsync()
+		const firstDocument = await firstRequest
+		expect(firstDocument?.source.type).toBe('text')
+		if (firstDocument?.source.type === 'text') firstDocument.source.content = '外部修改'
+
+		const secondRequest = getDocumentById('doc-002')
+		await vi.runAllTimersAsync()
+		const secondDocument = await secondRequest
+		expect(secondDocument?.source.type === 'text' ? secondDocument.source.content : '').not.toBe('外部修改')
+		vi.useRealTimers()
+	})
+
 	it('should hide unpublished or restricted documents from employees', async () => {
 		vi.useFakeTimers()
 		const searchRequest = searchDocuments('客戶資料')

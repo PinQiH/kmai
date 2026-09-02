@@ -3,9 +3,12 @@ import { defineStore } from 'pinia'
 import { citations, conversationHistory, conversationMessagesById } from '@/mocks/data'
 import type {
 	AnswerModelId,
+	AnswerFeedback,
+	AnswerFeedbackValue,
 	AnswerSegment,
 	AnswerSettings,
 	AnswerStyleId,
+	Citation,
 	ConversationMessage,
 	ConversationSummary,
 	ThinkingStage,
@@ -18,6 +21,7 @@ interface ConversationState {
 	isResponding: boolean
 	selectedScope: string
 	selectedKnowledgeSourceId: string
+	selectedDocuments: SelectedKnowledgeDocument[]
 	selectedSourceDefaultWebSearch: boolean
 	webSearchOverride: boolean | null
 	selectedAnswerStyleId: AnswerStyleId
@@ -30,6 +34,11 @@ interface ConversationState {
 	activeConversationId: string | null
 	historyKeyword: string
 	onlyArchived: boolean
+}
+
+interface SelectedKnowledgeDocument {
+	id: string
+	name: string
 }
 
 // > 可視化階段：正式串接後改由後端串流事件驅動，這裡先以固定節奏模擬
@@ -45,6 +54,7 @@ const STREAM_TICK_MS = 16
 const STREAM_CHUNK_SIZE = 2
 
 const SEARCH_RESULT_LIMIT = 20
+export const ANSWER_FEEDBACK_REASON_MAX_LENGTH = 500
 
 // - 釘選優先，其次依更新時間新到舊
 function comparePinnedFirst(left: ConversationSummary, right: ConversationSummary): number {
@@ -59,9 +69,10 @@ function matchesKeyword({ conversation, keyword }: { conversation: ConversationS
 }
 
 function cloneConversationMessages(messages: ConversationMessage[]): ConversationMessage[] {
-	return messages.map(({ citations: messageCitations, isStreaming, trace, ...message }) => ({
+	return messages.map(({ citations: messageCitations, feedback, isStreaming, trace, ...message }) => ({
 		...message,
 		...(messageCitations ? { citations: messageCitations.map((citation) => ({ ...citation })) } : {}),
+		...(feedback ? { feedback: { ...feedback } } : {}),
 		...(isStreaming !== undefined ? { isStreaming: false } : {}),
 		...(trace
 			? {
@@ -127,16 +138,38 @@ export function formatHistoryTime({ isoDate }: { isoDate: string }): string {
 	return `${String(target.getMonth() + 1).padStart(2, '0')}/${String(target.getDate()).padStart(2, '0')} ${timeText}`
 }
 
-function createMockAnswer(question: string, scope: string, includeCitations = true): ConversationMessage {
+function createScopedCitations(documents: SelectedKnowledgeDocument[]): Citation[] {
+	return documents.map((document, index) => ({
+		id: `cite-scoped-${document.id}`,
+		chunkId: `${document.id}-mock-chunk`,
+		documentId: document.id,
+		title: document.name,
+		section: '限定文件',
+		excerpt: '這是文件限定功能的展示引用；正式環境會回傳實際命中的原文片段。',
+		confidence: Math.max(0.8, 0.94 - index * 0.02),
+	}))
+}
+
+function createMockAnswer(
+	question: string,
+	scope: string,
+	includeCitations = true,
+	selectedDocuments: SelectedKnowledgeDocument[] = [],
+): ConversationMessage {
 	const normalizedQuestion = question.toLowerCase()
-	let content = includeCitations
+	const hasDocumentScope = includeCitations && selectedDocuments.length > 0
+	const answerCitations = hasDocumentScope ? createScopedCitations(selectedDocuments) : (includeCitations ? citations : [])
+	const scopedCitationMarkers = answerCitations.map((_, index) => `[${index + 1}]`).join(' ')
+	let content = hasDocumentScope
+		? `我只會在「${scope}」範圍內整理答案 ${scopedCitationMarkers}。這是展示回答；正式環境會依限定文件的實際檢索結果回傳答案與原文引用。`
+		: includeCitations
 		? `我在「${scope}」範圍內找到幾份可能相關的資料 [1]。這是展示回答；正式環境會依實際檢索結果整理答案並附上對應引用。`
 		: `我會直接使用「${scope}」回答，不檢索知識庫、不搜尋網路，也不產生引用。這是展示回答；正式環境會由選定模型產生內容。`
-	if (includeCitations && (normalizedQuestion.includes('出差') || normalizedQuestion.includes('住宿') || normalizedQuestion.includes('差旅'))) {
+	if (!hasDocumentScope && includeCitations && (normalizedQuestion.includes('出差') || normalizedQuestion.includes('住宿') || normalizedQuestion.includes('差旅'))) {
 		content = '依目前有效的差旅辦法 [1]，國內住宿每晚原則上限為新台幣 3,000 元。若遇特殊地區或旺季，請在出差申請時事先說明。出差結束後，需在十個工作天內完成核銷並附上有效憑證 [2]。'
-	} else if (includeCitations && (normalizedQuestion.includes('新進') || normalizedQuestion.includes('到職'))) {
+	} else if (!hasDocumentScope && includeCitations && (normalizedQuestion.includes('新進') || normalizedQuestion.includes('到職'))) {
 		content = '新進同仁第一週應完成公司帳號啟用、設備點交、資訊安全訓練及主管安排的到職會談 [1]。完整清單請參考《新進同仁到職指南》。'
-	} else if (includeCitations && (normalizedQuestion.includes('資安') || normalizedQuestion.includes('客戶資料'))) {
+	} else if (!hasDocumentScope && includeCitations && (normalizedQuestion.includes('資安') || normalizedQuestion.includes('客戶資料'))) {
 		content = '客戶資料需依分級申請存取權限 [1]，對外分享前必須確認接收者、用途與保存期限。若發現異常存取，請立即通知資訊安全部 [2]。'
 	}
 
@@ -145,7 +178,7 @@ function createMockAnswer(question: string, scope: string, includeCitations = tr
 		role: 'assistant',
 		content,
 		createdAt: new Date().toISOString(),
-		citations: includeCitations ? citations : [],
+		citations: answerCitations,
 	}
 }
 
@@ -165,6 +198,7 @@ export const useConversationStore = defineStore('conversation', {
 		// @ 必須與 selectedKnowledgeSourceId 的預設值同義，否則來源晶片與來源對話框會顯示不一致
 		selectedScope: '公司制度',
 		selectedKnowledgeSourceId: DEFAULT_ASK_SOURCE_ID,
+		selectedDocuments: [],
 		selectedSourceDefaultWebSearch: false,
 		webSearchOverride: null,
 		selectedAnswerStyleId: DEFAULT_ANSWER_STYLE_ID,
@@ -226,14 +260,37 @@ export const useConversationStore = defineStore('conversation', {
 	},
 	actions: {
 		selectKnowledgeSource({ id, name, defaultWebSearchEnabled }: { id: string; name: string; defaultWebSearchEnabled: boolean }): void {
+			if (this.selectedKnowledgeSourceId !== id) this.selectedDocuments = []
 			this.selectedKnowledgeSourceId = id
 			this.selectedScope = name
 			this.selectedSourceDefaultWebSearch = defaultWebSearchEnabled
 			this.webSearchOverride = null
 		},
+		/**
+		 * 限定目前知識來源可使用的文件，空陣列代表搜尋整個來源。
+		 * @param sourceId 文件所屬的知識來源識別碼。
+		 * @param documents 使用者選取的文件快照。
+		 */
+		setSelectedDocuments({ sourceId, documents }: { sourceId: string; documents: SelectedKnowledgeDocument[] }): void {
+			if (this.selectedKnowledgeSourceId !== sourceId) return
+			this.selectedDocuments = Array.from(
+				new Map(
+					documents
+						.filter((document) => document.id.trim() && document.name.trim())
+						.map((document) => [document.id, { id: document.id, name: document.name }]),
+				).values(),
+			)
+		},
+		clearSelectedDocuments(): void {
+			this.selectedDocuments = []
+		},
 		syncSelectedSourceDefault({ id, defaultWebSearchEnabled }: { id: string; defaultWebSearchEnabled: boolean }): void {
 			if (this.selectedKnowledgeSourceId !== id) return
 			this.selectedSourceDefaultWebSearch = defaultWebSearchEnabled
+		},
+		syncSelectedSourceName({ id, name }: { id: string; name: string }): void {
+			if (this.selectedKnowledgeSourceId !== id) return
+			this.selectedScope = name
 		},
 		setWebSearchEnabled(isEnabled: boolean): void {
 			if (!this.canUseWebSearch) {
@@ -248,6 +305,37 @@ export const useConversationStore = defineStore('conversation', {
 		applyAnswerSettings({ answerStyleId, answerModelId }: AnswerSettings): void {
 			this.selectedAnswerStyleId = answerStyleId
 			this.selectedAnswerModelId = answerModelId
+		},
+		/**
+		 * 更新單筆 AI 回答的評價，倒讚必須附上原因。
+		 * @param messageId AI 回答訊息識別碼。
+		 * @param value 評價值；null 代表取消目前評價。
+		 * @param reason 倒讚原因。
+		 * @returns 是否成功更新評價。
+		 */
+		setAnswerFeedback({ messageId, value, reason = '' }: { messageId: string; value: AnswerFeedbackValue | null; reason?: string }): boolean {
+			const target = this.messages.find((message) => message.id === messageId && message.role === 'assistant')
+			if (!target) return false
+
+			const trimmedReason = reason.trim()
+			if (value === 'unhelpful' && (!trimmedReason || trimmedReason.length > ANSWER_FEEDBACK_REASON_MAX_LENGTH)) return false
+
+			const feedback: AnswerFeedback | null = value
+				? {
+					value,
+					...(value === 'unhelpful' ? { reason: trimmedReason } : {}),
+					submittedAt: new Date().toISOString(),
+				}
+				: null
+			if (feedback) target.feedback = feedback
+			else delete target.feedback
+
+			const savedMessage = this.activeConversationId
+				? this.conversationMessagesById[this.activeConversationId]?.find((message) => message.id === messageId)
+				: undefined
+			if (savedMessage && feedback) savedMessage.feedback = { ...feedback }
+			else if (savedMessage) delete savedMessage.feedback
+			return true
 		},
 		async askQuestion(question: string): Promise<void> {
 			const trimmedQuestion = question.trim()
@@ -270,15 +358,20 @@ export const useConversationStore = defineStore('conversation', {
 
 			try {
 				// TODO(api-integration): 改為串接 AI 串流回答 API，階段狀態由後端事件推送。
-				const searchDescription = this.isWebSearchEnabled ? `${this.selectedScope}＋網路搜尋` : this.selectedScope
-				const answer = createMockAnswer(trimmedQuestion, searchDescription, usesRetrieval)
+				const documentScope = this.selectedDocuments.length === 0
+					? this.selectedScope
+					: `${this.selectedScope}（限定 ${this.selectedDocuments.length} 份文件）`
+				const searchDescription = this.isWebSearchEnabled ? `${documentScope}＋網路搜尋` : documentScope
+				const answer = createMockAnswer(trimmedQuestion, searchDescription, usesRetrieval, this.selectedDocuments)
 
 				// > 前置階段：解析、檢索、比對版本
 				for (const [index, stage] of this.thinkingStages.entries()) {
 					if (stage.id === 'generate') break
 
 					stage.status = 'active'
-					if (usesRetrieval && stage.id === 'retrieve') this.retrievedCount = SEARCHABLE_DOCUMENT_TOTAL
+					if (usesRetrieval && stage.id === 'retrieve') {
+						this.retrievedCount = this.selectedDocuments.length || SEARCHABLE_DOCUMENT_TOTAL
+					}
 
 					const startTime = Date.now()
 					await delay({ ms: isReducedMotion ? 0 : STAGE_PLAN[index].plannedMs })

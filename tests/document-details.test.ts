@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
@@ -7,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { documentVersionHistoryById } from '@/mocks/data'
 import { getDocumentKnowledgeContext, getDocumentVersionDetail } from '@/mocks/documentDetails'
+import { useConversationStore } from '@/stores/conversation'
 import DocumentView from '@/views/DocumentView.vue'
 
 globalThis.ResizeObserver = class ResizeObserverStub {
@@ -80,6 +82,8 @@ describe('document detail data', () => {
 describe('DocumentView', () => {
 	it('should switch the document body and AI summary when another version is selected', async () => {
 		vi.useFakeTimers()
+		const pinia = createPinia()
+		setActivePinia(pinia)
 		const router = createRouter({
 			history: createMemoryHistory(),
 			routes: [
@@ -98,7 +102,7 @@ describe('DocumentView', () => {
 			},
 			{
 				global: {
-					plugins: [createVuetify({ components, directives }), router],
+					plugins: [pinia, createVuetify({ components, directives }), router],
 				},
 			},
 		)
@@ -118,6 +122,59 @@ describe('DocumentView', () => {
 		expect(wrapper.text()).toContain('國內住宿每晚以新台幣 2,800 元為原則')
 		expect(wrapper.text()).toContain('你正在閱讀歷史版本')
 		expect(wrapper.find('a[href="/documents/doc-005"]').exists()).toBe(true)
+
+		const conversationStore = useConversationStore()
+		conversationStore.messages.push({ id: 'old-message', role: 'user', content: '舊問題', createdAt: new Date().toISOString() })
+		await wrapper.get('[data-testid="ask-document"]').trigger('click')
+		await flushPromises()
+
+		expect(router.currentRoute.value.path).toBe('/ask')
+		expect(router.currentRoute.value.query).toEqual({})
+		expect(conversationStore.selectedKnowledgeSourceId).toBe('policy')
+		expect(conversationStore.selectedDocuments).toEqual([{ id: 'doc-001', name: '員工差旅與費用報支辦法' }])
+		expect(conversationStore.messages).toEqual([])
+
+		wrapper.unmount()
+	})
+
+	it('should render distinct detail styles for text and URL knowledge sources', async () => {
+		vi.useFakeTimers()
+		const pinia = createPinia()
+		setActivePinia(pinia)
+		const router = createRouter({
+			history: createMemoryHistory(),
+			routes: [
+				{ path: '/documents/:id', component: DocumentView },
+				{ path: '/library', component: { template: '<div />' } },
+				{ path: '/ask', component: { template: '<div />' } },
+				{ path: '/graph', component: { template: '<div />' } },
+			],
+		})
+		await router.push('/documents/doc-002')
+		await router.isReady()
+		const wrapper = mount(
+			{ components: { DocumentView }, template: '<VApp><DocumentView /></VApp>' },
+			{ global: { plugins: [pinia, createVuetify({ components, directives }), router] } },
+		)
+
+		await vi.advanceTimersByTimeAsync(320)
+		await flushPromises()
+		expect(wrapper.text()).toContain('輸入文字')
+		expect(wrapper.find('[data-testid="markdown-preview"]').exists()).toBe(true)
+		expect(wrapper.find('[data-testid="document-content-sections"]').exists()).toBe(true)
+		const previousTextVersionButton = wrapper.findAll('.version-option').find((button) => button.text().includes('第 1.5 版'))
+		expect(previousTextVersionButton).toBeDefined()
+		await previousTextVersionButton?.trigger('click')
+		expect(wrapper.find('[data-testid="markdown-preview"]').exists()).toBe(false)
+		expect(wrapper.find('[data-testid="document-content-sections"]').exists()).toBe(true)
+		expect(wrapper.text()).toContain('十個工作天內完成')
+
+		await router.push('/documents/doc-005')
+		await vi.advanceTimersByTimeAsync(320)
+		await flushPromises()
+		expect(wrapper.text()).toContain('貼上網址')
+		expect(wrapper.find('[data-testid="url-source-preview"]').exists()).toBe(true)
+		expect(wrapper.get('a[href="https://intranet.example.com/hr/performance-faq"]').attributes('rel')).toBe('noopener noreferrer')
 
 		wrapper.unmount()
 	})

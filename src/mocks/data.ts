@@ -4,6 +4,13 @@ import type { ActivityItem, AnswerTrace, Citation, ConversationMessage, Conversa
 export const documents: KnowledgeDocument[] = [
 	{
 		id: 'doc-001',
+		knowledgeSourceId: 'policy',
+		source: {
+			type: 'file',
+			fileName: '員工差旅與費用報支辦法.pdf',
+			mimeType: 'application/pdf',
+			extension: 'pdf',
+		},
 		title: '員工差旅與費用報支辦法',
 		summary: '說明國內外出差申請、交通與住宿標準，以及費用核銷所需文件。',
 		department: '財務部',
@@ -17,6 +24,12 @@ export const documents: KnowledgeDocument[] = [
 	},
 	{
 		id: 'doc-002',
+		knowledgeSourceId: 'benefits',
+		source: {
+			type: 'text',
+			format: 'markdown',
+			content: '# 新進同仁到職指南\n\n## 第一週任務\n\n- 啟用公司帳號\n- 完成設備點交\n- 參加入職與資訊安全訓練\n\n> 若任務無法如期完成，請主動與直屬主管確認。',
+		},
 		title: '新進同仁到職指南',
 		summary: '從帳號申請、設備領用到前三十天任務的完整到職流程。',
 		department: '人力資源部',
@@ -30,6 +43,14 @@ export const documents: KnowledgeDocument[] = [
 	},
 	{
 		id: 'doc-003',
+		knowledgeSourceId: 'information-security',
+		source: {
+			type: 'url',
+			url: 'https://intranet.example.com/security/customer-data',
+			domain: 'intranet.example.com',
+			capturedAt: '2026-08-07T15:30:00+08:00',
+			snapshot: '內部資安入口網站的客戶資料分級、權限申請與對外分享規範快照。',
+		},
 		title: '客戶資料存取與分享規範',
 		summary: '定義客戶資料的分級、存取授權、對外分享與異常回報流程。',
 		department: '資訊安全部',
@@ -43,6 +64,13 @@ export const documents: KnowledgeDocument[] = [
 	},
 	{
 		id: 'doc-004',
+		knowledgeSourceId: 'operations',
+		source: {
+			type: 'file',
+			fileName: '採購請款標準作業流程.docx',
+			mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+			extension: 'docx',
+		},
 		title: '採購請款標準作業流程',
 		summary: '整理需求提出、比價、簽核、驗收與請款各階段的負責人與文件。',
 		department: '採購部',
@@ -56,6 +84,14 @@ export const documents: KnowledgeDocument[] = [
 	},
 	{
 		id: 'doc-005',
+		knowledgeSourceId: 'benefits',
+		source: {
+			type: 'url',
+			url: 'https://intranet.example.com/hr/performance-faq',
+			domain: 'intranet.example.com',
+			capturedAt: '2026-07-30T10:15:00+08:00',
+			snapshot: '人力資源入口網站的績效目標設定、期中檢視、評等與申覆常見問題快照。',
+		},
 		title: '年度績效評核常見問題',
 		summary: '彙整績效目標設定、期中檢視、評等與申覆流程的常見問題。',
 		department: '人力資源部',
