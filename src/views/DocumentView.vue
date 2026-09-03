@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import DocumentKnowledgeGraph from '@/components/DocumentKnowledgeGraph.vue'
 import DocumentSourcePreview from '@/components/DocumentSourcePreview.vue'
+import DocumentVersionSelector from '@/components/DocumentVersionSelector.vue'
 import StatePanel from '@/components/StatePanel.vue'
 import { documentVersionHistoryById } from '@/mocks/data'
 import { getDocumentKnowledgeContext, getDocumentVersionDetail } from '@/mocks/documentDetails'
@@ -142,24 +143,7 @@ async function askDocument(): Promise<void> {
 				<VBtn v-if="!selectedVersion?.isCurrent" variant="text" @click="selectedVersionNumber = document.version">回到目前版本</VBtn>
 			</div>
 
-			<nav class="version-switcher" aria-label="選擇文件版本">
-				<button
-					v-for="version in documentVersions"
-					:key="version.version"
-					type="button"
-					class="version-option"
-					:class="{ 'is-active': version.version === selectedVersion?.version }"
-					:aria-current="version.version === selectedVersion?.version ? 'true' : undefined"
-					:aria-label="`閱讀第 ${version.version} 版，發布於 ${version.date}${version.isCurrent ? '，目前版本' : ''}`"
-					@click="selectedVersionNumber = version.version"
-				>
-					<span class="version-option-label">
-						<strong>第 {{ version.version }} 版</strong>
-						<small v-if="version.isCurrent">目前版本</small>
-					</span>
-					<time :datetime="version.date">{{ version.date }}</time>
-				</button>
-			</nav>
+			<DocumentVersionSelector v-model="selectedVersionNumber" :versions="documentVersions" />
 			<p class="sr-only" aria-live="polite">目前顯示第 {{ selectedVersion?.version }} 版文件內容。</p>
 
 			<div v-if="selectedVersion && selectedVersionDetail" class="document-workspace">
@@ -314,57 +298,6 @@ async function askDocument(): Promise<void> {
 
 .document-trust-strip span {
 	color: var(--ink-muted);
-}
-
-.version-switcher {
-	display: flex;
-	gap: var(--space-sm);
-	margin-block: var(--space-lg);
-	overflow-x: auto;
-	scrollbar-width: thin;
-}
-
-.version-option {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-lg);
-	min-width: 190px;
-	min-height: 56px;
-	padding: var(--space-sm) var(--space-md);
-	border: 1px solid rgb(var(--v-theme-outline));
-	border-radius: var(--radius-sm);
-	background: rgb(var(--v-theme-surface));
-	color: var(--ink-strong);
-	cursor: pointer;
-	font: inherit;
-	text-align: left;
-	transition: background-color var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
-}
-
-.version-option:hover {
-	background: var(--tint-hover);
-}
-
-.version-option.is-active {
-	border-color: rgb(var(--v-theme-primary));
-	background: var(--tint-active);
-}
-
-.version-option-label {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-}
-
-.version-option-label strong {
-	font-size: 0.9rem;
-}
-
-.version-option-label small,
-.version-option time {
-	color: var(--ink-muted);
-	font-size: 0.74rem;
 }
 
 .document-workspace {
@@ -599,10 +532,6 @@ async function askDocument(): Promise<void> {
 		flex-wrap: wrap;
 	}
 
-	.version-option {
-		min-width: 168px;
-	}
-
 	.reader-header,
 	.version-changes {
 		grid-template-columns: 1fr;
@@ -615,9 +544,4 @@ async function askDocument(): Promise<void> {
 	}
 }
 
-@media (prefers-reduced-motion: reduce) {
-	.version-option {
-		transition: none;
-	}
-}
 </style>
