@@ -105,6 +105,7 @@ export const redDarkTheme: ThemeDefinition = {
 }
 
 export type ThemeMode = 'light' | 'dark'
+export type ThemePreference = ThemeMode | 'system'
 export type ThemeAccent = 'indigo' | 'red'
 
 export const themeAccentLabels: Record<ThemeAccent, string> = {

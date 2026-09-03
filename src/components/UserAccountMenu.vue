@@ -31,14 +31,14 @@ const accountItems: AccountMenuItem[] = [
 		tab: 'profile',
 	},
 	{
-		title: '外觀設定',
-		icon: 'mdi-palette-outline',
-		tab: 'appearance',
-	},
-	{
 		title: '密碼與安全',
 		icon: 'mdi-lock-outline',
 		tab: 'security',
+	},
+	{
+		title: '外觀設定',
+		icon: 'mdi-palette-outline',
+		tab: 'appearance',
 	},
 ]
 

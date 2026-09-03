@@ -3,22 +3,31 @@ import type { DocumentVersionEntry } from '@/types'
 
 interface ComponentProps {
 	versions: DocumentVersionEntry[]
+	showStatus?: boolean
 }
 
-defineProps<ComponentProps>()
+withDefaults(defineProps<ComponentProps>(), {
+	showStatus: true,
+})
 </script>
 
 <template>
 	<ol v-if="versions.length" class="version-timeline" aria-label="文件版本時間軸">
 		<li v-for="version in versions" :key="`${version.version}-${version.date}`" class="version-entry">
 			<div class="timeline-rail" aria-hidden="true">
-				<span class="timeline-marker" :class="{ 'timeline-marker--current': version.isCurrent }" />
+				<span data-testid="version-marker" class="timeline-marker" :class="{ 'timeline-marker--current': version.isCurrent }" />
 			</div>
 			<article class="version-content">
 				<div class="version-heading">
 					<div class="d-flex flex-wrap align-center ga-2">
 						<h3>第 {{ version.version }} 版</h3>
-						<VChip v-if="version.isCurrent || version.status" :color="version.isCurrent ? 'primary' : undefined" variant="tonal" size="x-small">
+						<VChip
+							v-if="showStatus && (version.isCurrent || version.status)"
+							data-testid="version-status"
+							:color="version.isCurrent ? 'primary' : undefined"
+							variant="tonal"
+							size="x-small"
+						>
 							{{ version.status ?? '目前版本' }}
 						</VChip>
 					</div>

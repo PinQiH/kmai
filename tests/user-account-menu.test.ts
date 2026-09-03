@@ -94,7 +94,7 @@ describe('UserAccountMenu', () => {
 		expect(document.body.textContent).toContain('產品企劃部 · 系統管理員')
 		expect(document.querySelector('.user-summary-email-sr')?.textContent).toBe('employee@company.com')
 
-		for (const tab of ['profile', 'appearance', 'security', 'support', 'about']) {
+		for (const tab of ['profile', 'security', 'appearance', 'support', 'about']) {
 			const link = document.querySelector(`[data-testid="user-menu-${tab}"]`)
 			expect(link, `${tab} 應顯示在使用者選單`).toBeInstanceOf(HTMLAnchorElement)
 			expect((link as HTMLAnchorElement).href).toContain(`/account?tab=${tab}`)
@@ -130,11 +130,11 @@ describe('UserAccountMenu', () => {
 		const actions = Array.from(lists[0]?.querySelectorAll('[data-testid]') ?? []).map((element) => element.getAttribute('data-testid'))
 
 		expect(lists).toHaveLength(1)
-		expect(support?.previousElementSibling?.getAttribute('data-testid')).toBe('user-menu-security')
+		expect(support?.previousElementSibling?.getAttribute('data-testid')).toBe('user-menu-appearance')
 		expect(actions).toEqual([
 			'user-menu-profile',
-			'user-menu-appearance',
 			'user-menu-security',
+			'user-menu-appearance',
 			'user-menu-support',
 			'user-menu-about',
 			'user-menu-logout',

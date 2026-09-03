@@ -320,7 +320,6 @@ async function handleLogout(): Promise<void> {
       >
         <VTooltip activator="parent">{{ workspaceSwitchLabel }}</VTooltip>
       </VBtn>
-      <VBtn icon="mdi-magnify" aria-label="前往搜尋" to="/search" />
       <NotificationMenu />
       <VBtn
         :icon="

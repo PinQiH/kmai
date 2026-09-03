@@ -6,19 +6,20 @@ import { useTheme } from "vuetify"
 import DocumentVersionTimeline from "@/components/DocumentVersionTimeline.vue"
 import PageHeader from "@/components/PageHeader.vue"
 import { useAppStore } from "@/stores/app"
-import type { ThemeMode } from "@/theme"
+import type { ThemePreference } from "@/theme"
 import type { DocumentVersionEntry } from "@/types"
 
 const route = useRoute()
 const theme = useTheme()
 const appStore = useAppStore()
 
-function handleModeChange(mode: ThemeMode): void {
-  if (mode === appStore.themeMode) return
-  appStore.toggleTheme(theme)
+function handleModeChange(preference: ThemePreference): void {
+  if (preference === appStore.themePreference) return
+  appStore.setThemePreference(theme, preference)
 }
 
 const activeTab = ref("profile")
+const account = "employee"
 const displayName = ref("王小明")
 const email = ref("employee@company.com")
 const issueCategory = ref("搜尋結果")
@@ -34,18 +35,33 @@ const passwordTouched = ref(false)
 const passwordMessage = ref("")
 const isPrivacyOpen = ref(false)
 
+const ASCII_SYMBOL_PATTERN = /[\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]/
+const PRINTABLE_ASCII_PATTERN = /^[\x21-\x7E]+$/
+
+function isValidNewPassword(password: string): boolean {
+  return (
+    password.length >= 8 &&
+    password.length <= 20 &&
+    PRINTABLE_ASCII_PATTERN.test(password) &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password) &&
+    ASCII_SYMBOL_PATTERN.test(password)
+  )
+}
+
 const systemReleaseHistory: DocumentVersionEntry[] = [
   {
     version: "0.2.0",
     date: "2026-08-18",
     author: "系統管理團隊",
-    summary: "整理個人筆記本、網路搜尋控制與導覽體驗，準備下一次發布。",
+    isCurrent: true,
+    summary: "新增個人筆記本與網路搜尋控制，並改善導覽體驗。",
     changes: [
       "新增個人筆記本與文件上傳介面",
       "加入筆記本分享與成員權限設定",
       "問答頁可切換是否進行網路搜尋",
     ],
-    status: "即將推出",
   },
   {
     version: "0.1.0",
@@ -57,7 +73,6 @@ const systemReleaseHistory: DocumentVersionEntry[] = [
       "支援文件版本與引用追溯",
       "建立管理端健康度與處理監控",
     ],
-    isCurrent: true,
   },
   {
     version: "0.0.5",
@@ -69,14 +84,13 @@ const systemReleaseHistory: DocumentVersionEntry[] = [
       "加入文件列表與搜尋結果頁",
       "建立淺色及深色主題",
     ],
-    status: "已封存",
   },
 ]
 
 const allowedTabs = new Set([
   "profile",
-  "appearance",
   "security",
+  "appearance",
   "support",
   "about",
 ])
@@ -93,9 +107,10 @@ async function saveProfile(): Promise<void> {
 
 function updatePassword(): void {
   passwordTouched.value = true
+  passwordMessage.value = ""
   if (
     !currentPassword.value ||
-    newPassword.value.length < 8 ||
+    !isValidNewPassword(newPassword.value) ||
     newPassword.value !== confirmedPassword.value
   )
     return
@@ -103,7 +118,8 @@ function updatePassword(): void {
   newPassword.value = ""
   confirmedPassword.value = ""
   passwordTouched.value = false
-  passwordMessage.value = "密碼已更新，下次登入請使用新密碼。"
+  passwordMessage.value =
+    "密碼格式已通過；正式更新時，系統會再確認未與前三次密碼重複。"
 }
 
 function submitIssue(): void {
@@ -129,11 +145,13 @@ onMounted(syncTabFromRoute)
       description="管理個人資料、密碼、問題回報與產品資訊。"
     />
     <VTabs v-model="activeTab" color="primary" class="mb-6" show-arrows>
-      <VTab value="profile">個人資料</VTab
-      ><VTab value="appearance">外觀設定</VTab
-      ><VTab value="security">密碼與安全</VTab
-      ><VTab value="support">問題回報</VTab
-      ><VTab value="about">版本與隱私</VTab>
+      <VTab value="profile" data-testid="account-tab-profile">個人資料</VTab
+      ><VTab value="security" data-testid="account-tab-security"
+        >密碼與安全</VTab
+      ><VTab value="appearance" data-testid="account-tab-appearance"
+        >外觀設定</VTab
+      ><VTab value="support" data-testid="account-tab-support">問題回報</VTab
+      ><VTab value="about" data-testid="account-tab-about">版本與隱私</VTab>
     </VTabs>
     <VWindow v-model="activeTab">
       <VWindowItem value="profile">
@@ -143,12 +161,23 @@ onMounted(syncTabFromRoute)
           @submit.prevent="saveProfile"
         >
           <h2 class="section-heading mb-5">基本資料</h2>
-          <VTextField v-model="displayName" label="顯示名稱" />
+          <VTextField
+            :model-value="account"
+            label="帳號"
+            readonly
+            data-testid="profile-account"
+          />
+          <VTextField
+            v-model="displayName"
+            label="顯示名稱"
+            data-testid="profile-display-name"
+          />
           <VTextField
             v-model="email"
-            label="電子郵件"
+            label="Email"
             type="email"
             autocomplete="email"
+            data-testid="profile-email"
             :error-messages="
               emailTouched && !email.includes('@')
                 ? '請輸入有效的電子郵件地址，例如 name@company.com'
@@ -162,27 +191,11 @@ onMounted(syncTabFromRoute)
           <VBtn type="submit" color="primary">儲存變更</VBtn>
         </VCard>
       </VWindowItem>
-      <VWindowItem value="appearance">
-        <VCard class="surface-border pa-6">
-          <h2 class="section-heading mb-1">外觀</h2>
-          <p class="text-body-2 text-medium-emphasis mb-5">
-            可依使用習慣選擇明暗模式；系統配色由管理員統一設定。
-          </p>
-          <VRadioGroup
-            :model-value="appStore.themeMode"
-            label="明暗模式"
-            inline
-            @update:model-value="handleModeChange($event as ThemeMode)"
-          >
-            <VRadio label="淺色" value="light" />
-            <VRadio label="深色" value="dark" />
-          </VRadioGroup>
-        </VCard>
-      </VWindowItem>
       <VWindowItem value="security">
         <VCard
           class="surface-border pa-6"
           tag="form"
+          data-testid="password-form"
           @submit.prevent="updatePassword"
         >
           <h2 class="section-heading mb-5">變更密碼</h2>
@@ -191,17 +204,30 @@ onMounted(syncTabFromRoute)
             label="目前密碼"
             type="password"
             autocomplete="current-password"
+            data-testid="current-password"
           />
+          <ul
+            id="new-password-requirements"
+            class="text-body-2 text-medium-emphasis mb-4 ps-5"
+            data-testid="new-password-requirements"
+          >
+            <li>
+              密碼須為 8～20 碼，並包含英文大寫、英文小寫、數字及半形符號。
+            </li>
+            <li>僅可使用半形英數與符號，不可包含空白。</li>
+            <li>系統會檢查新密碼不得與前三次使用的密碼相同。</li>
+          </ul>
           <VTextField
             v-model="newPassword"
             label="新密碼"
             type="password"
             autocomplete="new-password"
-            hint="至少 8 個字元"
-            persistent-hint
+            maxlength="20"
+            aria-describedby="new-password-requirements"
+            data-testid="new-password"
             :error-messages="
-              passwordTouched && newPassword.length < 8
-                ? '新密碼至少需要 8 個字元'
+              passwordTouched && !isValidNewPassword(newPassword)
+                ? '請輸入 8～20 碼的半形字元，並包含英文大寫、英文小寫、數字及符號（不可有空白）'
                 : undefined
             "
             @blur="passwordTouched = true"
@@ -211,6 +237,8 @@ onMounted(syncTabFromRoute)
             label="再次輸入新密碼"
             type="password"
             autocomplete="new-password"
+            maxlength="20"
+            data-testid="confirmed-password"
             :error-messages="
               passwordTouched && confirmedPassword !== newPassword
                 ? '兩次輸入的密碼不一致，請重新確認'
@@ -220,12 +248,42 @@ onMounted(syncTabFromRoute)
           />
           <VAlert
             v-if="passwordMessage"
-            type="success"
+            type="info"
             variant="tonal"
             class="mb-4"
             >{{ passwordMessage }}</VAlert
           >
           <VBtn type="submit" color="primary">更新密碼</VBtn>
+        </VCard>
+      </VWindowItem>
+      <VWindowItem value="appearance">
+        <VCard class="surface-border pa-6">
+          <h2 class="section-heading mb-1">外觀</h2>
+          <p class="text-body-2 text-medium-emphasis mb-5">
+            可固定使用淺色或深色，也可以跟隨瀏覽器設定；系統配色由管理員統一設定。
+          </p>
+          <VRadioGroup
+            :model-value="appStore.themePreference"
+            label="明暗模式"
+            inline
+            @update:model-value="handleModeChange($event as ThemePreference)"
+          >
+            <VRadio
+              label="跟隨瀏覽器"
+              value="system"
+              data-testid="appearance-mode-system"
+            />
+            <VRadio
+              label="淺色"
+              value="light"
+              data-testid="appearance-mode-light"
+            />
+            <VRadio
+              label="深色"
+              value="dark"
+              data-testid="appearance-mode-dark"
+            />
+          </VRadioGroup>
         </VCard>
       </VWindowItem>
       <VWindowItem value="support">
@@ -276,7 +334,7 @@ onMounted(syncTabFromRoute)
               >查看隱私權政策</VBtn
             >
           </div>
-          <DocumentVersionTimeline :versions="systemReleaseHistory" />
+          <DocumentVersionTimeline :versions="systemReleaseHistory" :show-status="false" />
         </VCard>
       </VWindowItem>
     </VWindow>
