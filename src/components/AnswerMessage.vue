@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 import ThinkingTrace from '@/components/ThinkingTrace.vue'
 import { parseAnswerSegments } from '@/stores/conversation'
@@ -8,10 +8,11 @@ import type { Citation, ConversationMessage } from '@/types'
 interface ComponentProps {
 	message: ConversationMessage
 	isFavorite?: boolean
+	isTargeted?: boolean
 	savedNotebookCount?: number
 }
 
-const props = withDefaults(defineProps<ComponentProps>(), { isFavorite: false, savedNotebookCount: 0 })
+const props = withDefaults(defineProps<ComponentProps>(), { isFavorite: false, isTargeted: false, savedNotebookCount: 0 })
 
 const emit = defineEmits<{
 	openCitation: [citation: Citation, triggerId: string]
@@ -29,6 +30,10 @@ const elapsedText = computed(() => `${((props.message.trace?.elapsedMs ?? 0) / 1
 const saveToNotebookLabel = computed(() => props.savedNotebookCount > 0
 	? `已存入 ${props.savedNotebookCount} 本筆記本，可繼續新增`
 	: '將這個回答存入筆記本')
+
+watch(() => props.isTargeted, (isTargeted) => {
+	if (isTargeted && props.message.citations?.length) isCitationListOpen.value = true
+}, { immediate: true })
 
 // - 依上標編號取出對應引用，編號從 1 起算
 function findCitation({ index }: { index: number }): Citation | undefined {
@@ -62,7 +67,7 @@ function openCitationDetail(citation: Citation): void {
 </script>
 
 <template>
-	<article class="answer-card">
+	<article :id="`message-${message.id}`" class="answer-card" :class="{ 'is-targeted': isTargeted }" tabindex="-1">
 		<p class="assistant-name">KM 助理</p>
 
 		<!-- > 串流中的狀態列：回答完成前也要看得到系統在做什麼 -->
@@ -178,6 +183,11 @@ function openCitationDetail(citation: Citation): void {
 /* @ 不使用卡片外觀：本元件已位於主卡片內，再加邊框與底色就是卡中卡 */
 .answer-card {
 	min-width: 0;
+}
+
+.answer-card.is-targeted {
+	border-radius: var(--radius-md);
+	box-shadow: 0 0 0 2px rgb(var(--v-theme-primary), 0.45);
 }
 
 .assistant-name {

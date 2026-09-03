@@ -88,6 +88,25 @@ describe('AnswerMessage', () => {
 		expect(wrapper.emitted('openCitation')?.[0]).toEqual([citation, 'citation-answer-1-cite-1'])
 	})
 
+	it('should expose and expand a targeted answer with its saved citations', () => {
+		const wrapper = mount(AnswerMessage, {
+			props: { message, isTargeted: true },
+			global: {
+				stubs: {
+					ThinkingTrace: true,
+					VBtn: true,
+					VExpandTransition: { template: '<div><slot /></div>' },
+					VIcon: true,
+				},
+			},
+		})
+
+		expect(wrapper.get('article').attributes('id')).toBe('message-answer-1')
+		expect(wrapper.get('article').classes()).toContain('is-targeted')
+		expect(wrapper.get('.citation-toggle').attributes('aria-expanded')).toBe('true')
+		expect(wrapper.get('[data-testid="citation-entry-1"]').text()).toContain('員工差旅與費用報支辦法')
+	})
+
 	it('should render selected icons and pressed states when helpful feedback is present', () => {
 		const wrapper = mount(AnswerMessage, {
 			props: {

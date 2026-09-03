@@ -8,7 +8,7 @@ describe('favorites store', () => {
 
 	it('should add and remove the same answer through toggle', () => {
 		const store = useFavoritesStore()
-		const favorite = { id: 'answer-10', question: '測試問題', answer: '測試回答', date: '2026-08-14' }
+		const favorite = { id: 'answer-10', conversationId: 'conversation-10', question: '測試問題', answer: '測試回答', date: '2026-08-14' }
 
 		store.toggle(favorite)
 		expect(store.isFavorite(favorite.id)).toBe(true)

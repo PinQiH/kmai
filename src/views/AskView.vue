@@ -49,6 +49,7 @@ const composerField = ref<HTMLTextAreaElement>()
 const scopeTrigger = ref<HTMLButtonElement>()
 const documentScopeSection = ref<HTMLElement>()
 const activeQuestionId = ref<string | null>(null)
+const targetedMessageId = ref<string | null>(null)
 const citationTriggerId = ref<string | null>(null)
 const documentSearch = ref<string | null>('')
 const documentPage = ref(1)
@@ -60,6 +61,7 @@ const saveTargetId = ref<string | null>(null)
 const isSaveDialogOpen = ref(false)
 const selectedNotebookId = ref<string | null>(null)
 const saveAnswerError = ref('')
+const navigationErrorMessage = ref('')
 
 const COMPOSER_MAX_HEIGHT = 120
 
@@ -228,6 +230,39 @@ const outlineItems = computed<OutlineItem[]>(() => {
 
 function prefersReducedMotion(): boolean {
 	return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function routeQueryText(value: unknown): string {
+	return typeof value === 'string' ? value.trim() : ''
+}
+
+async function openConversationMessage({ conversationId, messageId }: { conversationId: string; messageId: string }): Promise<void> {
+	navigationErrorMessage.value = ''
+	targetedMessageId.value = null
+	if (!conversationId || !messageId) {
+		navigationErrorMessage.value = '收藏連結不完整，無法開啟原始問答。'
+		return
+	}
+	if (conversationStore.isResponding) {
+		navigationErrorMessage.value = '目前正在產生回答，請稍候完成後再開啟收藏。'
+		return
+	}
+
+	conversationStore.openConversation(conversationId)
+	const targetMessage = conversationStore.messages.find((message) => message.id === messageId)
+	if (conversationStore.activeConversationId !== conversationId || !targetMessage || targetMessage.role !== 'assistant') {
+		navigationErrorMessage.value = '原始對話或回答已不存在，無法開啟這筆收藏。'
+		return
+	}
+
+	targetedMessageId.value = messageId
+	await nextTick()
+	window.requestAnimationFrame(() => {
+		if (targetedMessageId.value !== messageId) return
+		const target = document.getElementById(`message-${messageId}`)
+		target?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' })
+		target?.focus({ preventScroll: true })
+	})
 }
 
 // - 原生 textarea 的 auto-grow：先歸零再依 scrollHeight 撐高，上限 120px
@@ -421,8 +456,9 @@ function saveAnswerToNotebook(): void {
 
 function toggleFavorite(messageId: string, answer: string): void {
 	const questionMessage = findQuestionForAnswer(messageId)
-	if (!questionMessage) return
-	favoritesStore.toggle({ id: messageId, question: questionMessage.content, answer, date: new Date().toISOString().slice(0, 10) })
+	const conversationId = conversationStore.activeConversationId
+	if (!questionMessage || !conversationId) return
+	favoritesStore.toggle({ id: messageId, conversationId, question: questionMessage.content, answer, date: new Date().toISOString().slice(0, 10) })
 	feedbackMessage.value = favoritesStore.isFavorite(messageId) ? '已加入我的收藏。' : '已取消收藏。'
 }
 
@@ -476,6 +512,13 @@ function observeQuestions(): void {
 }
 
 onMounted(() => {
+	const conversationId = routeQueryText(route.query.conversationId)
+	const messageId = routeQueryText(route.query.messageId)
+	if (conversationId || messageId) {
+		void openConversationMessage({ conversationId, messageId })
+		return
+	}
+
 	const initialQuestion = String(route.query.q ?? '')
 	if (initialQuestion) {
 		void submitQuestion(initialQuestion)
@@ -494,10 +537,25 @@ watch(outlineItems, async () => {
 // @ 首頁與側邊欄都可能帶著新的 q 進來，需要重新觸發提問
 watch(() => route.query.q, (nextQuestion) => {
 	const questionText = String(nextQuestion ?? '')
-	if (!questionText) return
+	if (!questionText || routeQueryText(route.query.conversationId) || routeQueryText(route.query.messageId)) return
+	targetedMessageId.value = null
+	navigationErrorMessage.value = ''
 	conversationStore.startNewConversation()
 	void submitQuestion(questionText)
 })
+
+watch(
+	() => [route.query.conversationId, route.query.messageId] as const,
+	([conversationIdValue, messageIdValue]) => {
+		const conversationId = routeQueryText(conversationIdValue)
+		const messageId = routeQueryText(messageIdValue)
+		if (!conversationId && !messageId) {
+			targetedMessageId.value = null
+			return
+		}
+		void openConversationMessage({ conversationId, messageId })
+	},
+)
 </script>
 
 <template>
@@ -514,6 +572,7 @@ watch(() => route.query.q, (nextQuestion) => {
 						<div class="ask-scroll-layout" :class="{ 'has-outline': showOutline }">
 							<div class="ask-content">
 								<VAlert v-if="conversationStore.errorMessage" type="error" variant="tonal" density="compact" class="mb-4">{{ conversationStore.errorMessage }}</VAlert>
+								<VAlert v-if="navigationErrorMessage" type="warning" variant="tonal" density="compact" closable class="mb-4" @click:close="navigationErrorMessage = ''">{{ navigationErrorMessage }}</VAlert>
 
 								<!-- @ 空狀態刻意左對齊並貼齊輸入框：標題→輸入框→建議題目形成一條可讀的直欄，而非置中的 AI 首屏 -->
 								<div v-if="isEmptyState" class="ask-empty">
@@ -534,6 +593,7 @@ watch(() => route.query.q, (nextQuestion) => {
 											v-else
 											:message="message"
 											:is-favorite="favoritesStore.isFavorite(message.id)"
+											:is-targeted="targetedMessageId === message.id"
 											:saved-notebook-count="getSavedNotebookCount(message.id)"
 											@open-citation="openCitation"
 											@feedback="recordFeedback(message.id, $event)"

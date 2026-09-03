@@ -95,9 +95,7 @@ const routes: RouteRecordRaw[] = [
 	},
 	{
 		path: "/favorites",
-		name: "favorites",
-		component: () => import("@/views/FavoritesView.vue"),
-		meta: { title: "我的收藏" },
+		redirect: "/",
 	},
 	{
 		path: "/notifications",

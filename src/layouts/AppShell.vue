@@ -29,12 +29,11 @@ const employeeItems: NavigationItem[] = [
     title: "搜尋對話",
     icon: "mdi-magnify",
     action: "search-conversation",
-    hint: "Ctrl K",
+    hint: "/",
   },
   { title: "知識庫", icon: "mdi-bookshelf", to: "/library" },
   { title: "個人筆記本", icon: "mdi-notebook-outline", to: "/notebooks" },
   { title: "知識圖譜", icon: "mdi-graph-outline", to: "/graph" },
-  { title: "我的收藏", icon: "mdi-bookmark-outline", to: "/favorites" },
 ]
 
 const adminOverviewItem: NavigationItem = {
@@ -158,11 +157,26 @@ async function handleNavigate(item: NavigationItem): Promise<void> {
   if (item.to) await router.push(item.to)
 }
 
-// @ 只在非輸入元素上攔截 Ctrl/Cmd + K，避免搶走輸入框的組字與選取
+// - 判斷快捷鍵是否發生於可輸入內容，避免搶走文字輸入與組字
+function isEditableShortcutTarget(target: EventTarget | null): boolean {
+	if (!(target instanceof HTMLElement)) return false
+	return target.matches('input, textarea, select, [role="textbox"]')
+		|| target.isContentEditable
+		|| Boolean(target.closest('[contenteditable]:not([contenteditable="false"])'))
+}
+
+// - 使用斜線開啟搜尋，並避開輸入內容與中文組字
 function handleSearchShortcut(event: KeyboardEvent): void {
-  if (event.key !== "k" || !(event.ctrlKey || event.metaKey)) return
-  event.preventDefault()
-  isSearchOpen.value = true
+	const isSlash = event.key === '/'
+		&& !event.ctrlKey
+		&& !event.metaKey
+		&& !event.altKey
+
+	if (!isSlash) return
+	if (event.defaultPrevented || event.isComposing || isEditableShortcutTarget(event.target)) return
+
+	event.preventDefault()
+	isSearchOpen.value = true
 }
 
 onMounted(() => window.addEventListener("keydown", handleSearchShortcut))
