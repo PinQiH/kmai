@@ -33,7 +33,6 @@ const employeeItems: NavigationItem[] = [
   },
   { title: "知識庫", icon: "mdi-bookshelf", to: "/library" },
   { title: "個人筆記本", icon: "mdi-notebook-outline", to: "/notebooks" },
-  { title: "知識圖譜", icon: "mdi-graph-outline", to: "/graph" },
 ]
 
 const adminOverviewItem: NavigationItem = {

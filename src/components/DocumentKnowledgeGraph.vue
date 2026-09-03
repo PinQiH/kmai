@@ -6,6 +6,7 @@ import type { DocumentKnowledgeContext } from '@/mocks/documentDetails'
 interface ComponentProps {
 	context: DocumentKnowledgeContext
 	documentTitle: string
+	knowledgeSourceId: string
 }
 
 defineProps<ComponentProps>()
@@ -41,7 +42,10 @@ function getTopicStyle(index: number): CSSProperties {
 				v-if="context.focusNodeId"
 				variant="text"
 				append-icon="mdi-arrow-top-right"
-				:to="{ path: '/graph', query: { focus: context.focusNodeId } }"
+				:to="{
+					path: '/library',
+					query: { source: knowledgeSourceId, view: 'graph', focus: context.focusNodeId },
+				}"
 			>
 				開啟完整圖譜
 			</VBtn>

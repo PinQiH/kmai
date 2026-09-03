@@ -90,7 +90,7 @@ const routes: RouteRecordRaw[] = [
 	{
 		path: "/graph",
 		name: "graph",
-		component: () => import("@/views/GraphView.vue"),
+		component: () => import("@/views/LibraryView.vue"),
 		meta: { title: "知識圖譜" },
 	},
 	{

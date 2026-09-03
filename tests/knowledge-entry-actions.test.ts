@@ -25,6 +25,7 @@ async function mountView(component: typeof HomeView | typeof LibraryView | typeo
 			{ path: '/notebooks', component: NotebooksView },
 			{ path: '/notebooks/:id', component: EmptyView },
 			{ path: '/documents/:id', component: EmptyView },
+			{ path: '/graph', name: 'graph', component: EmptyView },
 			{ path: '/ask', component: EmptyView },
 		],
 	})
@@ -53,6 +54,11 @@ beforeEach(() => {
 		unobserve(): void {}
 		disconnect(): void {}
 	})
+	vi.stubGlobal('matchMedia', vi.fn(() => ({
+		matches: true,
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
+	})))
 })
 
 afterEach(() => {
@@ -107,6 +113,37 @@ describe('knowledge source entry actions', () => {
 		expect(wrapper!.find('[data-testid="ask-knowledge-base"]').exists()).toBe(true)
 		expect(wrapper!.text()).toContain('員工差旅與費用報支辦法')
 		expect(wrapper!.text()).not.toContain('新進同仁到職指南')
+	})
+
+	it('should place the scoped knowledge graph beside the documents in its knowledge base', async () => {
+		await mountView(LibraryView, '/library?source=benefits&view=graph')
+
+		expect(wrapper!.findAll('.graph-node')).toHaveLength(11)
+		expect(wrapper!.text()).toContain('請假管理辦法')
+		expect(wrapper!.text()).toContain('績效考核辦法')
+		expect(wrapper!.text()).not.toContain('差旅管理辦法')
+		expect(wrapper!.find('[aria-label="全螢幕檢視知識圖譜"]').exists()).toBe(false)
+	})
+
+	it('should keep the knowledge base interface and close the detail panel on the full-screen route', async () => {
+		await mountView(LibraryView, '/graph?source=policy')
+
+		expect(wrapper!.get('h1').text()).toBe('知識庫')
+		expect(wrapper!.get('[data-testid="library-source-policy"]').attributes('aria-pressed')).toBe('true')
+		expect(wrapper!.findAll('.graph-node')).toHaveLength(8)
+		expect(wrapper!.find('.graph-detail').exists()).toBe(false)
+	})
+
+	it('should update the scoped graph when Vue reuses the knowledge base page across routes', async () => {
+		const router = await mountView(LibraryView, '/graph?source=policy')
+
+		await router.push('/library?source=benefits&view=graph')
+		await flushPromises()
+
+		expect(wrapper!.get('[data-testid="library-source-benefits"]').attributes('aria-pressed')).toBe('true')
+		expect(wrapper!.findAll('.graph-node')).toHaveLength(11)
+		expect(wrapper!.text()).toContain('請假管理辦法')
+		expect(wrapper!.text()).not.toContain('差旅管理辦法')
 	})
 
 	it('should fall back to all knowledge bases when a removed source is requested', async () => {

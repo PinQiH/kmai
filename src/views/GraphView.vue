@@ -7,14 +7,25 @@ import PageHeader from '@/components/PageHeader.vue'
 import {
 	GRAPH_CLUSTERS,
 	GRAPH_NODE_TYPES,
+	getKnowledgeGraphBySourceId,
 	getNeighbors,
-	graphEdges,
-	graphNodes,
 	type GraphNodeType,
 	type KnowledgeGraphNode,
 } from '@/mocks/graph'
+import { getEmployeeDocumentsBySourceId } from '@/repositories/knowledge.repository'
 import { clusterPalette } from '@/theme'
 import { ForceLayout, type ForceLink } from '@/utils/force-layout'
+import { DEFAULT_ASK_SOURCE_ID, getCompanyKnowledgeSourceById } from '@/utils/knowledgeSources'
+
+interface ComponentProps {
+	embedded?: boolean
+	knowledgeSourceId?: string
+}
+
+const props = withDefaults(defineProps<ComponentProps>(), {
+	embedded: false,
+	knowledgeSourceId: '',
+})
 
 const ALL_TYPES = '全部類型'
 
@@ -31,6 +42,20 @@ const LABEL_OFFSET_Y = 16
 
 const route = useRoute()
 const theme = useTheme()
+
+const requestedKnowledgeSourceId = props.knowledgeSourceId
+	|| (typeof route.query.source === 'string' ? route.query.source : '')
+const requestedKnowledgeSource = getCompanyKnowledgeSourceById(requestedKnowledgeSourceId)
+const defaultKnowledgeSource = getCompanyKnowledgeSourceById(DEFAULT_ASK_SOURCE_ID)!
+const currentKnowledgeSource = requestedKnowledgeSource && requestedKnowledgeSource.id !== 'company'
+	? requestedKnowledgeSource
+	: defaultKnowledgeSource
+const knowledgeSourceId = currentKnowledgeSource.id
+const scopedGraph = getKnowledgeGraphBySourceId(knowledgeSourceId)
+const graphNodes = scopedGraph.nodes
+const graphEdges = scopedGraph.edges
+const graphClusters = scopedGraph.clusters
+const relatedDocuments = getEmployeeDocumentsBySourceId(knowledgeSourceId)
 
 const isDark = computed(() => theme.current.value.dark)
 
@@ -103,7 +128,13 @@ const selectedNode = computed<KnowledgeGraphNode | null>(
 	() => graphNodes.find((node) => node.id === selectedId.value) ?? null,
 )
 
-const relatedNodes = computed(() => (selectedId.value ? getNeighbors(selectedId.value) : []))
+const relatedNodes = computed(() => (
+	selectedId.value ? getNeighbors(selectedId.value, graphNodes, graphEdges) : []
+))
+
+function getClusterClass(cluster: string): string {
+	return `cluster-${clusterIndexOf.get(cluster) ?? 0}`
+}
 
 // - 篩選只影響顯示強度，不從模擬中移除節點（移除會讓整張圖重新彈開）
 function matchesFilter(node: KnowledgeGraphNode): boolean {
@@ -361,9 +392,10 @@ onMounted(() => {
 	// @ 首頁星圖以 ?focus= 帶入主題：可能是節點名稱，也可能是叢集名稱
 	const focus = typeof route.query.focus === 'string' ? route.query.focus.trim() : ''
 	if (focus) {
+		const byId = graphNodes.find((node) => node.id === focus)
 		const byLabel = graphNodes.find((node) => node.label === focus)
 		const byCluster = graphNodes.find((node) => node.cluster === focus && node.type === '制度')
-		selectedId.value = byLabel?.id ?? byCluster?.id ?? ''
+		selectedId.value = byId?.id ?? byLabel?.id ?? byCluster?.id ?? ''
 	}
 
 	if (element) {
@@ -379,11 +411,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-	<div class="page-shell">
+	<div :class="{ 'page-shell': !props.embedded, 'graph-embedded': props.embedded }">
 		<PageHeader
+			v-if="!props.embedded"
 			eyebrow="探索關聯"
 			title="知識圖譜"
-			description="從制度、流程、部門與專有名詞之間的關聯，找到不容易用關鍵字發現的知識。"
+			:description="`目前顯示「${currentKnowledgeSource.name}」知識庫中，制度、流程、部門與專有名詞之間的關聯。`"
 		/>
 
 		<!-- @ 色票以 inline 自訂屬性下放，才不會受 Vuetify theme class 的掛載位置影響 -->
@@ -412,6 +445,7 @@ onBeforeUnmount(() => {
 						hide-details
 					/>
 					<VBtn
+						class="graph-rearrange-action"
 						icon="mdi-shuffle-variant"
 						variant="text"
 						size="small"
@@ -484,7 +518,7 @@ onBeforeUnmount(() => {
 					</svg>
 
 					<ul class="graph-legend" aria-label="主題群圖例">
-						<li v-for="(cluster, index) in GRAPH_CLUSTERS" :key="cluster" :class="`cluster-${index}`">
+						<li v-for="cluster in graphClusters" :key="cluster" :class="getClusterClass(cluster)">
 							<span class="legend-dot" aria-hidden="true" />{{ cluster }}
 						</li>
 					</ul>
@@ -539,20 +573,17 @@ onBeforeUnmount(() => {
 				<VDivider class="my-5" />
 
 				<p class="text-caption font-weight-bold mb-2">相關文件</p>
-				<VList density="compact">
+				<VList v-if="relatedDocuments.length" density="compact">
 					<VListItem
-						to="/documents/doc-001"
-						title="員工差旅與費用報支辦法"
-						subtitle="直接來源"
-						prepend-icon="mdi-file-document-outline"
-					/>
-					<VListItem
-						to="/documents/doc-002"
-						title="新進同仁到職指南"
-						subtitle="共同包含：申請流程"
+						v-for="document in relatedDocuments"
+						:key="document.id"
+						:to="`/documents/${document.id}`"
+						:title="document.title"
+						:subtitle="document.category"
 						prepend-icon="mdi-file-document-outline"
 					/>
 				</VList>
+				<p v-else class="detail-empty">目前沒有可瀏覽的相關文件。</p>
 			</aside>
 		</div>
 	</div>
@@ -592,6 +623,10 @@ onBeforeUnmount(() => {
 	padding: var(--space-sm) var(--space-md);
 	border-bottom: 1px solid rgb(var(--v-theme-outline));
 	background: rgb(var(--v-theme-background));
+}
+
+.graph-embedded {
+	min-width: 0;
 }
 
 .graph-layout {
@@ -839,6 +874,13 @@ onBeforeUnmount(() => {
 	color: var(--ink-muted);
 }
 
+.detail-empty {
+	margin: 0;
+	color: var(--ink-muted);
+	font-size: 0.84rem;
+	line-height: 1.6;
+}
+
 .related-list {
 	display: grid;
 	gap: 2px;
@@ -901,6 +943,11 @@ onBeforeUnmount(() => {
 	.graph-toolbar :deep(.v-select) {
 		grid-column: 1 / -1;
 		grid-row: 2;
+	}
+
+	.graph-rearrange-action {
+		grid-column: 2;
+		grid-row: 1;
 	}
 
 	.graph-instruction {

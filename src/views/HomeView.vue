@@ -6,6 +6,7 @@ import AnimatedNumber from '@/components/AnimatedNumber.vue'
 import DocumentCard from '@/components/DocumentCard.vue'
 import KnowledgeConstellation from '@/components/KnowledgeConstellation.vue'
 import SearchInput from '@/components/SearchInput.vue'
+import { getKnowledgeSourceIdByGraphLabel } from '@/mocks/graph'
 import { getEmployeeDocumentsSnapshot } from '@/repositories/knowledge.repository'
 import { COMPANY_KNOWLEDGE_SOURCES } from '@/utils/knowledgeSources'
 
@@ -35,9 +36,11 @@ async function handleSearch(value = query.value): Promise<void> {
 	await router.push({ path: '/ask', query: { q: value.trim() } })
 }
 
-// - 點擊背景星圖的節點，帶著該主題進知識圖譜頁
+// - 點擊背景星圖的節點，帶著該主題進入所屬知識庫的圖譜分頁
 async function handleTopicSelect(label: string): Promise<void> {
-	await router.push({ path: '/graph', query: { focus: label } })
+	const sourceId = getKnowledgeSourceIdByGraphLabel(label)
+	if (!sourceId) return
+	await router.push({ path: '/library', query: { source: sourceId, view: 'graph', focus: label } })
 }
 </script>
 

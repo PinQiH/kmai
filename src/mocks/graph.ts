@@ -21,6 +21,13 @@ export interface KnowledgeGraphEdge {
 
 export const GRAPH_CLUSTERS = ['差旅與報支', '人事與到職', '資訊安全', '採購與請款', '績效考核'] as const
 
+export const GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE: Record<string, readonly string[]> = {
+	policy: ['差旅與報支'],
+	benefits: ['人事與到職', '績效考核'],
+	'information-security': ['資訊安全'],
+	operations: ['採購與請款'],
+}
+
 export const GRAPH_NODE_TYPES: GraphNodeType[] = ['制度', '流程', '部門', '角色', '專有名詞']
 
 export const graphNodes: KnowledgeGraphNode[] = [
@@ -121,12 +128,42 @@ export const graphEdges: KnowledgeGraphEdge[] = [
 	{ from: 'n-km-owner', to: 'n-review-cycle', label: '維護' },
 ]
 
+export interface KnowledgeGraphSnapshot {
+	clusters: readonly string[]
+	nodes: KnowledgeGraphNode[]
+	edges: KnowledgeGraphEdge[]
+}
+
+/** 取得單一公司知識庫的圖譜快照，並排除跨知識庫連線。 */
+export function getKnowledgeGraphBySourceId(sourceId: string): KnowledgeGraphSnapshot {
+	const clusters = GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE[sourceId] ?? []
+	const clusterSet = new Set(clusters)
+	const nodes = graphNodes.filter((node) => clusterSet.has(node.cluster))
+	const nodeIds = new Set(nodes.map((node) => node.id))
+	const edges = graphEdges.filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to))
+
+	return { clusters, nodes, edges }
+}
+
+/** 依首頁星圖的主題或節點名稱，找出所屬公司知識庫。 */
+export function getKnowledgeSourceIdByGraphLabel(label: string): string | undefined {
+	const node = graphNodes.find((item) => item.label === label)
+	const cluster = node?.cluster ?? label
+
+	return Object.entries(GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE)
+		.find(([, clusters]) => clusters.includes(cluster))?.[0]
+}
+
 // - 取得指定節點的相鄰節點與關聯語意
-export function getNeighbors(nodeId: string): { node: KnowledgeGraphNode, label: string }[] {
-	const byId = new Map(graphNodes.map((node) => [node.id, node]))
+export function getNeighbors(
+	nodeId: string,
+	nodes: KnowledgeGraphNode[] = graphNodes,
+	edges: KnowledgeGraphEdge[] = graphEdges,
+): { node: KnowledgeGraphNode, label: string }[] {
+	const byId = new Map(nodes.map((node) => [node.id, node]))
 	const result: { node: KnowledgeGraphNode, label: string }[] = []
 
-	for (const edge of graphEdges) {
+	for (const edge of edges) {
 		const otherId = edge.from === nodeId ? edge.to : edge.to === nodeId ? edge.from : ''
 		if (!otherId) continue
 		const node = byId.get(otherId)

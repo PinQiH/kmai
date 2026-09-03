@@ -114,7 +114,9 @@ describe('DocumentView', () => {
 		expect(wrapper.text()).toContain('國內住宿每晚以新台幣 3,000 元為原則')
 		expect(wrapper.text()).toContain('這份文件的知識關聯')
 
-		await wrapper.get('[data-testid="version-older"]').trigger('click')
+		const previousVersionButton = wrapper.findAll('.version-option').find((button) => button.text().includes('第 3.1 版'))
+		expect(previousVersionButton).toBeDefined()
+		await previousVersionButton?.trigger('click')
 
 		expect(wrapper.text()).toContain('依第 3.1 版全文產生')
 		expect(wrapper.text()).toContain('國內住宿每晚以新台幣 2,800 元為原則')
@@ -124,7 +126,6 @@ describe('DocumentView', () => {
 		const conversationStore = useConversationStore()
 		conversationStore.messages.push({ id: 'old-message', role: 'user', content: '舊問題', createdAt: new Date().toISOString() })
 		await wrapper.get('[data-testid="ask-document"]').trigger('click')
-		await vi.advanceTimersByTimeAsync(0)
 		await flushPromises()
 
 		expect(router.currentRoute.value.path).toBe('/ask')
@@ -161,14 +162,14 @@ describe('DocumentView', () => {
 		expect(wrapper.text()).toContain('輸入文字')
 		expect(wrapper.find('[data-testid="markdown-preview"]').exists()).toBe(true)
 		expect(wrapper.find('[data-testid="document-content-sections"]').exists()).toBe(true)
-		await wrapper.get('[data-testid="version-older"]').trigger('click')
+		const previousTextVersionButton = wrapper.findAll('.version-option').find((button) => button.text().includes('第 1.5 版'))
+		expect(previousTextVersionButton).toBeDefined()
+		await previousTextVersionButton?.trigger('click')
 		expect(wrapper.find('[data-testid="markdown-preview"]').exists()).toBe(false)
 		expect(wrapper.find('[data-testid="document-content-sections"]').exists()).toBe(true)
 		expect(wrapper.text()).toContain('十個工作天內完成')
 
-		const nextDocumentNavigation = router.push('/documents/doc-005')
-		await vi.advanceTimersByTimeAsync(0)
-		await nextDocumentNavigation
+		await router.push('/documents/doc-005')
 		await vi.advanceTimersByTimeAsync(320)
 		await flushPromises()
 		expect(wrapper.text()).toContain('貼上網址')
