@@ -56,11 +56,11 @@ const systemReleaseHistory: DocumentVersionEntry[] = [
     date: "2026-08-18",
     author: "系統管理團隊",
     isCurrent: true,
-    summary: "新增個人筆記本與網路搜尋控制，並改善導覽體驗。",
+    summary: "新增個人筆記本與文件範圍控制，並改善導覽體驗。",
     changes: [
       "新增個人筆記本與文件上傳介面",
       "加入筆記本分享與成員權限設定",
-      "問答頁可切換是否進行網路搜尋",
+      "問答頁可限定知識來源與指定文件",
     ],
   },
   {

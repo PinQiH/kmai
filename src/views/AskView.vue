@@ -13,7 +13,7 @@ import { ANSWER_FEEDBACK_REASON_MAX_LENGTH, useConversationStore } from '@/store
 import { useFavoritesStore } from '@/stores/favorites'
 import { useNotebooksStore } from '@/stores/notebooks'
 import type { Citation, ConversationMessage, OutlineItem } from '@/types'
-import { buildAskKnowledgeSourceGroups, MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
+import { buildAskKnowledgeSourceGroups } from '@/utils/knowledgeSources'
 
 interface SourceDocumentOption {
 	id: string
@@ -22,7 +22,6 @@ interface SourceDocumentOption {
 
 // > 起手問題依知識來源分組；切換來源會換掉整組題目，讓來源選擇的影響立即可見
 const SOURCE_STARTERS: Record<string, string[]> = {
-	[MODEL_ONLY_SOURCE_ID]: ['這個頁面可以怎麼操作？', '幫我整理這個問題的處理步驟', '有哪些常見風險要注意？'],
 	policy: ['加班與補休怎麼計算？', '採購金額到多少需要主管簽核？', '離職交接必須繳回哪些項目？'],
 	benefits: ['年度健康檢查補助多少？', '育嬰留職停薪最長可以請多久？', '團體保險的理賠怎麼申請？'],
 	'information-security': ['客戶資料可以分享給哪些人？', '如何申請資料存取權限？', '發現異常存取時要怎麼處理？'],
@@ -165,10 +164,6 @@ function selectKnowledgeSource(sourceId: string): void {
 	if (!source) return
 	conversationStore.selectKnowledgeSource(source)
 	documentSearch.value = ''
-	if (source.kind === 'model') {
-		isScopeOpen.value = false
-		return
-	}
 	void nextTick(() => documentScopeSection.value?.scrollIntoView?.({ block: 'nearest' }))
 }
 
@@ -186,10 +181,6 @@ function toggleSelectedDocument(document: SourceDocumentOption, isSelected: bool
 
 function focusKnowledgeSourceTrigger(): void {
 	scopeTrigger.value?.focus({ preventScroll: true })
-}
-
-function toggleWebSearch(): void {
-	conversationStore.setWebSearchEnabled(!conversationStore.isWebSearchEnabled)
 }
 
 let outlineObserver: IntersectionObserver | null = null
@@ -304,15 +295,6 @@ watch(isEmptyState, (isEmpty) => {
 	if (isSaveDialogOpen.value) setSaveDialogOpen(false)
 	focusComposer()
 })
-
-watch(
-	() => notebooksStore.notebooks.map((notebook) => `${notebook.id}:${notebook.defaultWebSearchEnabled}`).join('|'),
-	() => {
-		const selectedNotebook = notebooksStore.notebooks.find((notebook) => notebook.id === conversationStore.selectedKnowledgeSourceId)
-		if (!selectedNotebook) return
-		conversationStore.syncSelectedSourceDefault({ id: selectedNotebook.id, defaultWebSearchEnabled: selectedNotebook.defaultWebSearchEnabled })
-	},
-)
 
 // @ 中文輸入法組字期間的 Enter 是選字，不能當送出；必須檢查 isComposing
 function handleComposerEnter(event: KeyboardEvent): void {
@@ -650,18 +632,6 @@ watch(
 						>
 							<VIcon icon="mdi-filter-variant" size="13" aria-hidden="true" />
 							<span class="tool-chip-label">{{ selectedScopeSummary }}</span>
-						</button>
-						<button
-							type="button"
-							class="tool-chip"
-							:class="{ 'is-enabled': conversationStore.isWebSearchEnabled }"
-							:disabled="!conversationStore.canUseWebSearch"
-							:aria-pressed="conversationStore.isWebSearchEnabled"
-							:title="conversationStore.webSearchSettingSource === 'default' ? '使用知識來源的預設值' : '你已覆寫知識來源的預設值'"
-							@click="toggleWebSearch"
-						>
-							<VIcon icon="mdi-web" size="13" aria-hidden="true" />網路搜尋：{{ conversationStore.canUseWebSearch ? (conversationStore.isWebSearchEnabled ? '開' : '關') : '不可用' }}
-							<span v-if="conversationStore.canUseWebSearch" class="setting-origin">{{ conversationStore.webSearchSettingSource === 'default' ? '預設' : '已調整' }}</span>
 						</button>
 						<AnswerSettingsMenu
 							:selected-answer-style-id="conversationStore.selectedAnswerStyleId"
@@ -1261,12 +1231,6 @@ watch(
 	white-space: nowrap;
 }
 
-.tool-chip.is-enabled {
-	border-color: rgba(var(--v-theme-primary), 0.45);
-	background: var(--tint-active);
-	color: rgb(var(--v-theme-primary));
-}
-
 .settings-tool {
 	max-width: min(240px, 44vw);
 }
@@ -1289,13 +1253,6 @@ watch(
 .send-button:focus-visible {
 	outline: 2px solid rgb(var(--v-theme-primary));
 	outline-offset: 2px;
-}
-
-.setting-origin {
-	padding-left: var(--space-xs);
-	border-left: 1px solid currentColor;
-	font-size: 0.6rem;
-	opacity: 0.75;
 }
 
 .source-dialog {

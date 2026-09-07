@@ -348,11 +348,5 @@ export const useNotebooksStore = defineStore('notebooks', {
 			if (!notebook || !this.canManageSharing(notebookId)) return
 			notebook.members = notebook.members.filter((member) => member.id !== memberId || member.role === 'owner')
 		},
-		updateDefaultWebSearch({ notebookId, isEnabled }: { notebookId: string; isEnabled: boolean }): void {
-			const notebook = this.notebooks.find((item) => item.id === notebookId)
-			if (!notebook || !this.canManageSharing(notebookId)) return
-			notebook.defaultWebSearchEnabled = isEnabled
-			notebook.updatedAt = new Date().toISOString()
-		},
 	},
 })

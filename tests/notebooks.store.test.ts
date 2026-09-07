@@ -16,7 +16,6 @@ describe('notebooks store', () => {
 		expect(notebook?.members).toEqual([
 			expect.objectContaining({ name: '王小明', role: 'owner' }),
 		])
-		expect(notebook?.defaultWebSearchEnabled).toBe(false)
 	})
 
 	it('should ignore blank names and duplicate sharing targets', () => {
@@ -57,13 +56,11 @@ describe('notebooks store', () => {
 
 		currentUser.role = 'editor'
 		await store.addDocuments({ notebookId: notebook.id, files: [new File(['test'], 'editor.txt')] })
-		store.updateDefaultWebSearch({ notebookId: notebook.id, isEnabled: false })
 		expect(notebook.documents).toHaveLength(originalDocumentCount + 1)
-		expect(notebook.defaultWebSearchEnabled).toBe(true)
 
 		currentUser.role = 'owner'
-		store.updateDefaultWebSearch({ notebookId: notebook.id, isEnabled: false })
-		expect(notebook.defaultWebSearchEnabled).toBe(false)
+		store.addMember({ notebookId: notebook.id, member: { id: 'user-owner-added', name: '擁有者新增成員', type: 'user', role: 'viewer' } })
+		expect(notebook.members.some((member) => member.id === 'user-owner-added')).toBe(true)
 	})
 
 	it('should save an AI answer for owners and editors', () => {

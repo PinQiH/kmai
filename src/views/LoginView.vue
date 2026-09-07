@@ -59,12 +59,14 @@ async function handleLogin(): Promise<void> {
         </p>
         <VTextField
           v-model="account"
+          data-testid="login-account"
           label="公司帳號"
           autocomplete="username"
           type="email"
         />
         <VTextField
           v-model="password"
+          data-testid="login-password"
           label="密碼"
           :type="isPasswordVisible ? 'text' : 'password'"
           autocomplete="current-password"
@@ -79,6 +81,7 @@ async function handleLogin(): Promise<void> {
           @click:append-inner="isPasswordVisible = !isPasswordVisible"
         />
         <VBtn
+          data-testid="login-submit"
           type="submit"
           color="primary"
           block

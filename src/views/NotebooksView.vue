@@ -35,7 +35,6 @@ async function askNotebook(notebook: Notebook): Promise<void> {
 	conversationStore.selectKnowledgeSource({
 		id: notebook.id,
 		name: notebook.name,
-		defaultWebSearchEnabled: notebook.defaultWebSearchEnabled,
 	})
 	conversationStore.clearSelectedDocuments()
 	await router.push('/ask')
@@ -67,7 +66,6 @@ async function askNotebook(notebook: Notebook): Promise<void> {
 					<div class="card-meta">
 						<span>{{ notebook.documents.length }} 份文件</span>
 						<span>{{ notebook.members.length }} 位成員</span>
-						<span>{{ notebook.defaultWebSearchEnabled ? '預設搜尋網路' : '僅搜尋內部文件' }}</span>
 					</div>
 				</VCardText>
 				<VCardActions class="notebook-card-actions">

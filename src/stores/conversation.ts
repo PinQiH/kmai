@@ -14,7 +14,7 @@ import type {
 	ThinkingStage,
 } from '@/types'
 import { DEFAULT_ANSWER_MODEL_ID, DEFAULT_ANSWER_STYLE_ID, getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
-import { DEFAULT_ASK_SOURCE_ID, MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
+import { DEFAULT_ASK_SOURCE, MODEL_ONLY_SOURCE_ID } from '@/utils/knowledgeSources'
 
 interface ConversationState {
 	messages: ConversationMessage[]
@@ -22,8 +22,6 @@ interface ConversationState {
 	selectedScope: string
 	selectedKnowledgeSourceId: string
 	selectedDocuments: SelectedKnowledgeDocument[]
-	selectedSourceDefaultWebSearch: boolean
-	webSearchOverride: boolean | null
 	selectedAnswerStyleId: AnswerStyleId
 	selectedAnswerModelId: AnswerModelId
 	errorMessage: string
@@ -195,12 +193,9 @@ export const useConversationStore = defineStore('conversation', {
 	state: (): ConversationState => ({
 		messages: [],
 		isResponding: false,
-		// @ 必須與 selectedKnowledgeSourceId 的預設值同義，否則來源晶片與來源對話框會顯示不一致
-		selectedScope: '公司制度',
-		selectedKnowledgeSourceId: DEFAULT_ASK_SOURCE_ID,
+		selectedScope: DEFAULT_ASK_SOURCE.name,
+		selectedKnowledgeSourceId: DEFAULT_ASK_SOURCE.id,
 		selectedDocuments: [],
-		selectedSourceDefaultWebSearch: false,
-		webSearchOverride: null,
 		selectedAnswerStyleId: DEFAULT_ANSWER_STYLE_ID,
 		selectedAnswerModelId: DEFAULT_ANSWER_MODEL_ID,
 		errorMessage: '',
@@ -213,16 +208,6 @@ export const useConversationStore = defineStore('conversation', {
 		onlyArchived: false,
 	}),
 	getters: {
-		canUseWebSearch(state): boolean {
-			return state.selectedKnowledgeSourceId !== MODEL_ONLY_SOURCE_ID
-		},
-		isWebSearchEnabled(state): boolean {
-			if (state.selectedKnowledgeSourceId === MODEL_ONLY_SOURCE_ID) return false
-			return state.webSearchOverride ?? state.selectedSourceDefaultWebSearch
-		},
-		webSearchSettingSource(state): 'default' | 'override' {
-			return state.webSearchOverride === null ? 'default' : 'override'
-		},
 		answerStyleLabel(state): string {
 			return getAnswerStyleLabel(state.selectedAnswerStyleId)
 		},
@@ -259,12 +244,11 @@ export const useConversationStore = defineStore('conversation', {
 		},
 	},
 	actions: {
-		selectKnowledgeSource({ id, name, defaultWebSearchEnabled }: { id: string; name: string; defaultWebSearchEnabled: boolean }): void {
+		selectKnowledgeSource({ id, name }: { id: string; name: string }): void {
+			if (id === MODEL_ONLY_SOURCE_ID) return
 			if (this.selectedKnowledgeSourceId !== id) this.selectedDocuments = []
 			this.selectedKnowledgeSourceId = id
 			this.selectedScope = name
-			this.selectedSourceDefaultWebSearch = defaultWebSearchEnabled
-			this.webSearchOverride = null
 		},
 		/**
 		 * 限定目前知識來源可使用的文件，空陣列代表搜尋整個來源。
@@ -284,23 +268,9 @@ export const useConversationStore = defineStore('conversation', {
 		clearSelectedDocuments(): void {
 			this.selectedDocuments = []
 		},
-		syncSelectedSourceDefault({ id, defaultWebSearchEnabled }: { id: string; defaultWebSearchEnabled: boolean }): void {
-			if (this.selectedKnowledgeSourceId !== id) return
-			this.selectedSourceDefaultWebSearch = defaultWebSearchEnabled
-		},
 		syncSelectedSourceName({ id, name }: { id: string; name: string }): void {
 			if (this.selectedKnowledgeSourceId !== id) return
 			this.selectedScope = name
-		},
-		setWebSearchEnabled(isEnabled: boolean): void {
-			if (!this.canUseWebSearch) {
-				this.webSearchOverride = null
-				return
-			}
-			this.webSearchOverride = isEnabled
-		},
-		resetWebSearchToDefault(): void {
-			this.webSearchOverride = null
 		},
 		applyAnswerSettings({ answerStyleId, answerModelId }: AnswerSettings): void {
 			this.selectedAnswerStyleId = answerStyleId
@@ -350,8 +320,7 @@ export const useConversationStore = defineStore('conversation', {
 			this.isResponding = true
 			this.errorMessage = ''
 			this.retrievedCount = 0
-			const usesRetrieval = this.selectedKnowledgeSourceId !== MODEL_ONLY_SOURCE_ID
-			this.thinkingStages = createStagePlan(usesRetrieval)
+			this.thinkingStages = createStagePlan()
 
 			const isReducedMotion = prefersReducedMotion()
 			const askStartTime = Date.now()
@@ -361,15 +330,14 @@ export const useConversationStore = defineStore('conversation', {
 				const documentScope = this.selectedDocuments.length === 0
 					? this.selectedScope
 					: `${this.selectedScope}（限定 ${this.selectedDocuments.length} 份文件）`
-				const searchDescription = this.isWebSearchEnabled ? `${documentScope}＋網路搜尋` : documentScope
-				const answer = createMockAnswer(trimmedQuestion, searchDescription, usesRetrieval, this.selectedDocuments)
+				const answer = createMockAnswer(trimmedQuestion, documentScope, true, this.selectedDocuments)
 
 				// > 前置階段：解析、檢索、比對版本
 				for (const [index, stage] of this.thinkingStages.entries()) {
 					if (stage.id === 'generate') break
 
 					stage.status = 'active'
-					if (usesRetrieval && stage.id === 'retrieve') {
+					if (stage.id === 'retrieve') {
 						this.retrievedCount = this.selectedDocuments.length || SEARCHABLE_DOCUMENT_TOTAL
 					}
 
@@ -458,6 +426,8 @@ export const useConversationStore = defineStore('conversation', {
 			this.errorMessage = ''
 		},
 		startNewConversation(): void {
+			this.selectKnowledgeSource(DEFAULT_ASK_SOURCE)
+			this.clearSelectedDocuments()
 			this.messages = []
 			this.thinkingStages = []
 			this.retrievedCount = 0

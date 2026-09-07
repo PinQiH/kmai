@@ -72,9 +72,9 @@ async function nextStep(): Promise<void> {
 						<VIcon icon="mdi-cloud-upload-outline" size="42" color="primary" aria-hidden="true" />
 						<span class="font-weight-bold mt-3">選擇或拖曳{{ uploadMode === 'single' ? '一份文件' : '多份文件' }}</span>
 						<span class="text-body-2 text-medium-emphasis mt-1">支援 PDF、Word、Excel 與 PowerPoint，單檔上限 50 MB</span>
-						<input id="document-file" class="visually-hidden" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" :multiple="uploadMode === 'batch'" @change="handleFileChange" />
+						<input id="document-file" class="visually-hidden" data-testid="document-file-input" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" :multiple="uploadMode === 'batch'" @change="handleFileChange" />
 					</label>
-					<p v-if="fileError" class="text-error text-body-2 mt-3" role="alert">{{ fileError }}</p>
+					<p v-if="fileError" class="text-error text-body-2 mt-3" role="alert" data-testid="file-error">{{ fileError }}</p>
 					<VList v-if="selectedFiles.length" class="surface-border rounded-lg mt-4" aria-label="已選擇檔案">
 						<VListItem v-for="file in selectedFiles" :key="`${file.name}-${file.size}`" :title="file.name" :subtitle="`${Math.max(1, Math.round(file.size / 1024))} KB`" prepend-icon="mdi-file-document-outline" />
 					</VList>
@@ -95,7 +95,7 @@ async function nextStep(): Promise<void> {
 				</div>
 			</template>
 		</VStepper>
-		<div class="d-flex justify-space-between mt-5"><VBtn variant="outlined" :disabled="currentStep === 1 || isComplete" @click="currentStep -= 1">上一步</VBtn><VBtn v-if="!isComplete" color="primary" :loading="isSubmitting" :disabled="!canContinue" @click="nextStep">{{ currentStep === 3 ? '確認並開始處理' : '下一步' }}</VBtn><VBtn v-else color="primary" to="/admin/processing">查看處理進度</VBtn></div>
+		<div class="d-flex justify-space-between mt-5"><VBtn variant="outlined" :disabled="currentStep === 1 || isComplete" @click="currentStep -= 1">上一步</VBtn><VBtn v-if="!isComplete" data-testid="upload-next" color="primary" :loading="isSubmitting" :disabled="!canContinue" @click="nextStep">{{ currentStep === 3 ? '確認並開始處理' : '下一步' }}</VBtn><VBtn v-else color="primary" to="/admin/processing">查看處理進度</VBtn></div>
 	</div>
 </template>
 

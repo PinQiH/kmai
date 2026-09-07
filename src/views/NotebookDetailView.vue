@@ -235,18 +235,12 @@ function confirmMemberRemoval(): void {
 	void nextTick(() => document.querySelector<HTMLButtonElement>('[data-testid="close-sharing-dialog"]')?.focus())
 }
 
-function updateDefaultWebSearch(isEnabled: boolean | null): void {
-	if (!notebook.value || isEnabled === null) return
-	notebooksStore.updateDefaultWebSearch({ notebookId: notebook.value.id, isEnabled })
-}
-
 function askNotebook(): void {
 	if (!notebook.value) return
 	conversationStore.startNewConversation()
 	conversationStore.selectKnowledgeSource({
 		id: notebook.value.id,
 		name: notebook.value.name,
-		defaultWebSearchEnabled: notebook.value.defaultWebSearchEnabled,
 	})
 	conversationStore.clearSelectedDocuments()
 	void router.push('/ask')
@@ -377,10 +371,6 @@ async function confirmNotebookDeletion(): Promise<void> {
 		<input ref="fileInput" class="visually-hidden" type="file" multiple accept=".pdf,.doc,.docx,.txt,.md" @change="handleFiles">
 		<VAlert v-if="fileSourceError" class="mb-5" type="error" variant="tonal" density="compact">{{ fileSourceError }}</VAlert>
 
-		<div class="setting-strip">
-			<div><strong>問答預設</strong><span>{{ notebook.defaultWebSearchEnabled ? '同時搜尋網路' : '只使用筆記本文件' }}</span></div>
-			<VSwitch :model-value="notebook.defaultWebSearchEnabled" :disabled="!canManageSharing" color="primary" hide-details inset label="預設允許網路搜尋" @update:model-value="updateDefaultWebSearch" />
-		</div>
 		<VAlert v-if="currentUserRole === 'viewer'" type="info" variant="tonal" density="compact" class="mb-5">你目前是檢視者，可以查看文件並用於問答，但不能上傳或調整分享設定。</VAlert>
 
 		<div class="notebook-content-tabs">
@@ -615,8 +605,6 @@ async function confirmNotebookDeletion(): Promise<void> {
 .confirm-dialog-copy p { margin: 0; }
 .confirm-dialog-note { margin-top: var(--space-sm) !important; color: var(--ink-muted); font-size: 0.875rem; }
 .confirm-dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); padding-top: var(--space-lg); }
-.setting-strip { display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); margin-bottom: var(--space-lg); padding: var(--space-md) var(--space-lg); border: 1px solid rgb(var(--v-theme-outline)); border-radius: var(--radius-md); }
-.setting-strip div { display: grid; gap: 2px; }.setting-strip span { color: var(--ink-muted); font-size: 0.78rem; }
 .notebook-content-tabs { margin-top: var(--space-xl); border-bottom: 1px solid rgb(var(--v-theme-outline)); }
 .notebook-content-panel { padding-top: var(--space-lg); }
 .document-table-scroll { max-height: min(56vh, 560px); overflow: auto; border-radius: var(--radius-md); background: rgb(var(--v-theme-surface)); }
@@ -646,6 +634,6 @@ async function confirmNotebookDeletion(): Promise<void> {
 .invite-form { display: grid; grid-template-columns: 140px minmax(0, 1fr) 130px auto; align-items: start; gap: var(--space-sm); margin-top: var(--space-lg); }
 .member-list { margin: var(--space-sm) 0 var(--space-lg); border-top: 1px solid rgb(var(--v-theme-outline)); }.role-select { width: 120px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-@media (max-width: 760px) { .page-shell { padding: var(--space-md); }.setting-strip { align-items: stretch; flex-direction: column; }.invite-form { grid-template-columns: 1fr; }.heading-actions { flex-wrap: wrap; justify-content: flex-start; }.notebook-content-tabs :deep(.v-slide-group__content) { justify-content: stretch; }.notebook-content-tabs :deep(.v-tab) { flex: 1 1 0; min-width: 0; } }
+@media (max-width: 760px) { .page-shell { padding: var(--space-md); }.invite-form { grid-template-columns: 1fr; }.heading-actions { flex-wrap: wrap; justify-content: flex-start; }.notebook-content-tabs :deep(.v-slide-group__content) { justify-content: stretch; }.notebook-content-tabs :deep(.v-tab) { flex: 1 1 0; min-width: 0; } }
 @media (max-width: 480px) { .confirm-dialog-actions { align-items: stretch; flex-direction: column; }.confirm-dialog-actions :deep(.v-btn) { width: 100%; }.source-form-fields { grid-template-columns: 1fr; }.source-form-fields :deep(.v-input) { grid-column: 1; } }
 </style>

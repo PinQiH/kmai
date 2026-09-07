@@ -18,5 +18,6 @@ describe('buildAskKnowledgeSourceGroups', () => {
 		expect(notebookGroup?.label).toBe('我的筆記本')
 		expect(notebookGroup?.sources.every((source) => source.kind === 'notebook')).toBe(true)
 		expect(allSources.some((source) => source.name === '全公司知識')).toBe(false)
+		expect(allSources.some((source) => source.name === '模型一般知識')).toBe(false)
 	})
 })

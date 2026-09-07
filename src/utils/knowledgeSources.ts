@@ -4,7 +4,7 @@ export const MODEL_ONLY_SOURCE_ID = 'model'
 export const DEFAULT_ASK_SOURCE_ID = 'policy'
 
 export interface KnowledgeSourceGroup {
-	id: 'syscom-library' | 'personal-notebooks' | 'model-only'
+	id: 'syscom-library' | 'personal-notebooks'
 	label: string
 	sources: KnowledgeSourceOption[]
 }
@@ -18,6 +18,15 @@ export const MODEL_ONLY_SOURCE: KnowledgeSourceOption = {
 	supportsWebSearch: false,
 }
 
+export const DEFAULT_ASK_SOURCE: KnowledgeSourceOption = {
+	id: DEFAULT_ASK_SOURCE_ID,
+	name: '公司制度',
+	description: '優先搜尋公司制度與作業規範。',
+	kind: 'knowledge-base',
+	defaultWebSearchEnabled: false,
+	supportsWebSearch: true,
+}
+
 export const COMPANY_KNOWLEDGE_SOURCES: KnowledgeSourceOption[] = [
 	{
 		id: 'company',
@@ -27,14 +36,7 @@ export const COMPANY_KNOWLEDGE_SOURCES: KnowledgeSourceOption[] = [
 		defaultWebSearchEnabled: false,
 		supportsWebSearch: true,
 	},
-	{
-		id: 'policy',
-		name: '公司制度',
-		description: '優先搜尋公司制度與作業規範。',
-		kind: 'knowledge-base',
-		defaultWebSearchEnabled: false,
-		supportsWebSearch: true,
-	},
+	DEFAULT_ASK_SOURCE,
 	{
 		id: 'benefits',
 		name: '人事流程',
@@ -106,7 +108,7 @@ export function buildKnowledgeSourceOptions(
 export function buildAskKnowledgeSourceGroups(
 	notebooks: Notebook[],
 ): KnowledgeSourceGroup[] {
-	const sources = buildKnowledgeSourceOptions(notebooks)
+	const sources = buildKnowledgeSourceOptions(notebooks, false)
 	return [
 		{
 			id: 'syscom-library',
@@ -119,11 +121,6 @@ export function buildAskKnowledgeSourceGroups(
 			id: 'personal-notebooks',
 			label: '我的筆記本',
 			sources: sources.filter((source) => source.kind === 'notebook'),
-		},
-		{
-			id: 'model-only',
-			label: '其他',
-			sources: sources.filter((source) => source.kind === 'model'),
 		},
 	]
 }

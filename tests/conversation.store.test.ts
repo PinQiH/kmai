@@ -31,30 +31,24 @@ describe('conversation store', () => {
 		expect(store.answerModelLabel).toBe('llama3.1:8b')
 	})
 
-	it('should apply knowledge source web-search defaults and allow an override', () => {
+	it('should update only the active knowledge source and reject model-only mode', () => {
 		const store = useConversationStore()
 
-		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記', defaultWebSearchEnabled: true })
-		expect(store.isWebSearchEnabled).toBe(true)
-		expect(store.webSearchSettingSource).toBe('default')
-
-		store.setWebSearchEnabled(false)
-		expect(store.isWebSearchEnabled).toBe(false)
-		expect(store.webSearchSettingSource).toBe('override')
-		store.syncSelectedSourceDefault({ id: 'notebook-1', defaultWebSearchEnabled: false })
-		expect(store.isWebSearchEnabled).toBe(false)
+		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記' })
+		expect(store.selectedKnowledgeSourceId).toBe('notebook-1')
 		store.syncSelectedSourceName({ id: 'notebook-1', name: '市場洞察筆記' })
 		expect(store.selectedScope).toBe('市場洞察筆記')
 		store.syncSelectedSourceName({ id: 'another-notebook', name: '不應套用' })
 		expect(store.selectedScope).toBe('市場洞察筆記')
 
-		store.resetWebSearchToDefault()
-		expect(store.isWebSearchEnabled).toBe(false)
+		store.selectKnowledgeSource({ id: 'model', name: '模型一般知識' })
+		expect(store.selectedKnowledgeSourceId).toBe('notebook-1')
+		expect(store.selectedScope).toBe('市場洞察筆記')
 	})
 
 	it('should keep a deduplicated document scope only for the selected source', () => {
 		const store = useConversationStore()
-		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記', defaultWebSearchEnabled: false })
+		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記' })
 
 		store.setSelectedDocuments({
 			sourceId: 'notebook-1',
@@ -68,7 +62,7 @@ describe('conversation store', () => {
 
 		expect(store.selectedDocuments).toEqual([{ id: 'doc-1', name: '市場分析.pdf' }])
 
-		store.selectKnowledgeSource({ id: 'benefits', name: '人事流程', defaultWebSearchEnabled: true })
+		store.selectKnowledgeSource({ id: 'benefits', name: '人事流程' })
 
 		expect(store.selectedDocuments).toEqual([])
 	})
@@ -76,7 +70,7 @@ describe('conversation store', () => {
 	it('should report the selected document count when answering within a limited scope', async () => {
 		vi.useFakeTimers()
 		const store = useConversationStore()
-		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記', defaultWebSearchEnabled: false })
+		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記' })
 		store.setSelectedDocuments({
 			sourceId: 'notebook-1',
 			documents: [
@@ -118,26 +112,6 @@ describe('conversation store', () => {
 		expect(store.isResponding).toBe(false)
 		expect(store.messages[1]?.role).toBe('assistant')
 		expect(store.messages[1]?.citations).toHaveLength(2)
-		vi.useRealTimers()
-	})
-
-	it('should skip retrieval citations and web search in model-only mode', async () => {
-		vi.useFakeTimers()
-		const store = useConversationStore()
-		store.selectKnowledgeSource({ id: 'model', name: '模型一般知識', defaultWebSearchEnabled: false })
-		store.setWebSearchEnabled(true)
-		const request = store.askQuestion('新進同仁第一週要完成哪些事情？')
-
-		expect(store.canUseWebSearch).toBe(false)
-		expect(store.isWebSearchEnabled).toBe(false)
-		expect(store.thinkingStages.map((stage) => stage.id)).toEqual(['parse', 'generate'])
-
-		await vi.runAllTimersAsync()
-		await request
-
-		expect(store.messages[1]?.citations).toEqual([])
-		expect(store.messages[1]?.content).not.toMatch(/\[\d+\]/)
-		expect(store.messages[1]?.trace?.retrievedCount).toBe(0)
 		vi.useRealTimers()
 	})
 
@@ -187,6 +161,28 @@ describe('conversation store', () => {
 
 		expect(store.thinkingStages).toHaveLength(0)
 		expect(store.retrievedCount).toBe(0)
+	})
+
+	it('should reset a notebook source to the default knowledge source when a new conversation starts', () => {
+		const store = useConversationStore()
+		store.selectKnowledgeSource({ id: 'notebook-1', name: '市場筆記' })
+
+		store.startNewConversation()
+
+		expect(store.selectedKnowledgeSourceId).toBe('policy')
+		expect(store.selectedScope).toBe('公司制度')
+		expect(store.selectedDocuments).toEqual([])
+	})
+
+	it('should clear document scope when a new conversation starts', () => {
+		const store = useConversationStore()
+		store.setSelectedDocuments({
+			sourceId: 'policy',
+			documents: [{ id: 'doc-1', name: '公司規章.pdf' }],
+		})
+		store.startNewConversation()
+
+		expect(store.selectedDocuments).toEqual([])
 	})
 
 	it('should attach a reviewable trace to the finished answer', async () => {

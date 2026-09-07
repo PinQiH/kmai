@@ -70,6 +70,8 @@ describe('NotebookDetailView sharing confirmation', () => {
 			},
 		)
 		const store = useNotebooksStore()
+		expect(wrapper.text()).not.toContain('網路搜尋')
+		expect(wrapper.text()).not.toContain('問答預設')
 
 		await wrapper.get('[data-testid="open-sharing-dialog"]').trigger('click')
 		await flushPromises()
@@ -360,7 +362,7 @@ describe('NotebookDetailView notebook actions', () => {
 		)
 		const notebooksStore = useNotebooksStore()
 		const conversationStore = useConversationStore()
-		conversationStore.selectKnowledgeSource({ id: 'notebook-product', name: '產品策略筆記本', defaultWebSearchEnabled: true })
+		conversationStore.selectKnowledgeSource({ id: 'notebook-product', name: '產品策略筆記本' })
 
 		await wrapper.get('[data-testid="notebook-actions-menu"]').trigger('click')
 		await flushPromises()
