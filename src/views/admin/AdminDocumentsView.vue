@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
@@ -15,6 +16,7 @@ const headers = [
 	{ title: '操作', key: 'actions', sortable: false, align: 'end' as const },
 ]
 
+const route = useRoute()
 const search = ref('')
 const status = ref('全部狀態')
 const selected = ref<string[]>([])
@@ -23,6 +25,15 @@ const isImportDialogOpen = ref(false)
 const deleteTargetId = ref<string | null>(null)
 const managedDocuments = ref(getAdminDocumentsSnapshot())
 const statusOptions = ['全部狀態', '已發布', '待審核', '處理中', '失敗', '已下架']
+
+// @ 由管理總覽的「審核文件」帶入 ?status=待審核，讓列表預設就停在待處理的文件上
+watch(
+	() => route.query.status,
+	(queryStatus) => {
+		if (typeof queryStatus === 'string' && statusOptions.includes(queryStatus)) status.value = queryStatus
+	},
+	{ immediate: true },
+)
 
 const visibleDocuments = computed(() => managedDocuments.value.filter((document) => {
 	const matchesSearch = !search.value || `${document.title} ${document.department}`.includes(search.value)

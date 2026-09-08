@@ -121,7 +121,7 @@ const metricColor = {
             <VBtn
               variant="tonal"
               prepend-icon="mdi-file-check-outline"
-              to="/admin/documents"
+              to="/admin/documents?status=待審核"
               >審核文件 <VChip class="ml-2" size="x-small">12</VChip></VBtn
             >
             <VBtn
@@ -139,7 +139,7 @@ const metricColor = {
             <VBtn
               variant="tonal"
               prepend-icon="mdi-bell-ring-outline"
-              to="/admin/monitoring"
+              to="/admin/monitoring?tab=alerts"
               >查看營運告警
               <VChip class="ml-2" size="x-small" color="error">2</VChip></VBtn
             >

@@ -515,3 +515,32 @@ export interface Notebook {
 	documents: NotebookDocument[]
 	members: NotebookMember[]
 }
+
+/** 編制單位選項。 */
+export interface OrganizationUnit {
+	id: string
+	name: string
+	parentName: string
+}
+
+/** 文件大類別與其下小類別。 */
+export interface DocumentCategoryGroup {
+	id: string
+	name: string
+	subCategories: string[]
+}
+
+/** 可指定為文件可見對象的使用者。 */
+export interface DirectoryUser {
+	id: string
+	name: string
+	email: string
+	department: string
+}
+
+/** 可指定為文件可見對象的群組。 */
+export interface DirectoryGroup {
+	id: string
+	name: string
+	description: string
+}

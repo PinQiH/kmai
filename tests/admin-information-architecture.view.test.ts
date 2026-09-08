@@ -65,6 +65,18 @@ describe('admin information architecture', () => {
 		expect(wrapper.text()).not.toContain('新增切塊')
 	})
 
+	it('should open the all-jobs tab when the upload flow links in with a tab query', async () => {
+		const { wrapper } = await mountAdminView(AdminProcessingView, '/admin/processing?tab=all', [
+			{ path: '/admin/processing', component: AdminProcessingView },
+			{ path: '/admin/documents/:id/manage', component: { template: '<div />' } },
+		])
+
+		const selectedTab = wrapper.findAll('[role="tab"]').find((tab) => tab.classes().includes('v-tab--selected'))
+
+		expect(selectedTab?.text()).toBe('全部工作')
+		expect(wrapper.text()).not.toContain('這裡只顯示失敗、等待過久、停滯或需要人工介入的工作')
+	})
+
 	it('should keep operational monitoring focused on health, alerts, metrics, logs and rules', async () => {
 		const { wrapper } = await mountAdminView(AdminMonitoringView, '/admin/monitoring', [
 			{ path: '/admin/monitoring', component: AdminMonitoringView },

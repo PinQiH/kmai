@@ -1,4 +1,4 @@
-import type { ActivityItem, AnswerTrace, Citation, ConversationMessage, ConversationSummary, DocumentVersionEntry, HealthMetric, KnowledgeDocument } from '@/types'
+import type { ActivityItem, AnswerTrace, Citation, ConversationMessage, ConversationSummary, DirectoryGroup, DirectoryUser, DocumentCategoryGroup, DocumentVersionEntry, HealthMetric, KnowledgeDocument, OrganizationUnit } from '@/types'
 
 // TODO(api-integration): 串接文件查詢 API 後移除此 Mock 資料。
 export const documents: KnowledgeDocument[] = [
@@ -388,4 +388,44 @@ export const recentActivities: ActivityItem[] = [
 	{ id: 'a1', title: '差旅辦法更新至 3.2 版', detail: '財務部 · 林怡君', time: '2 小時前', type: 'document' },
 	{ id: 'a2', title: '「海外出差住宿上限」回答收到負面回饋', detail: '等待知識管理員審查', time: '4 小時前', type: 'question' },
 	{ id: 'a3', title: '批次文件處理完成', detail: '成功 24 份，失敗 1 份', time: '昨天', type: 'system' },
+]
+
+// TODO(api-integration): 串接組織與分類 API 後移除以下 Mock 資料。
+export const organizationUnits: OrganizationUnit[] = [
+	{ id: 'unit-fin-01', name: '財務部', parentName: '管理中心' },
+	{ id: 'unit-fin-02', name: '財務部 - 會計科', parentName: '財務部' },
+	{ id: 'unit-fin-03', name: '財務部 - 出納科', parentName: '財務部' },
+	{ id: 'unit-hr-01', name: '人力資源部', parentName: '管理中心' },
+	{ id: 'unit-hr-02', name: '人力資源部 - 招募組', parentName: '人力資源部' },
+	{ id: 'unit-it-01', name: '資訊部', parentName: '技術中心' },
+	{ id: 'unit-it-02', name: '資訊安全部', parentName: '技術中心' },
+	{ id: 'unit-pur-01', name: '採購部', parentName: '營運中心' },
+	{ id: 'unit-ops-01', name: '客戶服務部', parentName: '營運中心' },
+	{ id: 'unit-law-01', name: '法務部', parentName: '管理中心' },
+]
+
+export const documentCategoryGroups: DocumentCategoryGroup[] = [
+	{ id: 'cat-policy', name: '公司制度', subCategories: ['差旅與報支', '出勤管理', '採購規範', '資產管理'] },
+	{ id: 'cat-hr', name: '人事與福利', subCategories: ['到職與離職', '薪酬制度', '績效考核', '教育訓練'] },
+	{ id: 'cat-process', name: '作業流程', subCategories: ['請購流程', '合約審查', '客訴處理', '異常通報'] },
+	{ id: 'cat-security', name: '資訊安全', subCategories: ['帳號權限', '資料保護', '事件通報'] },
+	{ id: 'cat-product', name: '產品與客戶', subCategories: ['產品規格', '常見問題', '服務條款'] },
+]
+
+export const directoryUsers: DirectoryUser[] = [
+	{ id: 'user-001', name: '林怡君', email: 'yijun.lin@example.com', department: '財務部' },
+	{ id: 'user-002', name: '陳柏宇', email: 'boyu.chen@example.com', department: '人力資源部' },
+	{ id: 'user-003', name: '黃筱雯', email: 'xiaowen.huang@example.com', department: '資訊安全部' },
+	{ id: 'user-004', name: '張哲瑋', email: 'zhewei.zhang@example.com', department: '採購部' },
+	{ id: 'user-005', name: '吳孟儒', email: 'mengru.wu@example.com', department: '資訊部' },
+	{ id: 'user-006', name: '蔡宜靜', email: 'yijing.tsai@example.com', department: '客戶服務部' },
+	{ id: 'user-007', name: '鄭凱翔', email: 'kaixiang.zheng@example.com', department: '法務部' },
+]
+
+export const directoryGroups: DirectoryGroup[] = [
+	{ id: 'group-managers', name: '各部門主管', description: '課級以上主管' },
+	{ id: 'group-finance', name: '財務部全體', description: '財務部所有同仁' },
+	{ id: 'group-hr', name: '人資夥伴', description: '人力資源部與各部門 HRBP' },
+	{ id: 'group-security', name: '資安小組', description: '資訊安全事件應變成員' },
+	{ id: 'group-newcomer', name: '新進同仁', description: '到職未滿三個月' },
 ]

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
@@ -87,7 +88,19 @@ const jobs = ref<ProcessingJob[]>([
 	},
 ])
 
+const route = useRoute()
 const activeTab = ref<ProcessingTab>('attention')
+
+// @ 剛上傳的文件不會是「需要處理」，由上傳完成頁帶 ?tab=all 進來才找得到自己的工作
+const processingTabs: ProcessingTab[] = ['attention', 'all', 'strategy']
+watch(
+	() => route.query.tab,
+	(tab) => {
+		const nextTab = processingTabs.find((item) => item === tab)
+		if (nextTab) activeTab.value = nextTab
+	},
+	{ immediate: true },
+)
 const statusFilter = ref<ProcessingStatus | '全部狀態'>('全部狀態')
 const selectedJob = ref<ProcessingJob | null>(null)
 const isDetailOpen = ref(false)

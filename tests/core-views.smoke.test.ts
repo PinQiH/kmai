@@ -101,6 +101,20 @@ describe('core views', () => {
 		expect(documentsView.text()).toContain(getAdminDocumentsSnapshot()[0]!.title)
 	})
 
+	it('should preselect the review queue when the overview links in with a status query', async () => {
+		const router = createTestRouter([{ path: '/admin/documents', component: AdminDocumentsView }])
+		await router.push('/admin/documents?status=待審核')
+		await router.isReady()
+		const documentsView = mountView(AdminDocumentsView, router)
+
+		const pendingTitles = getAdminDocumentsSnapshot().filter((item) => item.status === '待審核').map((item) => item.title)
+		const publishedTitle = getAdminDocumentsSnapshot().find((item) => item.status === '已發布')?.title
+
+		expect(pendingTitles.length).toBeGreaterThan(0)
+		pendingTitles.forEach((title) => expect(documentsView.text()).toContain(title))
+		if (publishedTitle) expect(documentsView.text()).not.toContain(publishedTitle)
+	})
+
 	it('should render the upload workflow at its first step', async () => {
 		const router = createTestRouter([{ path: '/admin/documents/upload', component: AdminUploadView }])
 		await router.push('/admin/documents/upload')
