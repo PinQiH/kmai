@@ -6,6 +6,7 @@ import { createApp } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
+import { zhHant } from 'vuetify/locale'
 
 import App from '@/App.vue'
 import { router } from '@/router'
@@ -15,6 +16,11 @@ import { darkTheme, lightTheme, redDarkTheme, redLightTheme } from '@/theme'
 const vuetify = createVuetify({
 	components,
 	directives,
+	// @ 未設定語系時，資料表格分頁等內建文字會落回英文。
+	locale: {
+		locale: 'zhHant',
+		messages: { zhHant },
+	},
 	theme: {
 		defaultTheme: 'kmaiLight',
 		themes: {

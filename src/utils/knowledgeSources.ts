@@ -101,7 +101,7 @@ export function buildKnowledgeSourceOptions(
 }
 
 /**
- * 建立員工前台 AI 問答的分組來源，排除過度寬泛的全公司來源。
+ * 建立前台 AI 問答的分組來源，排除過度寬泛的全公司來源。
  * @param notebooks 目前使用者可見的個人筆記本。
  * @returns 依凌群知識庫、個人筆記本與模型一般知識分組的來源。
  */

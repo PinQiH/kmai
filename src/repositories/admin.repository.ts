@@ -1,8 +1,8 @@
+import { workspaceDocuments as documents } from '@/mocks/documentWorkspace'
 import {
 	directoryGroups,
 	directoryUsers,
 	documentCategoryGroups,
-	documents,
 	healthMetrics,
 	organizationUnits,
 	recentActivities,

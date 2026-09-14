@@ -61,7 +61,7 @@ describe('admin information architecture', () => {
 		expect(tabLabels.some((label) => label.includes('需要處理'))).toBe(true)
 		expect(tabLabels).toContain('全部工作')
 		expect(tabLabels).toContain('處理策略')
-		expect(wrapper.text()).toContain('這裡只顯示失敗、等待過久、停滯或需要人工介入的工作')
+		expect(wrapper.text()).toContain('這裡只顯示失敗、部分附件失敗、等待過久，或策略已變更待重新處理的工作')
 		expect(wrapper.text()).not.toContain('新增切塊')
 	})
 
@@ -74,7 +74,7 @@ describe('admin information architecture', () => {
 		const selectedTab = wrapper.findAll('[role="tab"]').find((tab) => tab.classes().includes('v-tab--selected'))
 
 		expect(selectedTab?.text()).toBe('全部工作')
-		expect(wrapper.text()).not.toContain('這裡只顯示失敗、等待過久、停滯或需要人工介入的工作')
+		expect(wrapper.text()).not.toContain('這裡只顯示失敗、部分附件失敗、等待過久，或策略已變更待重新處理的工作')
 	})
 
 	it('should keep operational monitoring focused on health, alerts, metrics, logs and rules', async () => {

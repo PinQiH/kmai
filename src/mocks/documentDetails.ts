@@ -1,3 +1,4 @@
+import { versionFiles } from '@/mocks/documentFiles'
 import { documents } from '@/mocks/data'
 import { getDocumentContent } from '@/mocks/documentContent'
 import { getNeighbors, graphNodes, type GraphNodeType } from '@/mocks/graph'
@@ -147,6 +148,8 @@ export function getDocumentVersionDetail({
 	version: string
 	versionSummary: string
 }): DocumentVersionDetail {
+	const uploaded = versionFiles[documentId]?.[version]
+	if (uploaded?.isUploaded) return { aiSummary: '尚未產生 AI 摘要', keyPoints: [], sections: uploaded.sections.map((section) => ({ ...section })) }
 	const detail = versionDetailsByDocumentId[documentId]?.[version]
 	if (detail) {
 		return {

@@ -1,4 +1,4 @@
-import { documents } from '@/mocks/data'
+import { workspaceDocuments as documents } from '@/mocks/documentWorkspace'
 import type { KnowledgeDocument, UserDocumentSource } from '@/types'
 
 const MOCK_DELAY_MS = 320
@@ -26,12 +26,12 @@ function cloneKnowledgeDocument(document: KnowledgeDocument): KnowledgeDocument 
 	}
 }
 
-/** 取得員工目前可見的文件快照，避免 View 直接依賴 Mock 資料來源。 */
+/** 取得前台目前可見的文件快照，避免 View 直接依賴 Mock 資料來源。 */
 export function getEmployeeDocumentsSnapshot(): KnowledgeDocument[] {
 	return documents.filter(canEmployeeReadDocument).map(cloneKnowledgeDocument)
 }
 
-/** 取得員工在指定公司知識庫中目前可用的文件。 */
+/** 取得前台在指定公司知識庫中目前可用的文件。 */
 export function getEmployeeDocumentsBySourceId(sourceId: string): KnowledgeDocument[] {
 	return getEmployeeDocumentsSnapshot().filter((document) => document.knowledgeSourceId === sourceId)
 }

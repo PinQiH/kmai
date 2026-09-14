@@ -122,7 +122,7 @@ describe('core views', () => {
 		const uploadView = mountView(AdminUploadView, router)
 
 		expect(uploadView.text()).toContain('新增文件')
-		expect(uploadView.text()).toContain('選擇檔案')
+		expect(uploadView.text()).toContain('文件來源')
 	})
 
 	it('should render an existing document management detail page', async () => {

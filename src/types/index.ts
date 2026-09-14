@@ -4,14 +4,71 @@ export interface KnowledgeDocument {
 	source: UserDocumentSource
 	title: string
 	summary: string
+	/** 編制單位，對應上傳流程的「編制單位」欄位。 */
 	department: string
+	/** 大類別，對應上傳流程的「大類別」欄位。 */
 	category: string
+	/** 小類別，上傳時可留空。 */
+	subCategory?: string
 	tags: string[]
+	/** 文件首次上傳日期（YYYY-MM-DD）。 */
+	uploadedAt: string
 	updatedAt: string
 	version: string
 	status: '已發布' | '待審核' | '處理中' | '失敗' | '已下架'
-	visibility: '全公司' | '指定群組' | '僅自己'
+	visibility: '全公司' | '指定群組' | '指定使用者' | '僅自己'
+	visibilityGroupIds?: string[]
+	visibilityUserIds?: string[]
 	owner: string
+}
+
+/** 文件狀態；同時是生命週期的判讀依據。 */
+export type DocumentStatus = KnowledgeDocument['status']
+
+/** 單一處理步驟的執行結果。 */
+export interface DocumentProcessingStep {
+	id: string
+	name: string
+	state: '已完成' | '進行中' | '等待中' | '失敗' | '未執行'
+	detail: string
+	finishedAt: string | null
+	/** 這一步實際耗用的時間，展開處理細節時顯示。 */
+	durationLabel?: string
+	/** 不致失敗但需要留意的狀況，例如部分頁面辨識率偏低。 */
+	warnings?: string[]
+}
+
+/** 處理工作底下的單一檔案；一份文件含一個主文件與零到多個附件。 */
+export interface DocumentProcessingFile {
+	id: string
+	name: string
+	role: '主文件' | '附件'
+	extension: string
+	state: DocumentProcessingStep['state']
+	progress: number
+	/** 目前所在步驟名稱。 */
+	stage: string
+	note?: string
+	/** 這個檔案自己的處理步驟；主文件與整份工作相同，附件各自獨立。 */
+	steps?: DocumentProcessingStep[]
+}
+
+/** 一份文件的處理紀錄，供列表、預覽與管理頁共用。 */
+export interface DocumentProcessingRecord {
+	version?: string
+	cancelled?: boolean
+	documentId: string
+	jobId: string
+	progress: number
+	uploadedBy: string
+	uploadedAt: string
+	startedAt: string
+	lastUpdatedAt: string
+	failureReason: string | null
+	reviewNote: string | null
+	steps: DocumentProcessingStep[]
+	/** 主文件與附件的個別處理狀態；未提供時視為只有主文件。 */
+	files?: DocumentProcessingFile[]
 }
 
 export interface DocumentVersionEntry {

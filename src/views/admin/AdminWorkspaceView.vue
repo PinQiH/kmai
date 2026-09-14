@@ -75,7 +75,7 @@ const workspaceTabItems: Record<string, WorkspaceItem[][]> = {
 	graph: [
 		[{ title: '圖譜規模', description: '3,842 個節點 · 12,906 條關聯 · 1,018 份文件', status: '健康' }, { title: '最近更新', description: '今天 03:10 · 新增 84 個節點與 216 條關聯', status: '完成', action: '查看變更' }],
 		[{ title: 'ACME Cloud', description: '可能與「ACME 雲端服務」為相同實體', status: '待覆核', action: '合併實體' }, { title: '差旅管理', description: '類型：制度 · 來源 12 份文件', status: '已確認', action: '編輯實體' }],
-		[{ title: '員工生命週期', description: '包含到職、訓練、績效與離職等 128 個節點', status: '已產生', action: '查看社群' }, { title: '費用與採購', description: '包含差旅、採購、請款等 96 個節點', status: '已產生', action: '查看社群' }],
+		[{ title: '人員生命週期', description: '包含到職、訓練、績效與離職等 128 個節點', status: '已產生', action: '查看社群' }, { title: '費用與採購', description: '包含差旅、採購、請款等 96 個節點', status: '已產生', action: '查看社群' }],
 		[{ title: '快速重建', description: '保留已確認實體，只重算新增與異動文件', status: '建議', action: '開始重建' }, { title: '完整重建', description: '重新產生所有實體、關聯與知識社群', status: '高風險', action: '查看影響' }],
 	],
 	feedback: [

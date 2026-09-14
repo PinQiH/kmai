@@ -66,6 +66,7 @@ describe('AdminUploadView', () => {
 		await view.get('[data-testid="upload-next"]').trigger('click')
 		await flushPromises()
 		expect(view.text()).toContain('文件資訊')
+		await view.get('[data-testid="initial-version-note"] textarea').setValue('初次建立差旅規範')
 
 		await view.get('[data-testid="upload-next"]').trigger('click')
 		await flushPromises()
@@ -118,6 +119,7 @@ describe('AdminUploadView', () => {
 		await view.get('[data-testid="upload-next"]').trigger('click')
 		await flushPromises()
 
+		await view.get('[data-testid="initial-version-note"] textarea').setValue('初版說明')
 		const department = view.findComponent('[data-testid="department-select"]')
 		await department.setValue('海外事業處')
 		await view.findComponent('[data-testid="main-category"]').setValue('併購專案')
@@ -150,6 +152,7 @@ describe('AdminUploadView', () => {
 		await view.get('[data-testid="upload-next"]').trigger('click')
 		await flushPromises()
 
+		await view.get('[data-testid="initial-version-note"] textarea').setValue('初版說明')
 		await view.findComponent('[data-testid="visibility-select"]').setValue('指定使用者')
 		await flushPromises()
 		expect(view.get('[data-testid="upload-next"]').attributes('disabled')).toBeDefined()

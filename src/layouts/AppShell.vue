@@ -93,7 +93,7 @@ const navigationItems = computed(() =>
   isAdminWorkspace.value ? adminItems : employeeItems,
 )
 const workspaceSwitchLabel = computed(() =>
-  isAdminWorkspace.value ? "返回員工前台" : "管理後台",
+  isAdminWorkspace.value ? "返回前台" : "管理後台",
 )
 const workspaceSwitchIcon = computed(() =>
   isAdminWorkspace.value ? "mdi-arrow-left" : "mdi-shield-account-outline",
@@ -117,7 +117,7 @@ const isRailMode = computed(
 const railToggleLabel = computed(() =>
   appStore.isNavigationRail ? "展開側邊欄" : "收合側邊欄",
 )
-// @ 歷史對話只在員工前台的完整寬度側邊欄顯示
+// @ 歷史對話只在前台的完整寬度側邊欄顯示
 const showDrawerHistory = computed(
   () => !isAdminWorkspace.value && !isRailMode.value,
 )
@@ -215,7 +215,7 @@ async function handleLogout(): Promise<void> {
         nav
         density="compact"
         class="navigation-list px-3"
-        :aria-label="isAdminWorkspace ? '管理後台導覽' : '員工前台導覽'"
+        :aria-label="isAdminWorkspace ? '管理後台導覽' : '前台導覽'"
       >
 		<template v-if="isAdminWorkspace">
 			<VListItem
@@ -263,7 +263,7 @@ async function handleLogout(): Promise<void> {
 
       <!--
         @ 歷史對話住在側邊欄導覽下方，吃掉剩餘高度。
-          只在員工前台的完整寬度模式顯示：rail 太窄、管理後台導覽已有九項。
+          只在前台的完整寬度模式顯示：rail 太窄、管理後台導覽已有九項。
       -->
       <template v-if="showDrawerHistory">
 				<ConversationHistoryPanel>
