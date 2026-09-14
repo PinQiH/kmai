@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
+import { describeProfile, getAssignedProfile, getConnection, getProfilesByKind, getUsage } from '@/mocks/systemResources'
 import { hasEditedChunks, processingStages, type ProcessingStageId } from '@/mocks/documentProcessing'
 import { getVersionCount, reprocessAllVersions } from '@/mocks/documentReprocess'
 import {
@@ -13,10 +14,12 @@ import {
 	getDocumentFileTypeId,
 	getEarliestPendingStage,
 	getFileTypeName,
+	getStrategyUsage,
 	markStrategyChanged,
 	pendingStrategyStages,
 	removeStageOverride,
 	resolveInheritedStrategy,
+	resolveStageProfile,
 	resolveStrategy,
 	saveStrategy,
 	strategySourceLabels,
@@ -88,6 +91,51 @@ function getInheritedLabel(stageId: string): string {
 
 function getStrategyMeta(stageId: string, strategyId: string) {
 	return processingStages.find((stage) => stage.id === stageId)?.strategies.find((strategy) => strategy.id === strategyId)
+}
+
+/** 只有切段與摘要還有步驟專屬參數；模型與解析參數改由系統資源設定檔提供。 */
+function hasStageParams(stageId: string): boolean {
+	const stage = currentStage(stageId)
+	return (stageId === 'chunk' || stageId === 'summarize') && Boolean(getStrategyMeta(stageId, stage.strategyId)?.hasOptions)
+}
+
+function getResourceItems(stageId: string) {
+	const usageId = getStrategyUsage(currentStage(stageId).strategyId)
+	if (!usageId) return []
+	const profiles = getProfilesByKind(getUsage(usageId).kind).map((profile) => ({ title: profile.name, subtitle: describeProfile(profile), value: profile.id as string | null }))
+	// @ 全域是最上層，必須明確選一個設定檔；檔案類型與文件層才有「沿用上層」
+	if (scope.value === 'global') return profiles
+	const parentStage = inherited.value.find((entry) => entry.stageId === stageId)
+	const parentProfile = parentStage && getStrategyUsage(parentStage.strategyId) === usageId
+		? resolveStageProfile(parentStage.strategyId, parentStage.options)
+		: getAssignedProfile(usageId)
+	return [
+		{ title: `沿用${getInheritedLabel(stageId)}：${parentProfile?.name ?? '尚未指定'}`, subtitle: describeProfile(parentProfile), value: null },
+		...profiles,
+	]
+}
+
+/** 全域層沒有「沿用」選項，未指定時顯示系統預設的設定檔。 */
+function getResourceValue(stageId: string): string | null {
+	const stage = currentStage(stageId)
+	if (scope.value !== 'global') return stage.options.resourceProfileId
+	return resolveStageProfile(stage.strategyId, stage.options)?.id ?? null
+}
+
+function getResourceWarning(stageId: string): string {
+	const stage = currentStage(stageId)
+	const usageId = getStrategyUsage(stage.strategyId)
+	if (!usageId) return ''
+	const profile = resolveStageProfile(stage.strategyId, stage.options)
+	if (!profile) return '這個用途尚未指派設定檔，處理時會失敗。'
+	const connection = getConnection(profile.connectionId)
+	return connection?.status === 'error' ? `「${connection.name}」目前連線異常，處理可能失敗。` : ''
+}
+
+function selectResource(stageId: string, profileId: string | null): void {
+	const stage = currentStage(stageId)
+	drafts.value = { ...drafts.value, [stageId]: { ...stage, options: { ...stage.options, resourceProfileId: profileId } } }
+	feedback.value = ''
 }
 
 function getOptionSummary(stageId: string): string {
@@ -288,8 +336,21 @@ function reprocessNow(): void {
 						:data-testid="`strategy-select-${stage.id}`"
 						@update:model-value="selectStrategy(stage.id, $event)"
 					/>
+					<VSelect
+						v-if="getStrategyUsage(currentStage(stage.id).strategyId)"
+						:model-value="getResourceValue(stage.id)"
+						:items="getResourceItems(stage.id)"
+						:item-props="(item) => ({ subtitle: item.subtitle })"
+						:disabled="isLocked"
+						:label="`${stage.name}使用的設定檔`"
+						hide-details
+						density="comfortable"
+						class="resource-select"
+						:data-testid="`strategy-resource-${stage.id}`"
+						@update:model-value="selectResource(stage.id, $event)"
+					/>
 					<VBtn
-						v-if="getStrategyMeta(stage.id, currentStage(stage.id).strategyId)?.hasOptions"
+						v-if="hasStageParams(stage.id)"
 						variant="outlined"
 						size="small"
 						prepend-icon="mdi-tune-variant"
@@ -311,6 +372,11 @@ function reprocessNow(): void {
 					</VBtn>
 				</div>
 				<p v-if="getOptionSummary(stage.id)" class="option-summary">{{ getOptionSummary(stage.id) }}</p>
+				<p v-if="getResourceWarning(stage.id)" class="resource-warning" role="note">
+					<VIcon icon="mdi-alert-outline" size="14" />
+					{{ getResourceWarning(stage.id) }}
+					<RouterLink to="/admin/system-resources">查看系統資源</RouterLink>
+				</p>
 			</li>
 		</ul>
 
@@ -350,12 +416,6 @@ function reprocessNow(): void {
 							<VCheckbox v-model="optionsDraft.splitAtEveryHeading" label="每個標題強制起新段" hide-details />
 							<VCheckbox v-model="optionsDraft.useBuiltinHeadings" label="同時套用內建標題規則（Markdown #、第 X 章、數字編號）" hide-details />
 						</template>
-					</template>
-					<template v-else-if="optionsStage.stageId === 'parse'">
-						<VSelect v-model="optionsDraft.ocrLanguage" label="辨識語言" :items="['繁體中文＋英文', '繁體中文', '英文', '日文']" />
-					</template>
-					<template v-else-if="optionsStage.stageId === 'embed'">
-						<VTextField v-model.number="optionsDraft.batchSize" label="批次大小" type="number" hint="一次送出的切塊數量，越大越快但越吃記憶體。" persistent-hint />
 					</template>
 					<template v-else-if="optionsStage.stageId === 'summarize'">
 						<VSelect v-model="optionsDraft.summaryLength" label="摘要長度" :items="['簡短（約 150 字）', '中等（約 300 字）', '詳細（約 600 字）']" />
@@ -461,6 +521,25 @@ function reprocessNow(): void {
 
 .stage-controls > :first-child {
 	flex: 1 1 260px;
+}
+
+.stage-controls > .resource-select {
+	flex: 1 1 240px;
+}
+
+.resource-warning {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+	margin: 6px 0 0;
+	color: rgb(var(--v-theme-warning));
+	font-size: 0.76rem;
+}
+
+.resource-warning a {
+	color: rgb(var(--v-theme-primary));
+	text-underline-offset: 2px;
 }
 
 .option-summary {

@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 
+import { getAssignedProfile, getProfile, type AiProfile, type UsageId } from '@/mocks/systemResources'
 import { processingStages, type ProcessingStageId } from '@/mocks/documentProcessing'
 import { workspaceDocuments } from '@/mocks/documentWorkspace'
 import type { UserDocumentSource } from '@/types'
@@ -11,8 +12,8 @@ export interface StrategyOptions {
 	splitAtEveryHeading: boolean
 	useBuiltinHeadings: boolean
 	customHeadings: string
-	ocrLanguage: string
-	batchSize: number
+	/** 指定的系統資源設定檔；null 代表沿用上一層（全域未指定時用系統預設）。 */
+	resourceProfileId: string | null
 	summaryLength: string
 }
 
@@ -22,8 +23,7 @@ export const DEFAULT_STRATEGY_OPTIONS: StrategyOptions = {
 	splitAtEveryHeading: false,
 	useBuiltinHeadings: true,
 	customHeadings: '',
-	ocrLanguage: '繁體中文＋英文',
-	batchSize: 32,
+	resourceProfileId: null,
 	summaryLength: '中等（約 300 字）',
 }
 
@@ -198,10 +198,41 @@ export function describeOptions(stageId: string, strategyId: string, options: St
 		if (strategyId === 'heading_aware' && options.splitAtEveryHeading) lines.push('每個標題起新段')
 		return lines
 	}
-	if (stageId === 'parse') return [`辨識語言：${options.ocrLanguage}`]
-	if (stageId === 'embed') return [`批次 ${options.batchSize}`]
 	if (stageId === 'summarize') return [options.summaryLength]
 	return []
+}
+
+// > 策略與系統資源的對應：模型與解析參數不再逐步驟填寫，只選設定檔
+// @ builtin、auto、graph_off 與建索引策略不呼叫系統資源，因此不在對應表中
+const strategyUsages: Record<string, UsageId> = {
+	ocr: 'parse',
+	docling: 'parse',
+	default_embed: 'embed',
+	multilingual: 'embed',
+	long_context: 'embed',
+	entity_relation: 'graph',
+	topic_only: 'graph',
+	key_points: 'summarize',
+	per_section: 'summarize',
+	qa_pairs: 'summarize',
+}
+
+/** 取得策略會呼叫的用途；不使用系統資源的策略回傳 undefined。 */
+export function getStrategyUsage(strategyId: string): UsageId | undefined {
+	return strategyUsages[strategyId]
+}
+
+/** 取得步驟實際使用的設定檔：步驟有指定就用指定的，否則沿用系統預設。 */
+export function resolveStageProfile(strategyId: string, options: StrategyOptions): AiProfile | undefined {
+	const usageId = getStrategyUsage(strategyId)
+	if (!usageId) return undefined
+	return getProfile(options.resourceProfileId) ?? getAssignedProfile(usageId)
+}
+
+/** 計算有多少檔案類型或文件的策略直接指定了這個設定檔，供刪除前檢查與影響說明。 */
+export function countProfileStrategyReferences(profileId: string): number {
+	const layers: StageOverrides[] = [globalStrategyConfig.stages, ...Object.values(fileTypeStrategyOverrides), ...Object.values(documentStrategyOverrides)]
+	return layers.filter((layer) => Object.values(layer).some((stage) => stage?.options.resourceProfileId === profileId)).length
 }
 
 /** 檢查切段參數；回傳空字串代表通過。 */

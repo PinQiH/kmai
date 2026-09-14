@@ -170,6 +170,12 @@ const routes: RouteRecordRaw[] = [
 		meta: { admin: true, workspace: "ai", title: "AI 與檢索設定" },
 	},
 	{
+		path: "/admin/system-resources",
+		name: "admin-system-resources",
+		component: () => import("@/views/admin/AdminSystemResourcesView.vue"),
+		meta: { admin: true, title: "系統資源" },
+	},
+	{
 		path: "/admin/access",
 		name: "admin-access",
 		component: () => import("@/views/admin/AdminWorkspaceView.vue"),

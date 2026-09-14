@@ -62,6 +62,7 @@ const adminNavigationGroups: Array<{ title: string; items: NavigationItem[] }> =
 	{
 		title: "系統管理",
 		items: [
+			{ title: "系統資源", icon: "mdi-database-cog-outline", to: "/admin/system-resources" },
 			{ title: "AI 與檢索設定", icon: "mdi-tune-variant", to: "/admin/ai-settings" },
 			{ title: "使用者與存取", icon: "mdi-account-group-outline", to: "/admin/access" },
 			{ title: "系統設定", icon: "mdi-cog-outline", to: "/admin/settings" },

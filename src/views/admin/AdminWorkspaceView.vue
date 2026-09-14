@@ -4,8 +4,18 @@ import { useRoute } from 'vue-router'
 import { useTheme } from 'vuetify'
 
 import PageHeader from '@/components/PageHeader.vue'
+import { describeProfile, getAssignedProfile, getProfilesByKind, getUsage, usageAssignments, type UsageId } from '@/mocks/systemResources'
 import { useAppStore } from '@/stores/app'
 import { themeAccentLabels, type ThemeAccent } from '@/theme'
+
+// @ 模型參數集中在系統資源，這裡只選用哪個設定檔
+function profileItems(usageId: UsageId) {
+	return getProfilesByKind(getUsage(usageId).kind).map((profile) => ({ title: profile.name, subtitle: describeProfile(profile), value: profile.id }))
+}
+
+function assignedSummary(usageId: UsageId): string {
+	return describeProfile(getAssignedProfile(usageId))
+}
 
 interface WorkspaceConfig {
 	eyebrow: string
@@ -41,7 +51,6 @@ const workspaceConfigs: Record<string, WorkspaceConfig> = {
 		tabs: ['問題路由', '知識檢索', '重新排序與引用', '回答模型', '工具調度', '提示詞與術語'],
 		items: [
 			{ title: '混合檢索', description: '語意搜尋 60% · 關鍵字搜尋 40% · 圖譜擴充已啟用', status: '已啟用', action: '調整權重' },
-			{ title: '回答模型：主要設定', description: 'OpenAI 相容服務 · 上下文 32K · Temperature 0.2', status: '連線正常', action: '測試連線' },
 			{ title: '引用規則', description: '最低分數 0.72 · 每次回答最多 6 筆引用', status: '已套用', action: '編輯規則' },
 			{ title: '專有名詞保護', description: '目前維護 126 個公司與產品名稱', status: '正常', action: '管理名詞' },
 		],
@@ -86,9 +95,9 @@ const workspaceTabItems: Record<string, WorkspaceItem[][]> = {
 	ai: [
 		[{ title: '單一主題路由', description: '優先限制在辨識出的知識主題', status: '已啟用', action: '編輯規則' }, { title: '跨文件問題路由', description: '需要比較或彙整時擴大檢索範圍', status: '已啟用', action: '編輯規則' }],
 		[{ title: '語意搜尋', description: '候選 20 筆 · 權重 60%', status: '已啟用', action: '調整參數' }, { title: '關鍵字搜尋', description: '候選 20 筆 · 權重 40%', status: '已啟用', action: '調整參數' }, { title: '知識圖譜擴充', description: '每個命中節點展開 2 層', status: '已啟用', action: '調整參數' }],
-		[{ title: 'Reranker', description: '保留 12 筆 · 逾時 8 秒', status: '連線正常', action: '測試服務' }, { title: '引用規則', description: '最低分數 0.72 · 最多 6 筆', status: '已套用', action: '編輯規則' }],
-		[{ title: '主要回答模型', description: 'OpenAI 相容服務 · 32K context', status: '連線正常', action: '編輯設定' }, { title: '備援回答模型', description: 'Ollama · 本機模型', status: '待測試', action: '測試連線' }],
-		[{ title: 'Agent 工具調度', description: '最多 6 次呼叫 · 45 秒時間預算', status: '已啟用', action: '編輯限制' }, { title: '規劃模型', description: '使用主要回答模型', status: '已套用', action: '變更模型' }],
+		[{ title: '引用規則', description: '最低分數 0.72 · 最多 6 筆', status: '已套用', action: '編輯規則' }],
+		[],
+		[{ title: 'Agent 工具調度', description: '最多 6 次呼叫 · 45 秒時間預算', status: '已啟用', action: '編輯限制' }],
 		[{ title: '共用系統提示詞', description: '最後更新：2026-08-10 · 林怡君', status: '已發布', action: '編輯提示詞' }, { title: '回答風格', description: '簡潔、詳細、步驟式共 3 種', status: '正常', action: '管理風格' }, { title: '專有名詞保護', description: '126 個公司與產品名稱', status: '正常', action: '管理名詞' }],
 	],
 	access: [
@@ -172,13 +181,13 @@ watch(workspaceKey, () => {
 
 		<VCard v-if="workspaceKey === 'ai'" class="surface-border pa-5 mb-5">
 			<h2 class="section-heading mb-1">{{ config.tabs[activeTab] }}</h2><p class="text-body-2 text-medium-emphasis mb-5">調整目前分頁的 Mock 設定，儲存後只在本次瀏覽期間生效。</p>
-			<template v-if="activeTab === 0"><VSwitch label="啟用規則快速判斷" color="primary" model-value /><VSelect label="跨文件問題處理方式" :items="['自動擴大範圍', '先詢問使用者', '維持原主題']" /><VSelect label="規劃模型" :items="['主要回答模型', '備援回答模型']" /></template>
+			<template v-if="activeTab === 0"><VSwitch label="啟用規則快速判斷" color="primary" model-value /><VSelect label="跨文件問題處理方式" :items="['自動擴大範圍', '先詢問使用者', '維持原主題']" /><VSelect v-model="usageAssignments.planner" label="規劃模型" :items="profileItems('planner')" :item-props="(item) => ({ subtitle: item.subtitle })" :hint="assignedSummary('planner')" persistent-hint /><RouterLink :to="{ path: '/admin/system-resources', query: { profile: usageAssignments.planner } }" class="resource-link">編輯系統資源中的模型設定檔</RouterLink></template>
 			<template v-else-if="activeTab === 1"><VSwitch v-model="semanticSearchEnabled" label="啟用語意搜尋" color="primary" /><VSwitch v-model="keywordSearchEnabled" label="啟用關鍵字搜尋" color="primary" /><VSwitch v-model="graphExpansionEnabled" label="啟用知識圖譜擴充" color="primary" /><VSlider v-model="resultLimit" label="每個管道取回數量" :min="5" :max="50" :step="5" thumb-label /></template>
-			<template v-else-if="activeTab === 2"><VTextField label="Reranker 服務網址" placeholder="由後端安全設定提供" /><VTextField label="模型名稱" model-value="bge-reranker-v2" /><VSlider label="引用證據最低分數" :model-value="72" :min="0" :max="100" thumb-label /><VTextField label="最多引用筆數" type="number" model-value="6" /></template>
-			<template v-else-if="activeTab === 3"><VSelect label="服務提供者" :items="['OpenAI 相容服務', 'Azure OpenAI', 'Gemini', 'Ollama']" /><VTextField label="模型名稱" model-value="gpt-4.1-mini" /><VTextField label="服務網址" placeholder="由後端安全設定提供" persistent-hint hint="API Key 只由後端安全保存，不在此展示介面顯示" /><VSlider label="Temperature" :model-value="20" :min="0" :max="100" thumb-label /></template>
+			<template v-else-if="activeTab === 2"><VSelect v-model="usageAssignments.rerank" label="Reranker" :items="profileItems('rerank')" :item-props="(item) => ({ subtitle: item.subtitle })" :hint="assignedSummary('rerank')" persistent-hint class="mb-2" /><RouterLink :to="{ path: '/admin/system-resources', query: { profile: usageAssignments.rerank } }" class="resource-link">編輯系統資源中的 Reranker 設定檔</RouterLink><VSlider label="引用證據最低分數" :model-value="72" :min="0" :max="100" thumb-label /><VTextField label="最多引用筆數" type="number" model-value="6" /></template>
+			<template v-else-if="activeTab === 3"><VSelect v-model="usageAssignments.answer" label="回答模型" :items="profileItems('answer')" :item-props="(item) => ({ subtitle: item.subtitle })" :hint="assignedSummary('answer')" persistent-hint /><RouterLink :to="{ path: '/admin/system-resources', query: { profile: usageAssignments.answer } }" class="resource-link">模型名稱、Temperature 等參數請到系統資源編輯</RouterLink></template>
 			<template v-else-if="activeTab === 4"><VSwitch label="啟用 Agent 工具調度" color="primary" model-value /><VCombobox label="可用工具" :items="['知識搜尋', '全文讀取', '版本比較', '文件摘要']" :model-value="['知識搜尋', '全文讀取']" multiple chips /><VTextField label="最多呼叫次數" type="number" model-value="6" /><VTextField label="時間預算（秒）" type="number" model-value="45" /></template>
 			<template v-else><VTextarea label="共用系統提示詞" rows="5" model-value="只根據可追溯的公司知識回答，資訊不足時明確說明。" /><VCombobox label="專有名詞保護" :items="['Syscom Cubi', 'ACME Cloud', 'Project Alpha']" :model-value="['Syscom Cubi', 'ACME Cloud']" multiple chips /></template>
-			<VBtn color="primary" @click="showSavedMessage">儲存目前設定</VBtn><VBtn v-if="activeTab === 2 || activeTab === 3" class="ml-2" variant="outlined" @click="showSavedMessage">測試連線</VBtn>
+			<VBtn color="primary" @click="showSavedMessage">儲存目前設定</VBtn>
 		</VCard>
 		<VCard v-else-if="workspaceKey === 'access'" class="surface-border pa-5 mb-5">
 			<h2 class="section-heading mb-4">快速新增使用者</h2><div class="access-form"><VTextField v-model="newUserEmail" label="公司電子郵件" type="email" hide-details /><VSelect label="角色" :items="['一般使用者', '知識管理員', '系統管理員']" hide-details /><VBtn color="primary" :disabled="!newUserEmail.includes('@')" @click="newUserEmail = ''; showSavedMessage()">新增使用者</VBtn></div>
@@ -189,7 +198,7 @@ watch(workspaceKey, () => {
 		<VCard v-else-if="workspaceKey === 'graph'" class="surface-border pa-5 mb-5">
 			<h2 class="section-heading mb-4">圖譜操作</h2><div class="d-flex flex-wrap ga-3"><VBtn variant="tonal" prepend-icon="mdi-account-check-outline" @click="showSavedMessage">批次核准實體</VBtn><VBtn variant="outlined" prepend-icon="mdi-graph-outline" @click="dialogItem = { title: '快速重建知識圖譜', description: '將保留已確認實體，並重新計算新增與異動文件。', action: '確認重建' }">快速重建</VBtn><VBtn variant="outlined" color="error" prepend-icon="mdi-alert-outline" @click="dialogItem = { title: '完整重建知識圖譜', description: '完整重建期間圖譜搜尋可能暫時無法使用。', action: '確認重建' }">完整重建</VBtn></div>
 		</VCard>
-		<VCard class="surface-border">
+		<VCard v-if="visibleItems.length" class="surface-border">
 			<VList lines="two">
 				<template v-for="(item, index) in visibleItems" :key="item.title">
 					<VListItem class="py-3"><template #prepend><VIcon icon="mdi-circle-medium" color="primary" aria-hidden="true" /></template><VListItemTitle class="font-weight-bold">{{ item.title }}</VListItemTitle><VListItemSubtitle>{{ item.description }}</VListItemSubtitle><template #append><div class="d-flex align-center ga-2"><VChip v-if="item.status" size="small" variant="tonal">{{ item.status }}</VChip><VBtn v-if="item.action" variant="text" size="small" @click="dialogItem = item">{{ item.action }}</VBtn></div></template></VListItem>
@@ -208,6 +217,7 @@ watch(workspaceKey, () => {
 <style scoped>
 .workspace-toolbar { display: flex; align-items: center; gap: 8px; }
 .workspace-toolbar > :first-child { max-width: 380px; }
+.resource-link { display: inline-block; margin: 4px 0 20px; color: rgb(var(--v-theme-primary)); font-size: 0.84rem; text-underline-offset: 2px; }
 .access-form { display: grid; grid-template-columns: 1fr 220px auto; gap: 12px; align-items: center; }
 @media (max-width: 700px) { .workspace-toolbar { align-items: stretch; flex-direction: column; } .workspace-toolbar > :first-child { max-width: none; } .access-form { grid-template-columns: 1fr; } }
 </style>
