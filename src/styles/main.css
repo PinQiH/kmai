@@ -290,6 +290,11 @@ body {
 		padding-bottom: 40px;
 	}
 
+	/* NOTE: 後台 AI 小幫手浮動鈕（56px）會蓋住頁面最底部的操作，保留足夠捲動空間 */
+	body:has([data-testid="admin-assistant-launcher"]) .page-shell {
+		padding-bottom: 104px;
+	}
+
 	.page-heading {
 		font-size: 1.75rem;
 	}

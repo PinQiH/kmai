@@ -222,7 +222,9 @@ router.beforeEach((to) => {
 	return { name: "forbidden" }
 })
 
-router.afterEach((to) => {
+router.afterEach((to, _from, failure) => {
+	// NOTE: 被取消的導覽（例如 Vuetify 對話框開啟時攔下）也會觸發 afterEach，此時不可更新標題與焦點
+	if (failure) return
 	document.title = `${String(to.meta.title ?? "凌群知識庫")}｜Syscom Cubi`
 	window.requestAnimationFrame(() => {
 		document

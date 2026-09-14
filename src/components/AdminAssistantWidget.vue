@@ -8,7 +8,7 @@ import { useAssistantIdleTimer } from '@/composables/useAssistantIdleTimer'
 import { useAdminAssistantStore } from '@/stores/adminAssistant'
 import { useNotebooksStore } from '@/stores/notebooks'
 import type { AssistantLauncherEdge, AssistantLauncherPosition } from '@/types'
-import { clampAssistantPosition, getDefaultAssistantPosition, type AssistantPositionOptions } from '@/utils/assistantPosition'
+import { getDefaultAssistantPosition, snapAssistantPosition, type AssistantPositionOptions } from '@/utils/assistantPosition'
 import { buildKnowledgeSourceOptions } from '@/utils/knowledgeSources'
 
 const route = useRoute()
@@ -50,7 +50,10 @@ function handlePositionChange(position: AssistantLauncherPosition, edge: Assista
 function constrainPosition(): void {
 	readSafeArea()
 	const position = assistantStore.launcherPosition ?? getDefaultAssistantPosition(viewport(), positionOptions.value)
-	assistantStore.updateLauncherPosition(clampAssistantPosition(position, viewport(), positionOptions.value), assistantStore.launcherEdge)
+	// NOTE: 只做 clamp 會讓視窗由窄變寬後停在畫面中間或蓋住側邊欄，改為依原本側邊重新吸附
+	const edgeAnchor = { x: assistantStore.launcherEdge === 'left' ? 0 : viewport().width, y: position.y }
+	const snapped = snapAssistantPosition(edgeAnchor, viewport(), positionOptions.value)
+	assistantStore.updateLauncherPosition(snapped.position, snapped.edge)
 	syncTimer()
 }
 
