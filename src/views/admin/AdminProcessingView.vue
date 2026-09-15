@@ -135,6 +135,10 @@ const documentIds = computed(() => {
 	const value = route.query.documentId
 	return (Array.isArray(value) ? value : [value]).filter((id): id is string => typeof id === 'string' && Boolean(id))
 })
+const documentFilters = computed(() => documentIds.value.map((id) => ({
+	id,
+	title: workspaceDocuments.find((document) => document.id === id)?.title ?? id,
+})))
 
 /** 名稱搜尋同時比對文件標題與主文件、附件檔名。 */
 function matchesSearch(job: ProcessingJob): boolean {
@@ -157,7 +161,7 @@ const rangeLabel = computed(() => {
 	const start = (page.value - 1) * pageSize.value + 1
 	return `共 ${total} 筆，顯示第 ${start}–${Math.min(total, start + pageSize.value - 1)} 筆`
 })
-const hasActiveFilter = computed(() => Boolean(searchQuery.value.trim()) || (activeTab.value === 'all' && statusFilter.value !== '全部狀態'))
+const hasActiveFilter = computed(() => Boolean(documentIds.value.length) || Boolean(searchQuery.value.trim()) || (activeTab.value === 'all' && statusFilter.value !== '全部狀態'))
 
 watch([searchQuery, statusFilter, pageSize, activeTab], () => { page.value = 1 })
 watch(pageCount, (count) => { if (page.value > count) page.value = count })
@@ -264,9 +268,16 @@ function confirmCancel(): void {
 	notify('示範處理工作已取消。')
 }
 
+function clearDocumentFilter(documentId?: string): void {
+	const remainingIds = documentId ? documentIds.value.filter((id) => id !== documentId) : []
+	const nextDocumentId = remainingIds.length === 1 ? remainingIds[0] : remainingIds.length ? remainingIds : undefined
+	router.replace({ query: { ...route.query, documentId: nextDocumentId } })
+}
+
 function clearFilters(): void {
 	searchQuery.value = ''
 	statusFilter.value = '全部狀態'
+	clearDocumentFilter()
 }
 
 // > 處理策略分頁：全域 + 各檔案類型
@@ -301,7 +312,6 @@ const strategyFileTypeId = computed(() => (strategyScope.value === 'global' ? un
 			{{ feedbackMessage }}
 		</VAlert>
 
-		<VAlert v-if="documentIds.length" type="info" variant="tonal" class="mb-4">僅顯示所選文件的處理工作。<VBtn :to="{ path: '/admin/processing', query: { tab: 'all' } }" variant="text" size="small">查看全部文件</VBtn></VAlert>
 		<VTabs v-model="activeTab" color="primary" class="mb-4">
 			<VTab value="attention">需要處理 <VChip size="x-small" color="error" class="ml-2">{{ attentionJobs.length }}</VChip></VTab>
 			<VTab value="all">全部工作</VTab>
@@ -329,6 +339,21 @@ const strategyFileTypeId = computed(() => (strategyScope.value === 'global' ? un
 				hide-details
 				class="toolbar-status"
 			/>
+		</div>
+		<div v-if="activeTab !== 'strategy' && documentFilters.length" class="document-filter-row" aria-label="目前套用的文件篩選">
+			<span class="document-filter-label">目前篩選</span>
+			<VChip
+				v-for="filter in documentFilters"
+				:key="filter.id"
+				closable
+				size="small"
+				prepend-icon="mdi-file-document-outline"
+				:data-testid="`processing-document-filter-${filter.id}`"
+				@click:close="clearDocumentFilter(filter.id)"
+			>
+				文件：{{ filter.title }}
+			</VChip>
+			<VBtn variant="text" size="small" @click="clearDocumentFilter()">查看全部文件</VBtn>
 		</div>
 
 		<VAlert v-if="activeTab === 'attention'" type="warning" variant="tonal" class="mb-5">
@@ -533,6 +558,19 @@ const strategyFileTypeId = computed(() => (strategyScope.value === 'global' ? un
 
 .toolbar-status {
 	flex: 0 0 180px;
+}
+
+.document-filter-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-xs);
+	margin: calc(var(--space-sm) * -1) 0 var(--space-md);
+}
+
+.document-filter-label {
+	color: var(--ink-muted);
+	font-size: 0.78rem;
 }
 
 .job-list {

@@ -4,7 +4,7 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import AdminMonitoringView from '@/views/admin/AdminMonitoringView.vue'
 import AdminNotificationsView from '@/views/admin/AdminNotificationsView.vue'
@@ -75,6 +75,19 @@ describe('admin information architecture', () => {
 
 		expect(selectedTab?.text()).toBe('全部工作')
 		expect(wrapper.text()).not.toContain('這裡只顯示失敗、部分附件失敗、等待過久，或策略已變更待重新處理的工作')
+	})
+
+	it('should show and clear the document filter when linked from document details', async () => {
+		const { wrapper, router } = await mountAdminView(AdminProcessingView, '/admin/processing?tab=all&documentId=doc-003', [
+			{ path: '/admin/processing', component: AdminProcessingView },
+			{ path: '/admin/documents/:id/manage', component: { template: '<div />' } },
+		])
+		const filterChip = wrapper.get('[data-testid="processing-document-filter-doc-003"]')
+
+		expect(filterChip.text()).toContain('文件：客戶資料存取與分享規範')
+		await filterChip.get('.v-chip__close').trigger('click')
+		await vi.waitFor(() => expect(router.currentRoute.value.query.documentId).toBeUndefined())
+		expect(wrapper.find('[data-testid="processing-document-filter-doc-003"]').exists()).toBe(false)
 	})
 
 	it('should keep operational monitoring focused on health, alerts, metrics, logs and rules', async () => {
