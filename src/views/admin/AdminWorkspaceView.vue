@@ -25,16 +25,6 @@ interface WorkspaceConfig {
 }
 
 const workspaceConfigs: Record<string, WorkspaceConfig> = {
-	graph: {
-		eyebrow: '關聯品質',
-		description: '覆核擷取出的實體、知識社群與圖譜規模，必要時重新建立關聯。',
-		tabs: ['圖譜統計', '實體覆核', '主題社群', '重建圖譜'],
-		items: [
-			{ title: '圖譜規模', description: '3,842 個節點 · 12,906 條關聯 · 1,018 份文件', status: '健康' },
-			{ title: '待覆核實體', description: '23 個新實體可能與既有名稱重複', status: '需處理', action: '開始覆核' },
-			{ title: '主題社群', description: '已辨識 38 個知識社群，最近更新於今天 03:10', status: '正常' },
-		],
-	},
 	feedback: {
 		eyebrow: '改善知識品質',
 		description: '從使用者回饋回看問題、回答、引用與檢索結果，找出需要修正的內容或設定。',
@@ -81,12 +71,6 @@ const workspaceConfigs: Record<string, WorkspaceConfig> = {
 type WorkspaceItem = WorkspaceConfig['items'][number]
 
 const workspaceTabItems: Record<string, WorkspaceItem[][]> = {
-	graph: [
-		[{ title: '圖譜規模', description: '3,842 個節點 · 12,906 條關聯 · 1,018 份文件', status: '健康' }, { title: '最近更新', description: '今天 03:10 · 新增 84 個節點與 216 條關聯', status: '完成', action: '查看變更' }],
-		[{ title: 'ACME Cloud', description: '可能與「ACME 雲端服務」為相同實體', status: '待覆核', action: '合併實體' }, { title: '差旅管理', description: '類型：制度 · 來源 12 份文件', status: '已確認', action: '編輯實體' }],
-		[{ title: '人員生命週期', description: '包含到職、訓練、績效與離職等 128 個節點', status: '已產生', action: '查看社群' }, { title: '費用與採購', description: '包含差旅、採購、請款等 96 個節點', status: '已產生', action: '查看社群' }],
-		[{ title: '快速重建', description: '保留已確認實體，只重算新增與異動文件', status: '建議', action: '開始重建' }, { title: '完整重建', description: '重新產生所有實體、關聯與知識社群', status: '高風險', action: '查看影響' }],
-	],
 	feedback: [
 		[{ title: '海外出差的住宿上限是多少？', description: '引用舊版本 · 回報者：陳小姐 · 今天 09:18', status: '高優先', action: '查看診斷' }, { title: '找不到設備申請流程', description: '搜尋無結果 · 可能缺少同義詞', status: '新進', action: '指派處理人' }],
 		[{ title: '文件預覽無法縮放', description: 'iOS Safari · 附有畫面資訊', status: '審查中', action: '更新狀態' }, { title: '無法下載附件', description: '財務部 · 差旅費用明細表', status: '待處理', action: '查看回報' }],
@@ -194,9 +178,6 @@ watch(workspaceKey, () => {
 		</VCard>
 		<VCard v-else-if="workspaceKey === 'settings'" class="surface-border pa-5 mb-5">
 			<h2 class="section-heading mb-4">品牌與預設外觀</h2><VTextField v-model="systemName" label="系統名稱" /><VFileInput label="Logo" accept="image/png,image/svg+xml" prepend-icon="mdi-image-outline" /><VSelect v-model="defaultTheme" label="預設主題" :items="['淺色', '深色', '跟隨作業系統']" /><VRadioGroup v-model="defaultThemeAccent" label="系統預設配色"><VRadio value="indigo" :label="themeAccentLabels.indigo" /><VRadio value="red" :label="themeAccentLabels.red" /></VRadioGroup><VBtn color="primary" @click="applySystemAppearance">套用外觀</VBtn>
-		</VCard>
-		<VCard v-else-if="workspaceKey === 'graph'" class="surface-border pa-5 mb-5">
-			<h2 class="section-heading mb-4">圖譜操作</h2><div class="d-flex flex-wrap ga-3"><VBtn variant="tonal" prepend-icon="mdi-account-check-outline" @click="showSavedMessage">批次核准實體</VBtn><VBtn variant="outlined" prepend-icon="mdi-graph-outline" @click="dialogItem = { title: '快速重建知識圖譜', description: '將保留已確認實體，並重新計算新增與異動文件。', action: '確認重建' }">快速重建</VBtn><VBtn variant="outlined" color="error" prepend-icon="mdi-alert-outline" @click="dialogItem = { title: '完整重建知識圖譜', description: '完整重建期間圖譜搜尋可能暫時無法使用。', action: '確認重建' }">完整重建</VBtn></div>
 		</VCard>
 		<VCard v-if="visibleItems.length" class="surface-border">
 			<VList lines="two">

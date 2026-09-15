@@ -21,6 +21,7 @@ import {
   versionFiles,
 } from "@/mocks/documentFiles"
 import { getDocumentVersionDetail } from "@/mocks/documentDetails"
+import { getDocumentGraphSummary } from "@/mocks/graphAdmin"
 import {
   getDocumentProcessingRecord,
   enqueueDocumentProcessing,
@@ -40,6 +41,11 @@ import {
 import { COMPANY_KNOWLEDGE_SOURCES } from "@/utils/knowledgeSources"
 
 const route = useRoute()
+// @ 詳細頁只放圖譜摘要，完整的實體檢視與編輯留在圖譜管理頁
+const GRAPH_ENTITY_PREVIEW = 8
+const graphSummary = computed(() =>
+  getDocumentGraphSummary(String(route.params.id)),
+)
 const document = computed(() =>
   workspaceDocuments.find((item) => item.id === String(route.params.id)),
 )
@@ -899,6 +905,48 @@ function viewChunks(fileId: string | undefined): void {
             :initial-scope="reprocessScope"
             @done="processingMessage = $event"
           />
+        </VCard>
+        <VCard class="surface-border pa-6 mt-4" data-testid="detail-graph-summary">
+          <p class="text-subtitle-1 font-weight-medium mb-2">知識圖譜</p>
+          <template v-if="graphSummary.entities.length">
+            <p class="tab-note mb-3">
+              這份文件抽出 {{ graphSummary.entities.length }} 個實體、{{
+                graphSummary.relationCount
+              }}
+              條相關關係。
+              <template v-if="graphSummary.pendingReviewCount">
+                其中 {{ graphSummary.pendingReviewCount }}
+                個實體有待覆核的合併建議。</template
+              >
+            </p>
+            <div class="d-flex flex-wrap ga-2 mb-4">
+              <VChip
+                v-for="entity in graphSummary.entities.slice(0, GRAPH_ENTITY_PREVIEW)"
+                :key="entity.id"
+                size="small"
+                variant="tonal"
+                >{{ entity.label }}</VChip
+              >
+              <VChip
+                v-if="graphSummary.entities.length > GRAPH_ENTITY_PREVIEW"
+                size="small"
+                variant="text"
+                >還有 {{ graphSummary.entities.length - GRAPH_ENTITY_PREVIEW }} 個</VChip
+              >
+            </div>
+          </template>
+          <p v-else class="tab-note mb-3">
+            尚未納入知識圖譜。文件處理完成後，下一次圖譜重建才會出現。
+          </p>
+          <VBtn
+            variant="text"
+            prepend-icon="mdi-graph-outline"
+            :to="{
+              path: '/admin/graph',
+              query: { tab: 'entities', documentId: document.id },
+            }"
+            >在圖譜管理查看</VBtn
+          >
         </VCard></VWindowItem
       >
       <VWindowItem value="chunks">

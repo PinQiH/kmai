@@ -154,8 +154,8 @@ const routes: RouteRecordRaw[] = [
 	{
 		path: "/admin/graph",
 		name: "admin-graph",
-		component: () => import("@/views/admin/AdminWorkspaceView.vue"),
-		meta: { admin: true, workspace: "graph", title: "圖譜管理" },
+		component: () => import("@/views/admin/AdminGraphView.vue"),
+		meta: { admin: true, title: "圖譜管理" },
 	},
 	{
 		path: "/admin/feedback",
@@ -205,7 +205,12 @@ const routes: RouteRecordRaw[] = [
 export const router = createRouter({
 	history: createWebHashHistory(import.meta.env.BASE_URL),
 	routes,
-	scrollBehavior: () => ({ top: 0 }),
+	// NOTE: 同一路徑只改 query（例如切換頁簽）時保留捲動位置；上一頁／下一頁還原原位置
+	scrollBehavior: (to, from, savedPosition) => {
+		if (savedPosition) return savedPosition
+		if (to.path === from.path) return false
+		return { top: 0 }
+	},
 })
 
 router.beforeEach((to) => {
