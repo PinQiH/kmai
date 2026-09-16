@@ -230,12 +230,10 @@ describe('notifications store', () => {
 		expect(store.rules.find((rule) => rule.id === resolvedRuleId)?.eventLabel).toBe('營運監控的系統告警已解除')
 	})
 
-	it('should keep recipient group IDs stable while editing delivery targets', () => {
+	it('should keep recipient groups editable for the rules that use them', () => {
 		const store = useNotificationsStore()
-		const monitoringStore = useMonitoringStore()
-		const group = store.recipientGroups[0]
+		const group = store.recipientGroups.find((item) => item.id === 'group-ops')
 		expect(group).toBeDefined()
-		const rule = monitoringStore.rules.find((item) => item.recipientGroupId === group?.id)
 
 		const addedCount = store.addRecipientEmails(group!.id, ['new.operator@company.com'])
 		store.updateRecipientGroupSeverities(group!.id, ['critical', 'warning'])
@@ -243,7 +241,31 @@ describe('notifications store', () => {
 		expect(addedCount).toBe(1)
 		expect(group?.emails).toContain('new.operator@company.com')
 		expect(group?.severities).toEqual(['critical', 'warning'])
-		expect(rule?.recipientGroupId).toBe(group?.id)
+		// 告警規則以嚴重度分流，嚴重與警告分別對應不同群組
+		expect(store.matchAlertRules('system-alert-triggered', 'critical').map((rule) => rule.targetGroupId)).toEqual(['group-manager'])
+		expect(store.matchAlertRules('system-alert-triggered', 'warning').map((rule) => rule.targetGroupId)).toEqual(['group-ops'])
+		expect(store.describeAlertDelivery('critical')).toContain('值班主管')
+	})
+
+	it('should stop notifying a severity when its alert rule is disabled', () => {
+		const store = useNotificationsStore()
+		store.setRuleEnabled('rule-alert-critical', false)
+
+		expect(store.matchAlertRules('system-alert-triggered', 'critical')).toHaveLength(0)
+		expect(store.describeAlertDelivery('critical')).toBe('沒有對應的通知規則')
+		store.setRuleEnabled('rule-alert-critical', true)
+	})
+
+	it('should send alert notifications to the routed in-app recipients', () => {
+		const store = useNotificationsStore()
+		const before = store.notifications.length
+		const result = store.notifyAlert({ ruleName: '文件處理積壓過高', severity: 'critical', observed: '18 件（門檻 15 件）', status: 'triggered', eventId: 'evt-01' })
+
+		expect(result.matchedRuleNames).toEqual(['嚴重告警通知值班主管'])
+		expect(result.inAppRecipientCount).toBeGreaterThan(0)
+		expect(result.emailRecipientCount).toBeGreaterThan(0)
+		expect(store.notifications).toHaveLength(before + 1)
+		expect(store.notifications[0]).toMatchObject({ title: '告警觸發：文件處理積壓過高', actionTo: '/admin/monitoring?tab=alerts&eventId=evt-01', priority: 'urgent' })
 	})
 
 	it('should save non-secret email channel settings without SMTP credentials', () => {

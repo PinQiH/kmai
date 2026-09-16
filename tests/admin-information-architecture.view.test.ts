@@ -90,15 +90,18 @@ describe('admin information architecture', () => {
 		expect(wrapper.find('[data-testid="processing-document-filter-doc-003"]').exists()).toBe(false)
 	})
 
-	it('should keep operational monitoring focused on health, alerts, metrics, answer quality, logs and rules', async () => {
+	it('should keep operational monitoring focused on detection and leave delivery to notifications', async () => {
 		const { wrapper } = await mountAdminView(AdminMonitoringView, '/admin/monitoring', [
 			{ path: '/admin/monitoring', component: AdminMonitoringView },
 		])
 		const tabLabels = wrapper.findAll('[role="tab"]').map((tab) => tab.text())
 
-		expect(tabLabels).toEqual(['系統概況', '目前告警', '服務指標', '回答滿意度', '日誌查詢', '告警規則'])
+		// 順序＝現在怎麼了 → 要處理什麼 → 怎麼判定 → 診斷 → 細節；VWindowItem 需同序，否則切換動畫方向會相反
+		expect(tabLabels).toEqual(['系統概況', '目前告警', '告警規則', '服務指標', '日誌查詢'])
 		expect(wrapper.text()).not.toContain('通知設定')
 		expect(wrapper.text()).not.toContain('SMTP 主機')
+		// 回答品質屬於知識管理員的閉環，放在回饋與問題頁
+		expect(wrapper.text()).not.toContain('回答滿意度')
 	})
 
 	it('should keep SMTP settings separate from per-rule notification channels', async () => {
@@ -121,7 +124,8 @@ describe('admin information architecture', () => {
 			{ path: '/admin/monitoring', component: { template: '<div />' } },
 		])
 
-		expect(wrapper.text()).toContain('每一條規則可選擇站內小鈴鐺、Email 或同時發送')
+		// 告警通知已併入自動通知，規則同時涵蓋文件事件與系統告警
+		expect(wrapper.text()).toContain('系統事件發生時通知誰、走哪些管道，包含營運監控的系統告警')
 		expect(wrapper.text()).toContain('站內小鈴鐺')
 		await wrapper.findAll('button').find((button) => button.text() === '編輯')?.trigger('click')
 		await flushPromises()

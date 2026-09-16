@@ -34,6 +34,12 @@ interface NotificationsState {
 	deliveryClock: number
 }
 
+export const ALERT_SEVERITY_LABELS: Record<AlertSeverity, string> = {
+	critical: '嚴重',
+	warning: '警告',
+	info: '資訊',
+}
+
 const NOTIFICATION_EVENT_LABELS: Record<NotificationEventType, string> = {
 	'document-ready': '文件完成解析、切塊與向量化',
 	'document-failed': '文件解析或向量化失敗',
@@ -58,9 +64,13 @@ function cloneRule(rule: AutomaticNotificationRule): AutomaticNotificationRule {
 	return {
 		...rule,
 		targetUserIds: [...rule.targetUserIds],
+		alertSeverities: [...rule.alertSeverities],
 		deliveryChannels: [...rule.deliveryChannels],
 	}
 }
+
+/** 系統告警事件；這兩種事件的規則會多一個嚴重度條件 */
+export const ALERT_EVENT_TYPES: NotificationEventType[] = ['system-alert-triggered', 'system-alert-resolved']
 
 function resolveAudienceUsers(
 	users: NotificationUser[],
@@ -68,10 +78,16 @@ function resolveAudienceUsers(
 	targetDepartment: string | null,
 	targetRole: NotificationRole | null,
 	targetUserIds: string[],
+	group?: RecipientGroup,
 ): NotificationUser[] {
 	if (audienceType === 'all') return [...users]
 	if (audienceType === 'department') return users.filter((user) => user.department === targetDepartment)
 	if (audienceType === 'role') return users.filter((user) => user.role === targetRole)
+	// @ 收件群組同時有站內成員與外部 Email；站內通知只看成員
+	if (audienceType === 'group') {
+		const memberIds = new Set(group?.memberUserIds ?? [])
+		return users.filter((user) => memberIds.has(user.id))
+	}
 
 	const targetIds = new Set(targetUserIds)
 	return users.filter((user) => targetIds.has(user.id))
@@ -82,7 +98,9 @@ function buildAudienceLabel(
 	recipients: NotificationUser[],
 	targetDepartment: string | null,
 	targetRole: NotificationRole | null,
+	group?: RecipientGroup,
 ): string {
+	if (audienceType === 'group') return group ? `收件群組（${group.name}）` : '收件群組'
 	if (audienceType === 'all') return '全體使用者'
 	if (audienceType === 'department') return targetDepartment ?? '未指定部門'
 	if (audienceType === 'role') return recipients[0]?.roleLabel ?? targetRole ?? '未指定角色'
@@ -113,6 +131,7 @@ function normalizeRuleInput(input: NotificationRuleInput): NotificationRuleInput
 		input.audienceType === 'all' ||
 		(input.audienceType === 'department' && Boolean(input.targetDepartment?.trim())) ||
 		(input.audienceType === 'role' && Boolean(input.targetRole)) ||
+		(input.audienceType === 'group' && Boolean(input.targetGroupId)) ||
 		(input.audienceType === 'selected' && input.targetUserIds.length > 0)
 	if (!name || !title || !body || actionTo === undefined || !hasValidAudience || input.deliveryChannels.length === 0) return null
 
@@ -124,6 +143,8 @@ function normalizeRuleInput(input: NotificationRuleInput): NotificationRuleInput
 		targetDepartment: input.audienceType === 'department' ? input.targetDepartment?.trim() || null : null,
 		targetRole: input.audienceType === 'role' ? input.targetRole : null,
 		targetUserIds: input.audienceType === 'selected' ? [...new Set(input.targetUserIds)] : [],
+		targetGroupId: input.audienceType === 'group' ? input.targetGroupId : null,
+		alertSeverities: ALERT_EVENT_TYPES.includes(input.eventType) ? [...new Set(input.alertSeverities)] : [],
 		deliveryChannels: [...new Set(input.deliveryChannels)],
 		actionTo,
 		actionLabel: actionTo ? input.actionLabel?.trim() || '查看詳情' : null,
@@ -145,6 +166,7 @@ export const useNotificationsStore = defineStore('notifications', {
 		users: notificationUsers.map((user) => ({ ...user })),
 		recipientGroups: recipientGroups.map((group) => ({
 			...group,
+			memberUserIds: [...group.memberUserIds],
 			emails: [...group.emails],
 			severities: [...group.severities],
 		})),
@@ -166,6 +188,28 @@ export const useNotificationsStore = defineStore('notifications', {
 			}).length
 		},
 		departments: (state): string[] => Array.from(new Set(state.users.map((user) => user.department))).sort(),
+		/** 找出會被某個告警事件與嚴重度觸發的規則；空的嚴重度代表不分等級 */
+		matchAlertRules() {
+			return (eventType: NotificationEventType, severity: AlertSeverity): AutomaticNotificationRule[] =>
+				this.rules.filter((rule) => rule.isEnabled
+					&& rule.eventType === eventType
+					&& (rule.alertSeverities.length === 0 || rule.alertSeverities.includes(severity)))
+		},
+		/** 以一行文字說明某個嚴重度觸發時會通知誰，供營運監控唯讀顯示 */
+		describeAlertDelivery() {
+			return (severity: AlertSeverity): string => {
+				const matched = this.matchAlertRules('system-alert-triggered', severity)
+				if (!matched.length) return '沒有對應的通知規則'
+				return matched
+					.map((rule) => {
+						const group = this.recipientGroups.find((item) => item.id === rule.targetGroupId)
+						const channels = rule.deliveryChannels.map((channel) => (channel === 'in-app' ? '站內' : 'Email')).join('＋')
+						const audience = group ? group.name : rule.audienceType === 'role' ? rule.targetRole ?? '指定角色' : '指定對象'
+						return `${audience}（${channels}）`
+					})
+					.join('、')
+			}
+		},
 	},
 	actions: {
 		/**
@@ -239,12 +283,14 @@ export const useNotificationsStore = defineStore('notifications', {
 				|| !Number.isFinite(Date.parse(createdAt))
 			) return null
 
+			const group = this.recipientGroups.find((item) => item.id === input.targetGroupId)
 			const recipients = resolveAudienceUsers(
 				this.users,
 				input.audienceType,
 				input.targetDepartment,
 				input.targetRole,
 				input.targetUserIds,
+				group,
 			)
 			if (recipients.length === 0) return null
 
@@ -256,7 +302,7 @@ export const useNotificationsStore = defineStore('notifications', {
 				priority: input.priority,
 				source: 'manual',
 				sourceLabel: '管理員發送',
-				audienceLabel: buildAudienceLabel(input.audienceType, recipients, input.targetDepartment, input.targetRole),
+				audienceLabel: buildAudienceLabel(input.audienceType, recipients, input.targetDepartment, input.targetRole, group),
 				actionLabel: actionTo ? input.actionLabel?.trim() || '查看詳情' : null,
 				actionTo,
 				createdAt,
@@ -268,6 +314,47 @@ export const useNotificationsStore = defineStore('notifications', {
 			this.notifications.unshift(notification)
 			this.deliveryClock = Date.now()
 			return notificationId
+		},
+		/**
+		 * 依嚴重度送出告警通知；對象與管道來自「自動通知」中的系統告警規則。
+		 * @param input 告警內容與狀態。
+		 * @returns 實際送達的規則、管道與人數。
+		 */
+		notifyAlert(input: { ruleName: string; severity: AlertSeverity; observed: string; status: 'triggered' | 'resolved' | 'test'; eventId?: string }): {
+			notificationIds: string[]
+			inAppRecipientCount: number
+			emailRecipientCount: number
+			matchedRuleNames: string[]
+		} {
+			const eventType: NotificationEventType = input.status === 'resolved' ? 'system-alert-resolved' : 'system-alert-triggered'
+			const matched = this.matchAlertRules(eventType, input.severity)
+			const notificationIds: string[] = []
+			let inAppRecipientCount = 0
+			let emailRecipientCount = 0
+
+			for (const rule of matched) {
+				const group = this.recipientGroups.find((item) => item.id === rule.targetGroupId)
+				const recipients = resolveAudienceUsers(this.users, rule.audienceType, rule.targetDepartment, rule.targetRole, rule.targetUserIds, group)
+				if (rule.deliveryChannels.includes('email')) emailRecipientCount += group?.emails.length ?? recipients.length
+				if (!rule.deliveryChannels.includes('in-app') || recipients.length === 0) continue
+
+				const titlePrefix = input.status === 'resolved' ? '告警已解除' : input.status === 'test' ? '告警測試通知' : '告警觸發'
+				const notificationId = this.sendSystemNotification({
+					title: `${titlePrefix}：${input.ruleName}`,
+					body: `${ALERT_SEVERITY_LABELS[input.severity]} · ${input.observed}`,
+					userIds: recipients.map((user) => user.id),
+					priority: rule.priority,
+					actionTo: input.eventId ? `/admin/monitoring?tab=alerts&eventId=${input.eventId}` : rule.actionTo,
+					actionLabel: rule.actionLabel ?? '查看告警',
+					sourceLabel: rule.name,
+				})
+				if (notificationId) {
+					notificationIds.push(notificationId)
+					inAppRecipientCount += recipients.length
+				}
+			}
+
+			return { notificationIds, inAppRecipientCount, emailRecipientCount, matchedRuleNames: matched.map((rule) => rule.name) }
 		},
 		/**
 		 * 由系統事件（例如回饋案件指派、結案）發送站內通知給指定使用者。
@@ -434,12 +521,14 @@ export const useNotificationsStore = defineStore('notifications', {
 			const rule = this.rules.find((item) => item.id === ruleId)
 			if (!rule?.isEnabled || !Number.isFinite(Date.parse(occurredAt))) return null
 
+			const group = this.recipientGroups.find((item) => item.id === rule.targetGroupId)
 			const recipients = resolveAudienceUsers(
 				this.users,
 				rule.audienceType,
 				rule.targetDepartment,
 				rule.targetRole,
 				rule.targetUserIds,
+				group,
 			)
 			if (recipients.length === 0) return null
 
@@ -455,7 +544,7 @@ export const useNotificationsStore = defineStore('notifications', {
 					priority: rule.priority,
 					source: 'automatic',
 					sourceLabel: rule.name,
-					audienceLabel: buildAudienceLabel(rule.audienceType, recipients, rule.targetDepartment, rule.targetRole),
+					audienceLabel: buildAudienceLabel(rule.audienceType, recipients, rule.targetDepartment, rule.targetRole, group),
 					actionLabel: rule.actionLabel,
 					actionTo: rule.actionTo,
 					createdAt: occurredAt,
@@ -467,7 +556,7 @@ export const useNotificationsStore = defineStore('notifications', {
 			}
 			return {
 				notificationId,
-				emailRecipientCount: rule.deliveryChannels.includes('email') ? recipients.length : 0,
+				emailRecipientCount: rule.deliveryChannels.includes('email') ? (group?.emails.length ?? recipients.length) : 0,
 			}
 		},
 	},

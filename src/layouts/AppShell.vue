@@ -48,13 +48,13 @@ const adminNavigationGroups: Array<{ title: string; items: NavigationItem[] }> =
 			{ title: "文件管理", icon: "mdi-file-document-multiple-outline", to: "/admin/documents" },
 			{ title: "文件處理", icon: "mdi-progress-wrench", to: "/admin/processing" },
 			{ title: "圖譜管理", icon: "mdi-vector-polyline", to: "/admin/graph" },
-			{ title: "回饋與問題", icon: "mdi-comment-alert-outline", to: "/admin/feedback" },
 		],
 	},
 	{
 		title: "營運與治理",
 		items: [
 			{ title: "營運監控", icon: "mdi-chart-timeline-variant", to: "/admin/monitoring" },
+			{ title: "回饋與問題", icon: "mdi-comment-alert-outline", to: "/admin/feedback" },
 			{ title: "通知管理", icon: "mdi-bell-cog-outline", to: "/admin/notifications" },
 			{ title: "系統紀錄", icon: "mdi-text-box-search-outline", to: "/admin/logs" },
 		],

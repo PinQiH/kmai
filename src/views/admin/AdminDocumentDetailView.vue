@@ -399,6 +399,7 @@ function viewChunks(fileId: string | undefined): void {
       class="px-0"
     />
     <PageHeader
+      eyebrow="內容生命週期"
       :title="document.title"
       :description="`目前版本 ${document.version} · ${document.department} · ${document.owner} 維護`"
     >

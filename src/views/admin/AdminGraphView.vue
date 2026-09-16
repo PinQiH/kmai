@@ -287,7 +287,7 @@ function scopeName(value: GraphScope): string {
 
 <template>
 	<div class="page-shell">
-		<PageHeader title="圖譜管理" description="覆核系統從文件擷取出的實體與關係，處理重複名稱與雜訊，並在需要時重建圖譜。這裡的修正會反映到前台知識圖譜與問答的圖譜擴充。">
+		<PageHeader eyebrow="知識關聯" title="圖譜管理" description="覆核系統從文件擷取出的實體與關係，處理重複名稱與雜訊，並在需要時重建圖譜。這裡的修正會反映到前台知識圖譜與問答的圖譜擴充。">
 			<template #actions>
 				<VSelect v-model="scope" :items="scopeOptions" label="知識主題" density="compact" hide-details class="scope-select" data-testid="graph-scope" />
 				<VBtn color="primary" prepend-icon="mdi-graph-outline" :disabled="Boolean(runningJob)" data-testid="graph-rebuild" @click="openRebuild(unappliedDecisions.length ? 'full' : 'quick')">重建圖譜</VBtn>

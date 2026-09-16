@@ -335,7 +335,6 @@ export interface AlertRule {
 	unit: string
 	durationMinutes: number
 	severity: AlertSeverity
-	recipientGroupId: string
 	isEnabled: boolean
 }
 
@@ -343,6 +342,8 @@ export interface RecipientGroup {
 	id: string
 	name: string
 	description: string
+	/** 站內通知的成員；Email 通知則使用 emails */
+	memberUserIds: string[]
 	emails: string[]
 	severities: AlertSeverity[]
 }
@@ -380,7 +381,7 @@ export interface EmailChannelSettings {
 // > 站內通知 Mock：人工發送、自動事件、逐人查看狀態與成效
 export type NotificationPriority = 'normal' | 'important' | 'urgent'
 export type NotificationSource = 'manual' | 'automatic'
-export type NotificationAudienceType = 'all' | 'department' | 'role' | 'selected'
+export type NotificationAudienceType = 'all' | 'department' | 'role' | 'selected' | 'group'
 export type NotificationRole = 'user' | 'knowledge-admin' | 'system-admin'
 export type NotificationDeliveryChannel = 'in-app' | 'email'
 export type NotificationEventType =
@@ -444,10 +445,14 @@ export interface AutomaticNotificationRule {
 	targetDepartment: string | null
 	targetRole: NotificationRole | null
 	targetUserIds: string[]
+	/** audienceType 為 group 時使用的收件群組 */
+	targetGroupId: string | null
 	actionLabel: string | null
 	actionTo: string | null
 	deliveryChannels: NotificationDeliveryChannel[]
 	isEnabled: boolean
+	/** 只有系統告警事件會用到；空陣列代表不分嚴重度都通知 */
+	alertSeverities: AlertSeverity[]
 }
 
 export interface SendNotificationInput {
@@ -458,6 +463,8 @@ export interface SendNotificationInput {
 	targetDepartment: string | null
 	targetRole: NotificationRole | null
 	targetUserIds: string[]
+	/** audienceType 為 group 時使用的收件群組 */
+	targetGroupId: string | null
 	actionLabel: string | null
 	actionTo: string | null
 }
@@ -472,10 +479,14 @@ export interface NotificationRuleInput {
 	targetDepartment: string | null
 	targetRole: NotificationRole | null
 	targetUserIds: string[]
+	/** audienceType 為 group 時使用的收件群組 */
+	targetGroupId: string | null
 	actionLabel: string | null
 	actionTo: string | null
 	deliveryChannels: NotificationDeliveryChannel[]
 	isEnabled: boolean
+	/** 只有系統告警事件會用到；空陣列代表不分嚴重度都通知 */
+	alertSeverities: AlertSeverity[]
 }
 
 export interface AutomaticNotificationTriggerResult {

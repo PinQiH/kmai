@@ -30,6 +30,13 @@ export interface FeedbackEvent {
 	text: string
 }
 
+/** 結案後回報者的評價；沒有評價代表對方還沒回應 */
+export interface ResolutionRating {
+	value: 'solved' | 'unsolved'
+	at: string
+	comment?: string
+}
+
 export interface FeedbackAttachment {
 	id: string
 	name: string
@@ -100,6 +107,7 @@ export interface FeedbackCase {
 	cause?: FeedbackCause
 	resolution?: string
 	closedAt?: string
+	resolutionRating?: ResolutionRating
 	events: FeedbackEvent[]
 }
 
@@ -335,6 +343,26 @@ const seedCases: FeedbackCase[] = [
 		],
 	},
 	{
+		id: 'is-0825',
+		kind: 'issue',
+		status: 'resolved',
+		title: '示範：文件處理結果確認',
+		detail: '文件上傳後一直顯示處理中，想確認是否已經完成。',
+		category: '文件內容',
+		reporter: { userId: CURRENT_NOTIFICATION_USER_ID, name: '王小明', email: 'employee@company.com', department: '產品企劃部' },
+		submittedAt: ago(1, 2),
+		attachments: [],
+		assignee: '陳志豪',
+		cause: 'product-bug',
+		resolution: '已修正處理狀態同步，重新整理後會顯示完成，文件也可以正常開啟。',
+		closedAt: ago(0, 4),
+		events: [
+			event(ago(1, 1), '陳志豪', '指派給 陳志豪'),
+			event(ago(1, 1), '陳志豪', '開始處理'),
+			event(ago(0, 4), '陳志豪', '標記為已解決（系統功能問題）'),
+		],
+	},
+	{
 		id: 'fb-1031',
 		kind: 'answer',
 		status: 'resolved',
@@ -361,6 +389,7 @@ const seedCases: FeedbackCase[] = [
 		cause: 'outdated-document',
 		resolution: '已上傳差旅辦法 3.2 版並完成處理，重新提問後回答為 3,000 元。',
 		closedAt: ago(2, 0),
+		resolutionRating: { value: 'solved', at: ago(1, 20), comment: '重問過了，金額正確。' },
 		events: [
 			event(ago(11, 20), '林怡君', '指派給 林怡君'),
 			event(ago(11, 20), '林怡君', '開始處理'),
@@ -589,6 +618,44 @@ export function closeCase(id: string, status: 'resolved' | 'dismissed', cause: F
 		item.events.push(event(now, '系統', `已通知回報者 ${item.reporter.name}`))
 	}
 	return ''
+}
+
+/**
+ * 由回報者評價結案結果；說「沒解決」時會通知處理人。
+ * @param id 案件識別碼。
+ * @param value 是否已解決。
+ * @param comment 補充說明，說沒解決時必填。
+ * @param reporterName 回報者顯示名稱。
+ * @returns 空字串代表成功，否則為可顯示的錯誤訊息。
+ */
+export function rateResolution(id: string, value: ResolutionRating['value'], comment: string, reporterName: string): string {
+	const item = getCase(id)
+	const text = comment.trim()
+	if (!item) return '找不到這筆案件，可能已被刪除。'
+	if (isOpen(item)) return '這筆回報還在處理中，處理完成後才能評價。'
+	if (value === 'unsolved' && !text) return '請說明還有哪裡沒有解決，處理人才知道要看什麼。'
+	if (text.length > RESOLUTION_MAX_LENGTH) return `說明最多 ${RESOLUTION_MAX_LENGTH} 個字。`
+
+	const now = new Date().toISOString()
+	item.resolutionRating = { value, at: now, ...(text ? { comment: text } : {}) }
+	item.events.push(event(now, reporterName, value === 'solved' ? '回報者確認已解決' : `回報者表示仍未解決：${text}`))
+	if (value === 'unsolved' && item.assignee) {
+		notify([handlerIdByName(item.assignee) ?? ''], {
+			title: `回報者表示仍未解決${quote(item.title)}`,
+			body: text,
+			actionTo: caseLink(item),
+			actionLabel: '查看案件',
+			sourceLabel: '回饋與問題',
+		})
+	}
+	return ''
+}
+
+/** 取得指定回報者的案件，新到舊 */
+export function getCasesByReporter(userId: string): FeedbackCase[] {
+	return feedbackAdminState.cases
+		.filter((item) => item.reporter.userId === userId)
+		.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
 }
 
 export function reopenCase(id: string, reason: string, actor: string): string {

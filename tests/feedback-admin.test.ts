@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	addCaseNote,
+	getCasesByReporter,
+	rateResolution,
 	assignCase,
 	buildRunFromTrace,
 	closeCase,
@@ -92,6 +94,29 @@ describe('feedback admin cases', () => {
 		expect(reopenCase('fb-1049', '', ACTOR)).not.toBe('')
 		expect(reopenCase('fb-1049', '使用者說還是舊的', ACTOR)).toBe('')
 		expect(item).toMatchObject({ status: 'investigating', closedAt: undefined })
+	})
+
+	it('should let the reporter confirm whether a closed case was solved', () => {
+		// @ 用 fb-1050 而非逾期測試依賴的 fb-1042，避免共用的 Mock 狀態互相影響
+		expect(rateResolution('fb-1050', 'solved', '', '吳承翰')).toContain('處理中')
+		expect(closeCase('fb-1050', 'resolved', 'answer-error', '已修正回答與引用', ACTOR)).toBe('')
+
+		expect(rateResolution('fb-1050', 'unsolved', '   ', '吳承翰')).toContain('說明')
+		expect(rateResolution('fb-1050', 'unsolved', '說法還是跟課程不一樣', '吳承翰')).toBe('')
+
+		const item = getCase('fb-1050')!
+		expect(item.resolutionRating).toMatchObject({ value: 'unsolved', comment: '說法還是跟課程不一樣' })
+		expect(item.events.at(-1)?.text).toContain('仍未解決')
+		// 處理人會收到通知，才知道要重新查看
+		expect(notificationsFor('user-current').some((notification) => notification.title.includes('仍未解決'))).toBe(true)
+	})
+
+	it('should list cases reported by one user, newest first', () => {
+		const mine = getCasesByReporter('user-current')
+
+		expect(mine.length).toBeGreaterThan(0)
+		expect(mine.every((item) => item.reporter.userId === 'user-current')).toBe(true)
+		expect([...mine].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))).toEqual(mine)
 	})
 
 	it('should mark old open cases as overdue and rank documents by open feedback', () => {

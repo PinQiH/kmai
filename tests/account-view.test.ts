@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -7,6 +8,7 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
 import { useAppStore } from '../src/stores/app'
+import { getCase } from '../src/mocks/feedbackAdmin'
 import { darkTheme, lightTheme, redDarkTheme, redLightTheme } from '../src/theme'
 import AccountView from '../src/views/AccountView.vue'
 
@@ -60,6 +62,24 @@ afterEach(() => {
 })
 
 describe('AccountView', () => {
+	it('should show a closed demonstration case that the reporter can rate', async () => {
+		const accountView = await mountAccountView('/account?tab=support')
+
+		expect(accountView.text()).toContain('示範：文件處理結果確認')
+		expect(accountView.get('[data-testid="rating-solved-is-0825"]')).toBeTruthy()
+		expect(accountView.get('[data-testid="rating-unsolved-is-0825"]')).toBeTruthy()
+	})
+
+	it('should record solved without requiring a comment', async () => {
+		const accountView = await mountAccountView('/account?tab=support')
+
+		await accountView.get('[data-testid="rating-solved-is-0825"]').trigger('click')
+		await nextTick()
+
+		expect(getCase('is-0825')?.resolutionRating).toMatchObject({ value: 'solved' })
+		expect(accountView.find('[data-testid="rating-solved-is-0825"]').exists()).toBe(false)
+	})
+
 	it('should show account, display name, and Email in the basic profile section', async () => {
 		const accountView = await mountAccountView()
 		const fields = accountView.findAll('[data-testid^="profile-"]')

@@ -152,3 +152,63 @@ export function getSatisfactionByModel(): SatisfactionBreakdown[] {
 export function breakdownRate(breakdown: SatisfactionBreakdown): number | null {
 	return rateOf(breakdown.helpful, breakdown.unhelpful)
 }
+
+export interface ResolutionSatisfaction {
+	/** 已結案且回報者已評價的案件數 */
+	rated: number
+	solved: number
+	unsolved: number
+	/** 說「已解決」的比例（%）；沒有人評價時為 null */
+	rate: number | null
+	/** 已結案但回報者還沒評價 */
+	awaiting: number
+}
+
+/**
+ * 處理滿意度：結案後回報者親自確認有沒有解決。
+ * @ 這是系統面（不只 AI 回答）唯一有真實訊號的滿意度，不用問卷推估
+ */
+export function getResolutionSatisfaction(): ResolutionSatisfaction {
+	const closed = feedbackAdminState.cases.filter((item) => item.status === 'resolved' || item.status === 'dismissed')
+	const rated = closed.filter((item) => item.resolutionRating)
+	const solved = rated.filter((item) => item.resolutionRating!.value === 'solved').length
+	return {
+		rated: rated.length,
+		solved,
+		unsolved: rated.length - solved,
+		rate: rated.length === 0 ? null : Math.round((solved / rated.length) * 1000) / 10,
+		awaiting: closed.length - rated.length,
+	}
+}
+
+export interface IssueMetrics {
+	reported: number
+	closed: number
+	open: number
+	/** 已結案案件的平均處理天數；沒有結案案件時為 null */
+	averageDaysToClose: number | null
+	byCategory: Array<{ label: string; count: number }>
+}
+
+/**
+ * 問題回報的客觀指標：不需要評分也能看出系統好不好用。
+ * @param days 統計區間天數。
+ */
+export function getIssueMetrics(days = 30): IssueMetrics {
+	const since = Date.now() - days * DAY_MS
+	const cases = feedbackAdminState.cases.filter((item) => new Date(item.submittedAt).getTime() >= since)
+	const closed = cases.filter((item) => item.closedAt)
+	const totalDays = closed.reduce((sum, item) => sum + (new Date(item.closedAt!).getTime() - new Date(item.submittedAt).getTime()) / DAY_MS, 0)
+	const categories = new Map<string, number>()
+	for (const item of cases) {
+		const label = item.kind === 'issue' ? item.category ?? '其他' : 'AI 回答'
+		categories.set(label, (categories.get(label) ?? 0) + 1)
+	}
+	return {
+		reported: cases.length,
+		closed: closed.length,
+		open: cases.length - closed.length,
+		averageDaysToClose: closed.length === 0 ? null : Math.round((totalDays / closed.length) * 10) / 10,
+		byCategory: [...categories.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
+	}
+}

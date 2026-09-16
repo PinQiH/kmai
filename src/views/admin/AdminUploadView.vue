@@ -187,7 +187,7 @@ async function nextStep(): Promise<void> {
 
 <template>
 	<div class="page-shell upload-page">
-		<PageHeader title="新增文件" description="上傳檔案、輸入文字或貼上網址，再設定文件資訊。">
+		<PageHeader eyebrow="內容與知識" title="新增文件" description="上傳檔案、輸入文字或貼上網址，再設定文件資訊。">
 			<template #actions><VBtn variant="text" to="/admin/documents">取消並返回</VBtn></template>
 		</PageHeader>
 		<VAlert type="info" variant="tonal" class="mb-6">文件與檔案僅保留於本次瀏覽工作階段，重新整理後清除；網址擷取與自動處理尚未串接。</VAlert>

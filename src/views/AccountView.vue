@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { useTheme } from "vuetify"
 
 import DocumentVersionTimeline from "@/components/DocumentVersionTimeline.vue"
 import PageHeader from "@/components/PageHeader.vue"
-import { reportIssue } from "@/mocks/feedbackAdmin"
+import {
+  FEEDBACK_STATUS_LABELS,
+  formatAge,
+  getCasesByReporter,
+  rateResolution,
+  reportIssue,
+} from "@/mocks/feedbackAdmin"
 import { useAppStore } from "@/stores/app"
 import type { ThemePreference } from "@/theme"
 import type { DocumentVersionEntry } from "@/types"
@@ -30,6 +36,29 @@ const isSaved = ref(false)
 const isIssueSubmitted = ref(false)
 const issueFiles = ref<File[]>([])
 const issueFileError = ref("")
+// TODO(api-integration): 改由後端依登入身分取得我的回報
+const CURRENT_USER_ID = "user-current"
+const ratingRevision = ref(0)
+const myCases = computed(() => {
+  ratingRevision.value
+  return getCasesByReporter(CURRENT_USER_ID)
+})
+const ratingComment = ref<Record<string, string>>({})
+const ratingError = ref<Record<string, string>>({})
+
+function submitRating(caseId: string, value: "solved" | "unsolved"): void {
+  const error = rateResolution(caseId, value, ratingComment.value[caseId] ?? "", displayName.value)
+  ratingError.value = { ...ratingError.value, [caseId]: error }
+  if (!error) {
+    ratingComment.value = { ...ratingComment.value, [caseId]: "" }
+    ratingRevision.value += 1
+  }
+}
+
+function updateRatingComment(caseId: string, value: string): void {
+  ratingComment.value = { ...ratingComment.value, [caseId]: value }
+  if (ratingError.value[caseId]) ratingError.value = { ...ratingError.value, [caseId]: "" }
+}
 const emailTouched = ref(false)
 const currentPassword = ref("")
 const newPassword = ref("")
@@ -369,6 +398,81 @@ onMounted(syncTabFromRoute)
             >送出問題</VBtn
           >
         </VCard>
+
+        <VCard class="surface-border pa-6 mt-6">
+          <h2 class="section-heading mb-1">我回報的問題</h2>
+          <p class="text-body-2 text-medium-emphasis mb-5">
+            處理完成後請回覆有沒有真的解決；說沒有的話，處理人會收到通知並重新查看。
+          </p>
+          <p v-if="!myCases.length" class="text-body-2 text-medium-emphasis">
+            你還沒有回報過問題，也還沒對 AI 回答按過倒讚。
+          </p>
+          <ul v-else class="my-case-list" data-testid="my-cases">
+            <li v-for="item in myCases" :key="item.id">
+              <div class="my-case-head">
+                <strong>{{ item.title }}</strong>
+                <VChip
+                  size="x-small"
+                  variant="tonal"
+                  :color="
+                    item.status === 'resolved'
+                      ? 'success'
+                      : item.status === 'dismissed'
+                        ? 'secondary'
+                        : item.status === 'investigating'
+                          ? 'info'
+                          : 'warning'
+                  "
+                  >{{ FEEDBACK_STATUS_LABELS[item.status] }}</VChip
+                >
+                <span class="my-case-meta">{{ formatAge(item.submittedAt) }}</span>
+              </div>
+              <p class="my-case-detail">{{ item.detail }}</p>
+              <p v-if="item.resolution" class="my-case-resolution">
+                處理結果：{{ item.resolution }}
+              </p>
+              <div
+                v-if="item.resolution && !item.resolutionRating"
+                class="my-case-rating"
+              >
+                <VTextField
+                  :model-value="ratingComment[item.id] ?? ''"
+                  label="補充說明（說沒解決時必填）"
+                  density="compact"
+                  hide-details="auto"
+                  :error-messages="ratingError[item.id]"
+                  :data-testid="`rating-comment-${item.id}`"
+                  @update:model-value="updateRatingComment(item.id, $event)"
+                />
+                <div class="d-flex ga-2">
+                  <VBtn
+                    size="small"
+                    variant="tonal"
+                    color="success"
+                    prepend-icon="mdi-check"
+                    :data-testid="`rating-solved-${item.id}`"
+                    @click="submitRating(item.id, 'solved')"
+                  >已解決</VBtn>
+                  <VBtn
+                    size="small"
+                    variant="outlined"
+                    :data-testid="`rating-unsolved-${item.id}`"
+                    @click="submitRating(item.id, 'unsolved')"
+                  >還沒解決</VBtn>
+                </div>
+              </div>
+              <p v-else-if="item.resolutionRating" class="my-case-meta">
+                你的回覆：{{
+                  item.resolutionRating.value === "solved"
+                    ? "已解決"
+                    : "還沒解決"
+                }}<template v-if="item.resolutionRating.comment">
+                  · {{ item.resolutionRating.comment }}</template
+                >
+              </p>
+            </li>
+          </ul>
+        </VCard>
       </VWindowItem>
       <VWindowItem value="about">
         <VCard class="surface-border pa-6">
@@ -412,6 +516,56 @@ onMounted(syncTabFromRoute)
 </template>
 
 <style scoped>
+.my-case-list {
+  display: grid;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.my-case-list li {
+  display: grid;
+  gap: 4px;
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid rgb(var(--v-theme-outline));
+}
+
+.my-case-list li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.my-case-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.my-case-detail,
+.my-case-resolution {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.my-case-resolution {
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.my-case-meta {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+}
+
+.my-case-rating {
+  display: grid;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+  max-width: 520px;
+}
+
 .account-page {
   max-width: 860px;
 }

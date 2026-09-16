@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useDisplay } from 'vuetify'
 
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
-import { useNotificationsStore } from '@/stores/notifications'
+import { ALERT_EVENT_TYPES, ALERT_SEVERITY_LABELS, useNotificationsStore } from '@/stores/notifications'
 import type {
+	AlertSeverity,
 	AppNotification,
 	AutomaticNotificationRule,
 	EmailChannelSettings,
@@ -39,6 +41,7 @@ interface ActionResolution {
 }
 
 const route = useRoute()
+const display = useDisplay()
 const notificationsStore = useNotificationsStore()
 
 const activeTab = ref<AdminNotificationTab>('notifications')
@@ -76,6 +79,12 @@ const audienceOptions: Array<{ title: string; value: NotificationAudienceType }>
 	{ title: '指定部門', value: 'department' },
 	{ title: '指定角色', value: 'role' },
 	{ title: '指定使用者', value: 'selected' },
+	{ title: '收件群組', value: 'group' },
+]
+const severityOptions: Array<{ title: string; value: AlertSeverity }> = [
+	{ title: '嚴重', value: 'critical' },
+	{ title: '警告', value: 'warning' },
+	{ title: '資訊', value: 'info' },
 ]
 const eventOptions: Array<{ title: string; value: NotificationEventType }> = [
 	{ title: '文件處理完成', value: 'document-ready' },
@@ -107,30 +116,92 @@ const deliveryChannelMeta: Record<NotificationDeliveryChannel, { label: string; 
 	'in-app': { label: '站內小鈴鐺', color: 'primary', icon: 'mdi-bell-outline' },
 	email: { label: 'Email', color: 'warning', icon: 'mdi-email-outline' },
 }
-const notificationHeaders = [
-	{ title: '通知', key: 'title' },
-	{ title: '來源', key: 'sourceLabel', width: 150 },
-	{ title: '通知方式', key: 'channel', width: 160 },
-	{ title: '發送對象', key: 'audienceLabel', width: 180 },
-	{ title: '發送時間', key: 'sentAt', width: 190 },
-	{ title: '人數', key: 'recipientCount', align: 'end' as const, width: 90 },
-	{ title: '', key: 'data-table-expand', width: 56 },
-]
-const recipientHeaders = [
-	{ title: '使用者', key: 'name', width: 180 },
-	{ title: '送達時間', key: 'deliveredAt', width: 190 },
-	{ title: '首次查看', key: 'firstViewedAt', width: 190 },
-	{ title: '最後查看', key: 'lastViewedAt', width: 190 },
-	{ title: '查看耗時', key: 'timeToViewSeconds', align: 'end' as const, width: 120 },
-	{ title: '查看次數', key: 'viewCount', align: 'end' as const, width: 100 },
-	{ title: '首次點擊', key: 'firstActionClickedAt', width: 190 },
-	{ title: '最後點擊', key: 'lastActionClickedAt', width: 190 },
-	{ title: '點擊次數', key: 'actionClickCount', align: 'end' as const, width: 100 },
-]
+// > 表格欄位依可用寬度調整；窄螢幕把來源、對象與人數收進第一欄，避免整張表要橫向捲動
+const notificationHeaders = computed(() => {
+	if (display.smAndDown.value) {
+		return [
+			{ title: '通知', key: 'title' },
+			{ title: '發送時間', key: 'sentAt' },
+			{ title: '', key: 'data-table-expand', width: 48 },
+		]
+	}
+	if (display.mdAndDown.value) {
+		return [
+			{ title: '通知', key: 'title' },
+			{ title: '發送對象', key: 'audienceLabel' },
+			{ title: '發送時間', key: 'sentAt', width: 150 },
+			{ title: '人數', key: 'recipientCount', align: 'end' as const, width: 96 },
+			{ title: '', key: 'data-table-expand', width: 48 },
+		]
+	}
+	return [
+		{ title: '通知', key: 'title' },
+		{ title: '來源', key: 'sourceLabel', width: 150 },
+		{ title: '通知方式', key: 'channel', width: 150 },
+		{ title: '發送對象', key: 'audienceLabel', width: 170 },
+		{ title: '發送時間', key: 'sentAt', width: 160 },
+		{ title: '人數', key: 'recipientCount', align: 'end' as const, width: 96 },
+		{ title: '', key: 'data-table-expand', width: 56 },
+	]
+})
+const recipientHeaders = computed(() => {
+	if (display.smAndDown.value) {
+		return [
+			{ title: '使用者', key: 'name' },
+			{ title: '首次查看', key: 'firstViewedAt' },
+		]
+	}
+	if (display.mdAndDown.value) {
+		return [
+			{ title: '使用者', key: 'name' },
+			{ title: '送達時間', key: 'deliveredAt', width: 150 },
+			{ title: '首次查看', key: 'firstViewedAt', width: 150 },
+			{ title: '查看次數', key: 'viewCount', align: 'end' as const, width: 90 },
+			{ title: '點擊次數', key: 'actionClickCount', align: 'end' as const, width: 90 },
+		]
+	}
+	return [
+		{ title: '使用者', key: 'name', width: 180 },
+		{ title: '送達時間', key: 'deliveredAt', width: 170 },
+		{ title: '首次查看', key: 'firstViewedAt', width: 170 },
+		{ title: '最後查看', key: 'lastViewedAt', width: 170 },
+		{ title: '查看耗時', key: 'timeToViewSeconds', align: 'end' as const, width: 110 },
+		{ title: '查看次數', key: 'viewCount', align: 'end' as const, width: 90 },
+		{ title: '首次點擊', key: 'firstActionClickedAt', width: 170 },
+		{ title: '最後點擊', key: 'lastActionClickedAt', width: 170 },
+		{ title: '點擊次數', key: 'actionClickCount', align: 'end' as const, width: 90 },
+	]
+})
 
 const userOptions = computed(() =>
 	notificationsStore.users.map((user) => ({ title: `${user.name} · ${user.department}`, value: user.id })),
 )
+// > 告警規則就是自動通知規則的一種：事件為系統告警，再依嚴重度分流
+const newGroupEmail = ref<Record<string, string>>({})
+
+function isAlertRule(rule: { eventType: NotificationEventType }): boolean {
+	return ALERT_EVENT_TYPES.includes(rule.eventType)
+}
+
+function groupOptionsForRouting() {
+	return notificationsStore.recipientGroups.map((group) => ({ title: `${group.name}（${group.emails.length} 位）`, value: group.id }))
+}
+
+function addGroupEmail(groupId: string): void {
+	const email = (newGroupEmail.value[groupId] ?? '').trim()
+	if (!isValidEmail(email)) {
+		notify('電子郵件格式不正確。', 'error')
+		return
+	}
+	const added = notificationsStore.addRecipientEmails(groupId, [email])
+	newGroupEmail.value[groupId] = ''
+	notify(added ? `已將 ${email} 加入收件人群組。` : `${email} 已經在這個群組中。`, added ? 'success' : 'info')
+}
+
+function removeGroupEmail(groupId: string, email: string): void {
+	if (notificationsStore.removeRecipientEmail(groupId, email)) notify(`已移除 ${email}。`)
+}
+
 const roleOptions = computed(() =>
 	Array.from(new Map(notificationsStore.users.map((user) => [user.role, user.roleLabel])).entries())
 		.map(([value, title]) => ({ title, value })),
@@ -188,6 +259,7 @@ function createEmptyNotificationDraft(): SendNotificationInput {
 		targetDepartment: null,
 		targetRole: null,
 		targetUserIds: [],
+		targetGroupId: null,
 		actionLabel: null,
 		actionTo: null,
 	}
@@ -204,6 +276,8 @@ function createEmptyRuleDraft(): NotificationRuleInput {
 		targetDepartment: null,
 		targetRole: null,
 		targetUserIds: [],
+		targetGroupId: null,
+		alertSeverities: [],
 		actionLabel: null,
 		actionTo: null,
 		deliveryChannels: ['in-app'],
@@ -380,6 +454,8 @@ function openEditRule(rule: AutomaticNotificationRule): void {
 		targetDepartment: rule.targetDepartment,
 		targetRole: rule.targetRole,
 		targetUserIds: [...rule.targetUserIds],
+		targetGroupId: rule.targetGroupId,
+		alertSeverities: [...rule.alertSeverities],
 		actionLabel: rule.actionLabel,
 		actionTo: rule.actionTo,
 		deliveryChannels: [...rule.deliveryChannels],
@@ -476,7 +552,7 @@ function sendTestEmail(): void {
 
 <template>
 	<div class="page-shell">
-		<PageHeader eyebrow="訊息與觸發規則" title="通知管理" description="手動通知使用站內小鈴鐺；自動通知可依每一條規則選擇站內小鈴鐺與 Email。">
+		<PageHeader eyebrow="訊息與觸發規則" title="通知管理" description="所有「誰在什麼時候收到什麼」都在這裡：手動通知、事件觸發的自動通知，以及告警依嚴重度的通知對象；發送結果一律回到發送紀錄。">
 			<template #actions><VBtn color="primary" prepend-icon="mdi-bell-plus-outline" @click="openSendDialog">發送站內通知</VBtn></template>
 		</PageHeader>
 
@@ -498,7 +574,7 @@ function sendTestEmail(): void {
 
 				<VCard v-if="notificationRows.length > 0" class="surface-border overflow-hidden">
 					<VDataTable v-model:expanded="expandedNotificationIds" :headers="notificationHeaders" :items="notificationRows" item-value="id" show-expand hover class="notification-record-table" data-testid="notification-record-table">
-						<template #item.title="{ item }"><div class="py-2"><div class="d-flex align-center ga-2"><VIcon :icon="priorityMeta[item.priority].icon" :color="priorityMeta[item.priority].color" size="18" /><span class="font-weight-bold">{{ item.title }}</span></div><p class="text-caption text-medium-emphasis mt-1">{{ item.createdBy }}</p></div></template>
+						<template #item.title="{ item }"><div class="py-2"><div class="d-flex align-center ga-2"><VIcon :icon="priorityMeta[item.priority].icon" :color="priorityMeta[item.priority].color" size="18" /><span class="font-weight-bold record-title">{{ item.title }}</span></div><p class="text-caption text-medium-emphasis mt-1">{{ item.createdBy }}<template v-if="display.mdAndDown.value"> · {{ item.sourceLabel }}</template><template v-if="display.smAndDown.value"> · {{ item.audienceLabel }} · {{ item.recipientCount }} 人</template></p></div></template>
 						<template #item.sourceLabel="{ item }"><div class="d-flex flex-wrap ga-1"><VChip size="small" variant="tonal" :color="item.source === 'manual' ? 'primary' : 'secondary'">{{ item.sourceLabel }}</VChip><VChip v-if="item.isScheduled" size="small" variant="tonal" color="warning">已排程</VChip></div></template>
 						<template #item.channel><VChip size="small" variant="tonal" color="primary" prepend-icon="mdi-bell-outline">站內小鈴鐺</VChip></template>
 						<template #item.sentAt="{ item }"><span class="text-caption text-medium-emphasis">{{ item.isScheduled ? '預定' : '已發送' }}</span><br>{{ formatNotificationTimestamp(item.sentAt) }}</template>
@@ -520,7 +596,7 @@ function sendTestEmail(): void {
 			</VWindowItem>
 
 			<VWindowItem value="rules">
-				<div class="admin-toolbar mb-5"><div><h2 class="section-heading">自動通知規則</h2><p class="text-body-2 text-medium-emphasis mt-1">每一條規則可選擇站內小鈴鐺、Email 或同時發送；新規則預設開啟站內小鈴鐺。</p></div><VBtn color="primary" prepend-icon="mdi-plus" @click="openCreateRule">新增規則</VBtn></div>
+				<div class="admin-toolbar mb-5"><div><h2 class="section-heading">自動通知規則</h2><p class="text-body-2 text-medium-emphasis mt-1">系統事件發生時通知誰、走哪些管道，包含營運監控的系統告警；告警規則可再依嚴重度分流。</p></div><VBtn color="primary" prepend-icon="mdi-plus" @click="openCreateRule">新增規則</VBtn></div>
 				<div v-if="notificationsStore.rules.length > 0" class="rule-grid">
 					<VCard v-for="rule in notificationsStore.rules" :key="rule.id" class="surface-border pa-5">
 						<div class="d-flex align-start ga-3">
@@ -529,7 +605,10 @@ function sendTestEmail(): void {
 								<div class="d-flex align-start ga-3">
 									<div class="flex-grow-1">
 										<h3 class="text-subtitle-1 font-weight-bold">{{ rule.name }}</h3>
-										<p class="text-body-2 text-medium-emphasis mt-1">{{ rule.eventLabel }}</p>
+										<p class="text-body-2 text-medium-emphasis mt-1">
+											{{ rule.eventLabel }}
+											<template v-if="isAlertRule(rule)"> · {{ rule.alertSeverities.length ? `僅${rule.alertSeverities.map((severity) => ALERT_SEVERITY_LABELS[severity]).join('、')}告警` : '所有嚴重度' }}</template>
+										</p>
 										<div class="d-flex flex-wrap ga-2 mt-3" aria-label="通知管道">
 											<VChip
 												v-for="channel in rule.deliveryChannels"
@@ -561,6 +640,43 @@ function sendTestEmail(): void {
 					</VCard>
 				</div>
 				<StatePanel v-else icon="mdi-bell-cog-outline" title="尚未建立自動通知規則" description="新增規則後，可以模擬固定系統事件並產生通知。" action-label="新增第一則規則" @action="openCreateRule" />
+
+				<VDivider class="my-8" />
+
+				<h2 class="section-heading mb-1">收件群組</h2>
+				<p class="text-body-2 text-medium-emphasis mb-4">供上方 Email 通知使用；成員異動後立即生效。</p>
+				<VRow>
+					<VCol v-for="group in notificationsStore.recipientGroups" :key="group.id" cols="12" md="4">
+						<VCard class="surface-border pa-5 h-100">
+							<h3 class="text-subtitle-1 font-weight-bold">{{ group.name }}</h3>
+							<p class="text-body-2 text-medium-emphasis mb-3">{{ group.description }}</p>
+							<div class="d-flex flex-wrap ga-2 mb-3">
+								<VChip
+									v-for="email in group.emails"
+									:key="email"
+									size="small"
+									closable
+									:aria-label="`移除 ${email}`"
+									@click:close="removeGroupEmail(group.id, email)"
+								>{{ email }}</VChip>
+								<span v-if="!group.emails.length" class="text-caption text-medium-emphasis">尚未加入收件人</span>
+							</div>
+							<div class="d-flex ga-2">
+								<VTextField
+									:model-value="newGroupEmail[group.id] ?? ''"
+									label="新增收件人 Email"
+									type="email"
+									density="compact"
+									hide-details
+									:data-testid="`group-email-${group.id}`"
+									@update:model-value="newGroupEmail[group.id] = $event"
+									@keyup.enter="addGroupEmail(group.id)"
+								/>
+								<VBtn variant="outlined" @click="addGroupEmail(group.id)">加入</VBtn>
+							</div>
+						</VCard>
+					</VCol>
+				</VRow>
 			</VWindowItem>
 
 			<VWindowItem value="delivery">
@@ -642,6 +758,7 @@ function sendTestEmail(): void {
 					<VSelect v-if="sendDraft.audienceType === 'department'" v-model="sendDraft.targetDepartment" :items="notificationsStore.departments" label="選擇部門" />
 					<VSelect v-if="sendDraft.audienceType === 'role'" v-model="sendDraft.targetRole" :items="roleOptions" label="選擇角色" />
 					<VAutocomplete v-if="sendDraft.audienceType === 'selected'" v-model="sendDraft.targetUserIds" :items="userOptions" label="選擇使用者" multiple chips closable-chips />
+					<VSelect v-if="sendDraft.audienceType === 'group'" v-model="sendDraft.targetGroupId" :items="groupOptionsForRouting()" label="選擇收件群組" />
 					<div class="form-grid">
 						<VSelect v-model="sendTimeMode" :items="sendTimeOptions" label="發送時間" />
 						<VTextField v-if="sendTimeMode === 'scheduled'" v-model="scheduledSendAt" type="datetime-local" label="預定發送時間" />
@@ -679,6 +796,26 @@ function sendTestEmail(): void {
 					</div>
 					<VSelect v-if="ruleDraft.audienceType === 'department'" v-model="ruleDraft.targetDepartment" :items="notificationsStore.departments" label="選擇部門" />
 					<VSelect v-if="ruleDraft.audienceType === 'role'" v-model="ruleDraft.targetRole" :items="roleOptions" label="選擇角色" />
+					<VSelect
+						v-if="ruleDraft.audienceType === 'group'"
+						v-model="ruleDraft.targetGroupId"
+						:items="groupOptionsForRouting()"
+						label="選擇收件群組"
+						hint="站內通知寄給群組成員，Email 寄給群組中的信箱"
+						persistent-hint
+						data-testid="rule-group-select"
+					/>
+					<VSelect
+						v-if="isSystemAlertEvent"
+						v-model="ruleDraft.alertSeverities"
+						:items="severityOptions"
+						label="套用的告警嚴重度"
+						multiple
+						chips
+						hint="不選代表所有嚴重度都通知"
+						persistent-hint
+						data-testid="rule-severity-select"
+					/>
 					<VAutocomplete v-if="ruleDraft.audienceType === 'selected'" v-model="ruleDraft.targetUserIds" :items="userOptions" label="選擇使用者" multiple chips closable-chips />
 					<fieldset class="delivery-channel-fieldset mb-5">
 						<legend class="font-weight-bold">通知管道</legend>
@@ -714,9 +851,13 @@ function sendTestEmail(): void {
 .performance-summary > div { display: grid; gap: var(--space-xs); padding: var(--space-md); border: 1px solid rgb(var(--v-theme-outline)); border-radius: var(--radius-md); background: rgb(var(--v-theme-surface)); }
 .performance-summary span { color: var(--ink-subtle); font-size: 0.8rem; }
 .performance-summary strong { font-size: 1.1rem; }
+/* @ 不再固定最小寬度：欄位改由 notificationHeaders / recipientHeaders 依斷點取捨，預設就不需要橫向捲動 */
+.notification-record-table :deep(th),
+.notification-record-table :deep(td) { white-space: normal; }
+.record-title { overflow-wrap: anywhere; }
 .recipient-table { overflow-x: auto; }
-.notification-record-table :deep(table) { min-width: 1040px; }
-.recipient-table :deep(table) { min-width: 1600px; }
+.recipient-table :deep(th),
+.recipient-table :deep(td) { white-space: normal; }
 @media (max-width: 1100px) { .performance-summary { grid-template-columns: repeat(4, minmax(120px, 1fr)); } }
 @media (max-width: 900px) { .rule-grid, .performance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .admin-toolbar { align-items: stretch; flex-direction: column; } .admin-toolbar > .v-input { max-width: none; } .rule-grid, .form-grid, .performance-summary { grid-template-columns: minmax(0, 1fr); } }

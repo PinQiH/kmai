@@ -3,7 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import FeedbackCaseDrawer from '@/components/FeedbackCaseDrawer.vue'
+import MetricSparkline from '@/components/MetricSparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import {
+	breakdownRate,
+	getIssueMetrics,
+	getResolutionSatisfaction,
+	getSatisfactionByModel,
+	getSatisfactionBySource,
+	getSatisfactionSummary,
+} from '@/mocks/answerSatisfaction'
 import {
 	CURRENT_HANDLER,
 	FEEDBACK_CAUSE_LABELS,
@@ -28,12 +37,12 @@ import { useNotebooksStore } from '@/stores/notebooks'
 import { getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
 import { buildKnowledgeSourceOptions } from '@/utils/knowledgeSources'
 
-type FeedbackTab = 'queue' | 'documents' | 'closed'
+type FeedbackTab = 'overview' | 'queue' | 'documents' | 'closed'
 type KindFilter = FeedbackKind | 'all'
 
 // TODO(api-integration): 分頁改由後端處理（page / pageSize / total），前端只保留目前頁
 const PAGE_SIZE = 10
-const tabs: FeedbackTab[] = ['queue', 'documents', 'closed']
+const tabs: FeedbackTab[] = ['overview', 'queue', 'documents', 'closed']
 const statusColor = { new: 'warning', investigating: 'info', resolved: 'success', dismissed: 'secondary' } as const
 const signalColor = { error: 'error', warning: 'warning', info: 'info' } as const
 const ownerOptions = [
@@ -60,18 +69,18 @@ const notebooksStore = useNotebooksStore()
 // > 分頁寫進網址；案件與文件篩選只在進頁或從通知連過來時讀網址
 // @ 開啟中的 temporary drawer 會攔下路由導覽，所以開關案件不經過 router
 const initialQuery = route.query
-const activeTab = ref<FeedbackTab>(tabs.find((tab) => tab === initialQuery.tab) ?? 'queue')
+const activeTab = ref<FeedbackTab>(tabs.find((tab) => tab === initialQuery.tab) ?? 'overview')
 const openCaseId = ref<string | null>(typeof initialQuery.case === 'string' ? initialQuery.case : null)
 const documentFilter = ref(typeof initialQuery.documentId === 'string' ? initialQuery.documentId : '')
 watch(() => route.query.tab, (tab) => {
-	activeTab.value = tabs.find((item) => item === tab) ?? 'queue'
+	activeTab.value = tabs.find((item) => item === tab) ?? 'overview'
 })
 // @ 已在本頁時點小鈴鐺的「查看案件」，query 會改變但元件不重建
 watch(() => route.query.case, (id) => {
 	if (typeof id === 'string') openCaseId.value = id
 })
 watch(activeTab, (tab) => {
-	const next = tab === 'queue' ? undefined : tab
+	const next = tab === 'overview' ? undefined : tab
 	if (next !== route.query.tab) router.replace({ query: { ...route.query, tab: next, case: undefined, documentId: undefined } })
 })
 
@@ -88,6 +97,27 @@ const closedCases = computed(() => cases.value.filter((item) => !isOpen(item)).s
 const closedThisWeek = computed(() => closedCases.value.filter((item) => item.closedAt && now.value - new Date(item.closedAt).getTime() < 7 * 86_400_000).length)
 const documentSummaries = computed(() => getDocumentSummaries())
 const topDocument = computed(() => documentSummaries.value.find((summary) => summary.openCount > 0))
+
+// > 概況：回答滿意度（讚／倒讚）、處理滿意度（結案後回報者確認）與問題回報的客觀指標
+const satisfactionDays = ref(7)
+const satisfactionDayOptions = [
+	{ title: '近 7 天', value: 7 },
+	{ title: '近 14 天', value: 14 },
+]
+const answerSatisfaction = computed(() => getSatisfactionSummary(satisfactionDays.value))
+const satisfactionBySource = computed(() => getSatisfactionBySource())
+const satisfactionByModel = computed(() => getSatisfactionByModel())
+const resolutionSatisfaction = computed(() => getResolutionSatisfaction())
+const issueMetrics = computed(() => getIssueMetrics(30))
+const satisfactionTone = computed(() => {
+	const rate = answerSatisfaction.value.rate
+	if (rate === null) return 'primary'
+	return rate >= 80 ? 'success' : rate >= 70 ? 'warning' : 'error'
+})
+
+function formatRate(rate: number | null): string {
+	return rate === null ? '—' : `${rate}%`
+}
 
 // > 待處理佇列
 const search = ref('')
@@ -209,7 +239,7 @@ function retest(caseId: string): void {
 
 <template>
 	<div class="page-shell">
-		<PageHeader title="回饋與問題" description="同仁對 AI 回答按倒讚、或從帳號頁回報問題，都會進到這裡。先看診斷線索與檢索過程判斷原因，修正後結案，系統會以站內通知告訴回報者。" />
+		<PageHeader eyebrow="使用者回饋" title="回饋與問題" description="同仁對 AI 回答按倒讚、或從帳號頁回報問題，都會進到這裡。先看診斷線索與檢索過程判斷原因，修正後結案，系統會以站內通知告訴回報者。" />
 
 		<VAlert v-if="message" :type="messageTone" variant="tonal" density="compact" closable class="mb-5" role="status" @click:close="message = ''">{{ message }}</VAlert>
 
@@ -228,12 +258,130 @@ function retest(caseId: string): void {
 		</dl>
 
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-5">
+			<VTab value="overview">概況</VTab>
 			<VTab value="queue">待處理<VChip v-if="openCases.length" size="x-small" color="warning" variant="tonal" class="ms-2">{{ openCases.length }}</VChip></VTab>
 			<VTab value="documents">依文件彙整</VTab>
 			<VTab value="closed">已結案</VTab>
 		</VTabs>
 
 		<VWindow v-model="activeTab" class="feedback-window">
+			<!-- > 概況：使用者覺得好不好用，這裡是唯一有真實評價訊號的地方 -->
+			<VWindowItem value="overview">
+				<section aria-labelledby="answer-quality-title" class="mb-8">
+					<div class="overview-head">
+						<div>
+							<h2 id="answer-quality-title" class="section-heading">AI 回答滿意度</h2>
+							<p class="overview-note">以「有幫助 ÷ 有評價」計算；沒有評價的回答不列入。</p>
+						</div>
+						<VSelect v-model="satisfactionDays" :items="satisfactionDayOptions" label="統計區間" density="compact" hide-details class="range-select" />
+					</div>
+					<dl class="metric-row" :aria-label="`最近 ${satisfactionDays} 天的回答評價`">
+						<div>
+							<dt>滿意度</dt>
+							<dd :class="`text-${satisfactionTone}`">{{ formatRate(answerSatisfaction.rate) }}</dd>
+							<span v-if="answerSatisfaction.deltaPoints !== null">與前 {{ satisfactionDays }} 天相比 {{ answerSatisfaction.deltaPoints > 0 ? '+' : '' }}{{ answerSatisfaction.deltaPoints }} 個百分點</span>
+							<span v-else>沒有可比較的區間</span>
+						</div>
+						<div>
+							<dt>有幫助</dt>
+							<dd>{{ answerSatisfaction.helpful.toLocaleString() }}</dd>
+							<span>共 {{ answerSatisfaction.rated.toLocaleString() }} 筆評價</span>
+						</div>
+						<div>
+							<dt>倒讚</dt>
+							<dd :class="{ 'text-error': answerSatisfaction.unhelpful > 0 }">{{ answerSatisfaction.unhelpful.toLocaleString() }}</dd>
+							<span>每筆倒讚都會成為待處理案件</span>
+						</div>
+						<div>
+							<dt>評價率</dt>
+							<dd>{{ answerSatisfaction.ratedRate }}%</dd>
+							<span>{{ answerSatisfaction.answered.toLocaleString() }} 次回答中有評價的比例</span>
+						</div>
+					</dl>
+					<VCard class="surface-border pa-5">
+						<h3 class="text-subtitle-1 font-weight-bold mb-1">每日滿意度</h3>
+						<p class="overview-note mb-4">評價數少的日子波動較大，判讀時請一併看評價率。</p>
+						<MetricSparkline :values="answerSatisfaction.series" :tone="satisfactionTone" :label="`最近 ${satisfactionDays} 天的每日滿意度`" :height="72" />
+					</VCard>
+				</section>
+
+				<section aria-labelledby="resolution-title" class="mb-8">
+					<h2 id="resolution-title" class="section-heading">處理滿意度</h2>
+					<p class="overview-note mb-4">案件結案後，回報者在個人設定的「問題回報」回覆有沒有真的解決；這是系統整體好不好用最直接的訊號。</p>
+					<dl class="metric-row" aria-label="結案後回報者的回覆">
+						<div>
+							<dt>說已解決</dt>
+							<dd :class="resolutionSatisfaction.rate !== null && resolutionSatisfaction.rate < 70 ? 'text-warning' : ''">{{ formatRate(resolutionSatisfaction.rate) }}</dd>
+							<span>{{ resolutionSatisfaction.rated }} 位回報者已回覆</span>
+						</div>
+						<div>
+							<dt>說還沒解決</dt>
+							<dd :class="{ 'text-error': resolutionSatisfaction.unsolved > 0 }">{{ resolutionSatisfaction.unsolved }}</dd>
+							<span>回覆沒解決時，處理人會收到通知</span>
+						</div>
+						<div>
+							<dt>等待回覆</dt>
+							<dd>{{ resolutionSatisfaction.awaiting }}</dd>
+							<span>已結案但回報者還沒回覆</span>
+						</div>
+						<div>
+							<dt>平均處理天數</dt>
+							<dd>{{ issueMetrics.averageDaysToClose ?? '—' }}</dd>
+							<span>近 30 天已結案的案件</span>
+						</div>
+					</dl>
+				</section>
+
+				<section aria-labelledby="issue-metrics-title">
+					<h2 id="issue-metrics-title" class="section-heading">近 30 天的回報</h2>
+					<p class="overview-note mb-4">沒有人評分時，回報量與分類一樣能看出哪裡卡住。</p>
+					<VRow>
+						<VCol cols="12" md="6">
+							<VCard class="surface-border pa-5 h-100">
+								<h3 class="text-subtitle-1 font-weight-bold mb-4">回報分類</h3>
+								<table class="overview-table">
+									<thead><tr><th scope="col">分類</th><th scope="col">件數</th></tr></thead>
+									<tbody>
+										<tr v-for="row in issueMetrics.byCategory" :key="row.label">
+											<td>{{ row.label }}</td>
+											<td class="num">{{ row.count }}</td>
+										</tr>
+										<tr v-if="!issueMetrics.byCategory.length"><td colspan="2" class="cell-sub">近 30 天沒有回報</td></tr>
+									</tbody>
+								</table>
+								<p class="overview-note mt-4">共 {{ issueMetrics.reported }} 件，已結案 {{ issueMetrics.closed }} 件、未結案 {{ issueMetrics.open }} 件。</p>
+							</VCard>
+						</VCol>
+						<VCol cols="12" md="6">
+							<VCard class="surface-border pa-5 h-100">
+								<h3 class="text-subtitle-1 font-weight-bold mb-1">回答滿意度分組</h3>
+								<p class="overview-note mb-4">累計統計，不受上方統計區間影響。</p>
+								<table class="overview-table">
+									<thead><tr><th scope="col">知識來源</th><th scope="col">滿意度</th><th scope="col">倒讚</th></tr></thead>
+									<tbody>
+										<tr v-for="row in satisfactionBySource" :key="row.id">
+											<td>{{ row.label }}</td>
+											<td class="num">{{ formatRate(breakdownRate(row)) }}</td>
+											<td class="num">{{ row.unhelpful.toLocaleString() }}</td>
+										</tr>
+									</tbody>
+								</table>
+								<table class="overview-table mt-4">
+									<thead><tr><th scope="col">回答模型</th><th scope="col">滿意度</th><th scope="col">倒讚</th></tr></thead>
+									<tbody>
+										<tr v-for="row in satisfactionByModel" :key="row.id">
+											<td>{{ row.label }}</td>
+											<td class="num">{{ formatRate(breakdownRate(row)) }}</td>
+											<td class="num">{{ row.unhelpful.toLocaleString() }}</td>
+										</tr>
+									</tbody>
+								</table>
+							</VCard>
+						</VCol>
+					</VRow>
+				</section>
+			</VWindowItem>
+
 			<VWindowItem value="queue">
 				<div class="toolbar">
 					<VTextField v-model="search" density="compact" placeholder="搜尋問題、原因或回報者" prepend-inner-icon="mdi-magnify" aria-label="搜尋待處理案件" hide-details clearable class="toolbar-search" data-testid="feedback-search" />
@@ -352,6 +500,14 @@ function retest(caseId: string): void {
 
 <style scoped>
 .feedback-window { overflow: visible; }
+
+.overview-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.overview-note { max-width: 72ch; margin: 4px 0 0; color: var(--ink-muted); font-size: 0.86rem; }
+.range-select { max-width: 180px; }
+.overview-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.overview-table th { padding: 4px 6px; border-bottom: 1px solid rgb(var(--v-theme-outline)); color: var(--ink-muted); font-weight: 500; text-align: left; }
+.overview-table td { padding: 8px 6px; border-bottom: 1px solid rgb(var(--v-theme-outline) / 50%); }
+.overview-table .num { font-variant-numeric: tabular-nums; }
 
 .metric-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-md); margin: 0 0 var(--space-lg); }
 .metric-row > div { display: grid; align-content: start; gap: 2px; padding: var(--space-md); border: 1px solid rgb(var(--v-theme-outline)); border-radius: var(--radius-md); background: rgb(var(--v-theme-surface)); }

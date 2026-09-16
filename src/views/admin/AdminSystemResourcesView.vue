@@ -230,7 +230,7 @@ function runConnectionTest(connectionId: string): void {
 
 <template>
 	<div class="page-shell">
-		<PageHeader title="系統資源" description="語言模型、嵌入、Reranker、Docling 解析參數與服務連線只在這裡定義一次。各管理頁面只選用設定檔，修改一個設定檔，所有使用它的地方會一起更新。">
+		<PageHeader eyebrow="AI 基礎資源" title="系統資源" description="語言模型、嵌入、Reranker、Docling 解析參數與服務連線只在這裡定義一次。各管理頁面只選用設定檔，修改一個設定檔，所有使用它的地方會一起更新。">
 			<template #actions>
 				<VMenu>
 					<template #activator="{ props: menuProps }">

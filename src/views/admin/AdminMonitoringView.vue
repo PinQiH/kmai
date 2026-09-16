@@ -8,12 +8,6 @@ import MetricSparkline from '@/components/MetricSparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
 import {
-	breakdownRate,
-	getSatisfactionByModel,
-	getSatisfactionBySource,
-	getSatisfactionSummary,
-} from '@/mocks/answerSatisfaction'
-import {
 	getLogEntriesSnapshot,
 	getServiceHealthSnapshot,
 	getServiceMetricsSnapshot,
@@ -50,26 +44,7 @@ const { rules, events } = storeToRefs(monitoringStore)
 const metrics = ref(getServiceMetricsSnapshot())
 const services = ref(getServiceHealthSnapshot())
 const logs = ref(getLogEntriesSnapshot())
-const groups = computed(() => notificationsStore.recipientGroups)
-
-// > 回答滿意度：有幫助 ÷ 有評價，資料與回饋與問題頁同源
-const satisfactionDays = ref(7)
-const satisfactionDayOptions = [
-	{ title: '近 7 天', value: 7 },
-	{ title: '近 14 天', value: 14 },
-]
-const satisfaction = computed(() => getSatisfactionSummary(satisfactionDays.value))
-const satisfactionBySource = computed(() => getSatisfactionBySource())
-const satisfactionByModel = computed(() => getSatisfactionByModel())
-const satisfactionTone = computed(() => {
-	const rate = satisfaction.value.rate
-	if (rate === null) return 'primary'
-	return rate >= 80 ? 'success' : rate >= 70 ? 'warning' : 'error'
-})
-
-function formatRate(rate: number | null): string {
-	return rate === null ? '—' : `${rate}%`
-}
+// @ 送達對象由通知管理維護，這裡只讀來顯示，避免兩邊各有一套收件人
 
 const activeTab = ref('overview')
 const feedbackMessage = ref('')
@@ -79,7 +54,7 @@ const focusedEventId = computed(() => typeof route.query.eventId === 'string' ? 
 watch(
 	() => route.query.tab,
 	(tab) => {
-		if (['overview', 'alerts', 'metrics', 'satisfaction', 'logs', 'rules'].includes(String(tab))) activeTab.value = String(tab)
+		if (['overview', 'alerts', 'rules', 'metrics', 'logs'].includes(String(tab))) activeTab.value = String(tab)
 	},
 	{ immediate: true },
 )
@@ -234,24 +209,17 @@ const severityOptions: Array<{ title: string; value: AlertSeverity }> = [
 ]
 
 const metricOptions = computed(() => metrics.value.map((metric) => ({ title: metric.label, value: metric.id })))
-const groupOptions = computed(() => groups.value.map((group) => ({ title: group.name, value: group.id })))
 
 const ruleDraft = ref<AlertRule | null>(null)
 const isNewRule = ref(false)
 const deleteTarget = ref<AlertRule | null>(null)
 
-function groupById(groupId: string) {
-	return groups.value.find((group) => group.id === groupId)
-}
-
-function groupLabel(groupId: string): string {
-	const group = groupById(groupId)
-	return group ? `${group.name}（${group.emails.length} 位收件人）` : '尚未指定收件人群組'
+function routingLabel(severity: AlertSeverity): string {
+	return notificationsStore.describeAlertDelivery(severity)
 }
 
 function openNewRule(): void {
 	const metric = metrics.value[0]
-	const group = groups.value[0]
 	isNewRule.value = true
 	ruleDraft.value = {
 		id: `rule-${Date.now()}`,
@@ -263,7 +231,6 @@ function openNewRule(): void {
 		unit: metric.unit,
 		durationMinutes: 5,
 		severity: 'warning',
-		recipientGroupId: group.id,
 		isEnabled: true,
 	}
 }
@@ -296,7 +263,7 @@ function saveRule(): void {
 	if (isNewRule.value) monitoringStore.addRule(draft)
 	else monitoringStore.updateRule(draft)
 	ruleDraft.value = null
-	notify(`已儲存規則「${draft.name}」，觸發時以電子郵件通知 ${groupLabel(draft.recipientGroupId)}。`)
+	notify(`已儲存規則「${draft.name}」，${severityMeta[draft.severity].label}告警會通知 ${routingLabel(draft.severity)}。`)
 }
 
 function toggleRule(rule: AlertRule, isEnabled: boolean | null): void {
@@ -315,7 +282,21 @@ function confirmDeleteRule(): void {
 }
 
 function testRule(rule: AlertRule): void {
-	notify(`已寄出「${rule.name}」的測試通知給 ${groupLabel(rule.recipientGroupId)}。`)
+	const result = notificationsStore.notifyAlert({
+		ruleName: rule.name,
+		severity: rule.severity,
+		observed: '測試通知，未實際觸發門檻',
+		status: 'test',
+	})
+	const parts = [
+		result.inAppRecipientCount ? `站內通知 ${result.inAppRecipientCount} 人` : '',
+		result.emailRecipientCount ? `Email ${result.emailRecipientCount} 位` : '',
+	].filter(Boolean)
+	if (!parts.length) {
+		notify('這個嚴重度目前沒有對應的通知規則，請到通知管理的「自動通知」新增系統告警規則。', 'error')
+		return
+	}
+	notify(`已依「${result.matchedRuleNames.join('、')}」送出測試通知：${parts.join('、')}。站內通知可在通知管理的發送紀錄查看。`)
 }
 
 // > 告警紀錄
@@ -339,7 +320,7 @@ onBeforeUnmount(() => {
 		<PageHeader
 			eyebrow="營運可觀測性"
 			title="營運監控"
-			description="以指標、日誌與告警三個視角掌握系統狀態。規則觸發時，通知一律寄送到指定的電子郵件群組。"
+			description="以指標、日誌與告警三個視角掌握系統狀態，判斷什麼情況算異常；通知誰與怎麼送，由通知管理依嚴重度決定。"
 		>
 			<template #actions>
 				<VBtn variant="outlined" prepend-icon="mdi-refresh" @click="refreshSnapshot(); notify('已重新取得監控資料。')">
@@ -375,38 +356,30 @@ onBeforeUnmount(() => {
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-5">
 			<VTab value="overview">系統概況</VTab>
 			<VTab value="alerts">目前告警</VTab>
-			<VTab value="metrics">服務指標</VTab>
-			<VTab value="satisfaction">回答滿意度</VTab>
-			<VTab value="logs">日誌查詢</VTab>
 			<VTab value="rules">告警規則</VTab>
+			<VTab value="metrics">服務指標</VTab>
+			<VTab value="logs">日誌查詢</VTab>
 		</VTabs>
 
 		<VWindow v-model="activeTab" class="monitoring-window">
 			<!-- > 系統概況：先回答現在是否需要處理，再引導到對應診斷頁籤 -->
 			<VWindowItem value="overview">
 				<VRow class="mb-6">
-					<VCol cols="12" md="3">
-						<VCard class="surface-border pa-5 h-100">
-							<p class="text-body-2 text-medium-emphasis">近 7 天回答滿意度</p>
-							<p class="metric-value mt-2" :class="`text-${satisfactionTone}`">{{ formatRate(getSatisfactionSummary(7).rate) }}</p>
-							<VBtn class="mt-3" variant="text" size="small" @click="activeTab = 'satisfaction'">查看回答品質</VBtn>
-						</VCard>
-					</VCol>
-					<VCol cols="12" md="3">
+					<VCol cols="12" md="4">
 						<VCard class="surface-border pa-5 h-100">
 							<p class="text-body-2 text-medium-emphasis">健康服務</p>
 							<p class="metric-value mt-2">{{ healthyServiceCount }} / {{ services.length }}</p>
 							<VBtn class="mt-3" variant="text" size="small" @click="activeTab = 'metrics'">查看服務指標</VBtn>
 						</VCard>
 					</VCol>
-					<VCol cols="12" md="3">
+					<VCol cols="12" md="4">
 						<VCard class="surface-border pa-5 h-100">
 							<p class="text-body-2 text-medium-emphasis">目前告警</p>
 							<p class="metric-value mt-2">{{ alertSummary.firing }}</p>
 							<VBtn class="mt-3" variant="text" size="small" @click="activeTab = 'alerts'">處理告警</VBtn>
 						</VCard>
 					</VCol>
-					<VCol cols="12" md="3">
+					<VCol cols="12" md="4">
 						<VCard class="surface-border pa-5 h-100">
 							<p class="text-body-2 text-medium-emphasis">目前快照錯誤日誌</p>
 							<p class="metric-value mt-2">{{ recentErrorCount }}</p>
@@ -415,88 +388,118 @@ onBeforeUnmount(() => {
 					</VCol>
 				</VRow>
 				<VAlert type="info" variant="tonal">
-					營運監控只處理系統健康、告警生命週期與技術日誌；Email 寄件服務請至「通知管理 → SMTP 設定」。
+					營運監控負責偵測：指標、告警門檻與技術日誌。通知誰、走站內或 Email，以及發送紀錄，都在「通知管理 → 自動通知」的系統告警規則。
 				</VAlert>
 			</VWindowItem>
 
-			<!-- > 回答滿意度：使用者評價的品質訊號，異常時到「回饋與問題」看個案 -->
-			<VWindowItem value="satisfaction">
-				<div class="monitoring-toolbar mb-5">
-					<VSelect v-model="satisfactionDays" :items="satisfactionDayOptions" label="統計區間" hide-details max-width="200" />
-					<VSpacer />
-					<VBtn variant="text" size="small" prepend-icon="mdi-comment-alert-outline" to="/admin/feedback">處理使用者回饋</VBtn>
+			<!-- > 告警紀錄：觸發、靜音與解除的完整過程 -->
+			<VWindowItem value="alerts">
+				<div class="d-flex flex-wrap align-center ga-2 mb-5">
+					<VChip color="error" variant="tonal" size="small">觸發中 {{ alertSummary.firing }}</VChip>
+					<VChip color="secondary" variant="tonal" size="small">已靜音 {{ alertSummary.silenced }}</VChip>
+					<VChip color="success" variant="tonal" size="small">已解除 {{ alertSummary.resolved }}</VChip>
 				</div>
 
-				<dl class="satisfaction-row" :aria-label="`最近 ${satisfactionDays} 天的回答評價`">
-					<div>
-						<dt>滿意度</dt>
-						<dd :class="`text-${satisfactionTone}`">{{ formatRate(satisfaction.rate) }}</dd>
-						<span v-if="satisfaction.deltaPoints !== null">與前 {{ satisfactionDays }} 天相比 {{ satisfaction.deltaPoints > 0 ? '+' : '' }}{{ satisfaction.deltaPoints }} 個百分點</span>
-						<span v-else>沒有可比較的區間</span>
-					</div>
-					<div>
-						<dt>有幫助</dt>
-						<dd>{{ satisfaction.helpful.toLocaleString() }}</dd>
-						<span>共 {{ satisfaction.rated.toLocaleString() }} 筆評價</span>
-					</div>
-					<div>
-						<dt>倒讚</dt>
-						<dd :class="{ 'text-error': satisfaction.unhelpful > 0 }">{{ satisfaction.unhelpful.toLocaleString() }}</dd>
-						<span>每筆倒讚都會進到回饋與問題</span>
-					</div>
-					<div>
-						<dt>評價率</dt>
-						<dd>{{ satisfaction.ratedRate }}%</dd>
-						<span>{{ satisfaction.answered.toLocaleString() }} 次回答中有評價的比例</span>
-					</div>
-				</dl>
+				<VCard class="surface-border pa-5">
+					<VTimeline side="end" density="compact" truncate-line="both">
+						<VTimelineItem
+							v-for="event in events"
+							:key="event.id"
+							:id="`alert-event-${event.id}`"
+							:class="{ 'focused-alert-event': event.id === focusedEventId }"
+							:dot-color="eventStatusMeta[event.status].color"
+							size="small"
+						>
+							<div class="d-flex flex-wrap align-center ga-2">
+								<p class="font-weight-bold">{{ event.ruleName }}</p>
+								<VChip :color="eventStatusMeta[event.status].color" size="x-small" variant="tonal">
+									<VIcon :icon="eventStatusMeta[event.status].icon" start size="12" aria-hidden="true" />
+									{{ eventStatusMeta[event.status].label }}
+								</VChip>
+								<VChip size="x-small" variant="tonal">{{ severityMeta[event.severity].label }}</VChip>
+							</div>
+							<p class="text-caption text-medium-emphasis mt-1">
+								觀測值 {{ event.observed }} · {{ event.startedAt }} · {{ event.durationLabel }}
+							</p>
+							<p class="text-caption mt-1" :class="event.notifyResult === '寄送失敗' ? 'text-error' : 'text-medium-emphasis'">
+								電子郵件通知：{{ event.notifyResult }}<template v-if="event.notifiedCount > 0">（{{ event.notifiedCount }} 位收件人）</template>
+							</p>
+							<VBtn
+								v-if="event.status === 'firing'"
+								class="mt-2"
+								size="small"
+								variant="outlined"
+								prepend-icon="mdi-bell-sleep-outline"
+								@click="silenceEvent(event)"
+							>
+								靜音 1 小時
+							</VBtn>
+						</VTimelineItem>
+					</VTimeline>
+				</VCard>
+			</VWindowItem>
 
-				<VCard class="surface-border pa-5 mb-6">
-					<h2 class="section-heading mb-1">每日滿意度</h2>
-					<p class="text-body-2 text-medium-emphasis mb-4">評價數少的日子波動較大，判讀時請一併看評價率。</p>
-					<MetricSparkline :values="satisfaction.series" :tone="satisfactionTone" :label="`最近 ${satisfactionDays} 天的每日滿意度`" :height="72" />
+			<!-- > 告警規則：只判定什麼情況算異常；通知誰在通知管理設定 -->
+			<VWindowItem value="rules">
+				<div class="d-flex flex-wrap align-center ga-3 mb-5">
+					<p class="text-body-2 text-medium-emphasis">
+						規則以指標門檻加上持續時間判斷，避免瞬間尖峰造成誤報；通知誰由嚴重度決定。
+					</p>
+					<VSpacer />
+					<VBtn color="primary" prepend-icon="mdi-plus" @click="openNewRule">新增規則</VBtn>
+				</div>
+
+				<VCard class="surface-border pa-4 mb-5">
+					<div class="d-flex flex-wrap align-center ga-3">
+						<div>
+							<p class="text-body-2 font-weight-bold mb-1">各嚴重度的通知對象</p>
+							<p class="text-caption text-medium-emphasis">嚴重：{{ routingLabel('critical') }}</p>
+							<p class="text-caption text-medium-emphasis">警告：{{ routingLabel('warning') }}</p>
+							<p class="text-caption text-medium-emphasis">資訊：{{ routingLabel('info') }}</p>
+						</div>
+						<VSpacer />
+						<VBtn variant="text" size="small" append-icon="mdi-arrow-right" to="/admin/notifications?tab=rules">在通知管理調整</VBtn>
+					</div>
 				</VCard>
 
-				<VRow>
-					<VCol cols="12" md="6">
-						<VCard class="surface-border pa-5 h-100">
-							<h2 class="section-heading mb-1">依知識來源</h2>
-							<p class="text-body-2 text-medium-emphasis mb-4">累計統計，不受上方統計區間影響。</p>
-							<table class="satisfaction-table">
-								<thead><tr><th scope="col">知識來源</th><th scope="col">滿意度</th><th scope="col">有幫助</th><th scope="col">倒讚</th></tr></thead>
-								<tbody>
-									<tr v-for="row in satisfactionBySource" :key="row.id">
-										<td>{{ row.label }}</td>
-										<td class="num">{{ formatRate(breakdownRate(row)) }}</td>
-										<td class="num">{{ row.helpful.toLocaleString() }}</td>
-										<td class="num">{{ row.unhelpful.toLocaleString() }}</td>
-									</tr>
-								</tbody>
-							</table>
-						</VCard>
-					</VCol>
-					<VCol cols="12" md="6">
-						<VCard class="surface-border pa-5 h-100">
-							<h2 class="section-heading mb-1">依回答模型</h2>
-							<p class="text-body-2 text-medium-emphasis mb-4">累計統計，不受上方統計區間影響。</p>
-							<table class="satisfaction-table">
-								<thead><tr><th scope="col">模型</th><th scope="col">滿意度</th><th scope="col">有幫助</th><th scope="col">倒讚</th></tr></thead>
-								<tbody>
-									<tr v-for="row in satisfactionByModel" :key="row.id">
-										<td>{{ row.label }}</td>
-										<td class="num">{{ formatRate(breakdownRate(row)) }}</td>
-										<td class="num">{{ row.helpful.toLocaleString() }}</td>
-										<td class="num">{{ row.unhelpful.toLocaleString() }}</td>
-									</tr>
-								</tbody>
-							</table>
-						</VCard>
-					</VCol>
-				</VRow>
-
-				<VAlert type="info" variant="tonal" class="mt-6">
-					滿意度只統計使用者主動評價的回答，沒有評價的不列入計算；要看個別案例與處理狀況，請到「回饋與問題」。
-				</VAlert>
+				<VCard class="surface-border">
+					<VList lines="two">
+						<template v-for="(rule, index) in rules" :key="rule.id">
+							<VListItem class="py-3">
+								<template #prepend>
+									<VIcon
+										:icon="severityMeta[rule.severity].icon"
+										:color="rule.isEnabled ? severityMeta[rule.severity].color : 'secondary'"
+										aria-hidden="true"
+									/>
+								</template>
+								<VListItemTitle class="font-weight-bold">
+									{{ rule.name }}
+									<VChip size="x-small" variant="tonal" class="ml-2">{{ severityMeta[rule.severity].label }}</VChip>
+								</VListItemTitle>
+								<VListItemSubtitle>
+									{{ describeAlertRule(rule) }} · 通知 {{ routingLabel(rule.severity) }}
+								</VListItemSubtitle>
+								<template #append>
+									<div class="d-flex align-center ga-2">
+										<VSwitch
+											:model-value="rule.isEnabled"
+											color="primary"
+											density="compact"
+											hide-details
+											:aria-label="`啟用規則 ${rule.name}`"
+											@update:model-value="toggleRule(rule, $event)"
+										/>
+										<VBtn variant="text" size="small" @click="testRule(rule)">測試通知</VBtn>
+										<VBtn variant="text" size="small" @click="openEditRule(rule)">編輯</VBtn>
+										<VBtn variant="text" size="small" color="error" @click="deleteTarget = rule">刪除</VBtn>
+									</div>
+								</template>
+							</VListItem>
+							<VDivider v-if="index < rules.length - 1" />
+						</template>
+					</VList>
+				</VCard>
 			</VWindowItem>
 
 			<!-- > 服務指標：流量、延遲、錯誤、飽和度四個訊號 + 各服務健康度 -->
@@ -637,106 +640,6 @@ onBeforeUnmount(() => {
 					@action="resetLogFilter"
 				/>
 			</VWindowItem>
-
-			<!-- > 告警規則：條件、嚴重度與收件人群組 -->
-			<VWindowItem value="rules">
-				<div class="d-flex flex-wrap align-center ga-3 mb-5">
-					<p class="text-body-2 text-medium-emphasis">
-						規則以指標門檻加上持續時間判斷，避免瞬間尖峰造成誤報。
-					</p>
-					<VSpacer />
-					<VBtn color="primary" prepend-icon="mdi-plus" @click="openNewRule">新增規則</VBtn>
-				</div>
-
-				<VCard class="surface-border">
-					<VList lines="two">
-						<template v-for="(rule, index) in rules" :key="rule.id">
-							<VListItem class="py-3">
-								<template #prepend>
-									<VIcon
-										:icon="severityMeta[rule.severity].icon"
-										:color="rule.isEnabled ? severityMeta[rule.severity].color : 'secondary'"
-										aria-hidden="true"
-									/>
-								</template>
-								<VListItemTitle class="font-weight-bold">
-									{{ rule.name }}
-									<VChip size="x-small" variant="tonal" class="ml-2">{{ severityMeta[rule.severity].label }}</VChip>
-									<VChip size="x-small" variant="tonal" color="warning" prepend-icon="mdi-email-outline" class="ml-2">
-										Email
-									</VChip>
-								</VListItemTitle>
-								<VListItemSubtitle>
-									{{ describeAlertRule(rule) }} · Email 通知 {{ groupLabel(rule.recipientGroupId) }}
-								</VListItemSubtitle>
-								<template #append>
-									<div class="d-flex align-center ga-2">
-										<VSwitch
-											:model-value="rule.isEnabled"
-											color="primary"
-											density="compact"
-											hide-details
-											:aria-label="`啟用規則 ${rule.name}`"
-											@update:model-value="toggleRule(rule, $event)"
-										/>
-										<VBtn variant="text" size="small" @click="testRule(rule)">測試通知</VBtn>
-										<VBtn variant="text" size="small" @click="openEditRule(rule)">編輯</VBtn>
-										<VBtn variant="text" size="small" color="error" @click="deleteTarget = rule">刪除</VBtn>
-									</div>
-								</template>
-							</VListItem>
-							<VDivider v-if="index < rules.length - 1" />
-						</template>
-					</VList>
-				</VCard>
-			</VWindowItem>
-
-			<!-- > 告警紀錄：觸發、靜音與解除的完整過程 -->
-			<VWindowItem value="alerts">
-				<div class="d-flex flex-wrap align-center ga-2 mb-5">
-					<VChip color="error" variant="tonal" size="small">觸發中 {{ alertSummary.firing }}</VChip>
-					<VChip color="secondary" variant="tonal" size="small">已靜音 {{ alertSummary.silenced }}</VChip>
-					<VChip color="success" variant="tonal" size="small">已解除 {{ alertSummary.resolved }}</VChip>
-				</div>
-
-				<VCard class="surface-border pa-5">
-					<VTimeline side="end" density="compact" truncate-line="both">
-						<VTimelineItem
-							v-for="event in events"
-							:key="event.id"
-							:id="`alert-event-${event.id}`"
-							:class="{ 'focused-alert-event': event.id === focusedEventId }"
-							:dot-color="eventStatusMeta[event.status].color"
-							size="small"
-						>
-							<div class="d-flex flex-wrap align-center ga-2">
-								<p class="font-weight-bold">{{ event.ruleName }}</p>
-								<VChip :color="eventStatusMeta[event.status].color" size="x-small" variant="tonal">
-									<VIcon :icon="eventStatusMeta[event.status].icon" start size="12" aria-hidden="true" />
-									{{ eventStatusMeta[event.status].label }}
-								</VChip>
-								<VChip size="x-small" variant="tonal">{{ severityMeta[event.severity].label }}</VChip>
-							</div>
-							<p class="text-caption text-medium-emphasis mt-1">
-								觀測值 {{ event.observed }} · {{ event.startedAt }} · {{ event.durationLabel }}
-							</p>
-							<p class="text-caption mt-1" :class="event.notifyResult === '寄送失敗' ? 'text-error' : 'text-medium-emphasis'">
-								電子郵件通知：{{ event.notifyResult }}<template v-if="event.notifiedCount > 0">（{{ event.notifiedCount }} 位收件人）</template>
-							</p>
-							<VBtn
-								v-if="event.status === 'firing'"
-								class="mt-2"
-								size="small"
-								variant="outlined"
-								prepend-icon="mdi-bell-sleep-outline"
-								@click="silenceEvent(event)"
-							>
-								靜音 1 小時
-							</VBtn>
-						</VTimelineItem>
-					</VTimeline>
-				</VCard>
-			</VWindowItem>
 		</VWindow>
 
 		<VAlert type="info" variant="tonal" class="mt-6">
@@ -801,9 +704,9 @@ onBeforeUnmount(() => {
 						<VTextField v-model.number="ruleDraft.durationMinutes" label="持續時間" type="number" suffix="分鐘" />
 					</div>
 					<VSelect v-model="ruleDraft.severity" :items="severityOptions" label="嚴重度" />
-					<VSelect v-model="ruleDraft.recipientGroupId" :items="groupOptions" label="Email 通知對象" />
 					<VAlert type="info" variant="tonal" density="compact">
-						觸發條件：{{ describeAlertRule(ruleDraft) }}
+						觸發條件：{{ describeAlertRule(ruleDraft) }}<br />
+						通知對象（依嚴重度）：{{ routingLabel(ruleDraft.severity) }}
 					</VAlert>
 				</VCardText>
 				<VCardActions class="pa-5">
@@ -832,75 +735,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.satisfaction-row {
-	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: var(--space-md);
-	margin: 0 0 var(--space-lg);
-}
-
-.satisfaction-row > div {
-	display: grid;
-	align-content: start;
-	gap: 2px;
-	padding: var(--space-md);
-	border: 1px solid rgb(var(--v-theme-outline));
-	border-radius: var(--radius-md);
-	background: rgb(var(--v-theme-surface));
-}
-
-.satisfaction-row dt {
-	color: var(--ink-muted);
-	font-size: 0.8rem;
-}
-
-.satisfaction-row dd {
-	margin: 0;
-	font-size: 1.6rem;
-	font-weight: 700;
-	font-variant-numeric: tabular-nums;
-	line-height: 1.3;
-}
-
-.satisfaction-row span {
-	color: var(--ink-muted);
-	font-size: 0.76rem;
-}
-
-.satisfaction-table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 0.88rem;
-}
-
-.satisfaction-table th {
-	padding: 4px 6px;
-	border-bottom: 1px solid rgb(var(--v-theme-outline));
-	color: var(--ink-muted);
-	font-weight: 500;
-	text-align: left;
-}
-
-.satisfaction-table td {
-	padding: 8px 6px;
-	border-bottom: 1px solid rgb(var(--v-theme-outline) / 50%);
-}
-
-.satisfaction-table .num {
-	font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 960px) {
-	.satisfaction-row {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-}
-
-@media (max-width: 600px) {
-	.satisfaction-row {
-		grid-template-columns: minmax(0, 1fr);
-	}
-}
 
 .monitoring-window {
 	overflow: visible;

@@ -96,11 +96,11 @@ export const logEntries: LogEntry[] = [
 ]
 
 export const alertRules: AlertRule[] = [
-	{ id: 'rule-latency', name: '回答延遲過高', metricId: 'metric-answer-latency', metricLabel: '回答延遲 p95', comparison: '>', threshold: 4, unit: '秒', durationMinutes: 5, severity: 'warning', recipientGroupId: 'group-ops', isEnabled: true },
-	{ id: 'rule-error', name: '請求錯誤率異常', metricId: 'metric-error-rate', metricLabel: '請求錯誤率', comparison: '>', threshold: 3, unit: '%', durationMinutes: 10, severity: 'critical', recipientGroupId: 'group-ops', isEnabled: true },
-	{ id: 'rule-backlog', name: '文件處理積壓過高', metricId: 'metric-queue-backlog', metricLabel: '文件處理積壓', comparison: '>=', threshold: 15, unit: '件', durationMinutes: 10, severity: 'critical', recipientGroupId: 'group-manager', isEnabled: true },
-	{ id: 'rule-llm', name: 'LLM 服務成功率下降', metricId: 'metric-error-rate', metricLabel: 'LLM 呼叫成功率', comparison: '<', threshold: 98, unit: '%', durationMinutes: 15, severity: 'warning', recipientGroupId: 'group-ops', isEnabled: true },
-	{ id: 'rule-traffic', name: '問答請求量異常下降', metricId: 'metric-request-rate', metricLabel: '問答請求量', comparison: '<', threshold: 50, unit: '次 / 小時', durationMinutes: 30, severity: 'info', recipientGroupId: 'group-km', isEnabled: false },
+	{ id: 'rule-latency', name: '回答延遲過高', metricId: 'metric-answer-latency', metricLabel: '回答延遲 p95', comparison: '>', threshold: 4, unit: '秒', durationMinutes: 5, severity: 'warning', isEnabled: true },
+	{ id: 'rule-error', name: '請求錯誤率異常', metricId: 'metric-error-rate', metricLabel: '請求錯誤率', comparison: '>', threshold: 3, unit: '%', durationMinutes: 10, severity: 'critical', isEnabled: true },
+	{ id: 'rule-backlog', name: '文件處理積壓過高', metricId: 'metric-queue-backlog', metricLabel: '文件處理積壓', comparison: '>=', threshold: 15, unit: '件', durationMinutes: 10, severity: 'critical', isEnabled: true },
+	{ id: 'rule-llm', name: 'LLM 服務成功率下降', metricId: 'metric-error-rate', metricLabel: 'LLM 呼叫成功率', comparison: '<', threshold: 98, unit: '%', durationMinutes: 15, severity: 'warning', isEnabled: true },
+	{ id: 'rule-traffic', name: '問答請求量異常下降', metricId: 'metric-request-rate', metricLabel: '問答請求量', comparison: '<', threshold: 50, unit: '次 / 小時', durationMinutes: 30, severity: 'info', isEnabled: false },
 ]
 
 export const alertEvents: AlertEvent[] = [
