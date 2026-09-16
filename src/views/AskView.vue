@@ -8,12 +8,13 @@ import AnswerSettingsMenu from '@/components/AnswerSettingsMenu.vue'
 import CitationSourcePanel from '@/components/CitationSourcePanel.vue'
 import ConversationOutline from '@/components/ConversationOutline.vue'
 import ThinkingTrace from '@/components/ThinkingTrace.vue'
+import { buildRunFromTrace, reportAnswerFeedback } from '@/mocks/feedbackAdmin'
 import { getEmployeeDocumentsBySourceId } from '@/repositories/knowledge.repository'
 import { ANSWER_FEEDBACK_REASON_MAX_LENGTH, useConversationStore } from '@/stores/conversation'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useNotebooksStore } from '@/stores/notebooks'
 import type { Citation, ConversationMessage, OutlineItem } from '@/types'
-import { buildAskKnowledgeSourceGroups } from '@/utils/knowledgeSources'
+import { buildAskKnowledgeSourceGroups, buildKnowledgeSourceOptions } from '@/utils/knowledgeSources'
 
 interface SourceDocumentOption {
 	id: string
@@ -366,6 +367,40 @@ function setFeedbackDialogOpen(isOpen: boolean): void {
 	focusAnswerAction('feedback-down', messageId)
 }
 
+// @ 倒讚會成為管理端「回饋與問題」的待處理案件，附上當時的提問、回答與引用供診斷
+function queueFeedbackForAdmin(messageId: string, reason: string): void {
+	const index = conversationStore.messages.findIndex((item) => item.id === messageId)
+	const answer = conversationStore.messages[index]
+	if (!answer) return
+	const question = conversationStore.messages.slice(0, index).reverse().find((item) => item.role === 'user')?.content ?? '（找不到對應的提問）'
+	const source = buildKnowledgeSourceOptions(notebooksStore.notebooks).find((option) => option.id === conversationStore.selectedKnowledgeSourceId)
+	const citations = answer.citations ?? []
+	reportAnswerFeedback({
+		question,
+		answer: answer.content,
+		reason,
+		citations,
+		conversationId: conversationStore.activeConversationId ?? undefined,
+		// @ 設定取倒讚當下的值；若使用者回答後才改設定會有落差，正式版由後端依 requestId 保存
+		run: buildRunFromTrace({
+			question,
+			citations,
+			trace: answer.trace,
+			settings: {
+				sourceId: conversationStore.selectedKnowledgeSourceId,
+				sourceName: source?.name ?? conversationStore.selectedScope,
+				documentIds: conversationStore.selectedDocuments.map((document) => document.id),
+				documentNames: conversationStore.selectedDocuments.map((document) => document.name),
+				answerStyleId: conversationStore.selectedAnswerStyleId,
+				answerModelId: conversationStore.selectedAnswerModelId,
+				webSearchEnabled: false,
+			},
+		}),
+		// TODO(api-integration): 回報者改由後端依登入身分帶入
+		reporter: { userId: 'user-current', name: '王小明', email: 'employee@company.com', department: '產品企劃部' },
+	})
+}
+
 function submitNegativeFeedback(): void {
 	const reason = feedbackReason.value.trim()
 	feedbackReasonError.value = ''
@@ -381,6 +416,7 @@ function submitNegativeFeedback(): void {
 		feedbackReasonError.value = '目前無法記錄倒讚，請關閉後再試一次。'
 		return
 	}
+	queueFeedbackForAdmin(feedbackTargetId.value, reason)
 	feedbackMessage.value = '已記錄倒讚與改善原因，謝謝你的回饋。'
 	setFeedbackDialogOpen(false)
 }

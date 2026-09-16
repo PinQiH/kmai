@@ -90,13 +90,13 @@ describe('admin information architecture', () => {
 		expect(wrapper.find('[data-testid="processing-document-filter-doc-003"]').exists()).toBe(false)
 	})
 
-	it('should keep operational monitoring focused on health, alerts, metrics, logs and rules', async () => {
+	it('should keep operational monitoring focused on health, alerts, metrics, answer quality, logs and rules', async () => {
 		const { wrapper } = await mountAdminView(AdminMonitoringView, '/admin/monitoring', [
 			{ path: '/admin/monitoring', component: AdminMonitoringView },
 		])
 		const tabLabels = wrapper.findAll('[role="tab"]').map((tab) => tab.text())
 
-		expect(tabLabels).toEqual(['系統概況', '目前告警', '服務指標', '日誌查詢', '告警規則'])
+		expect(tabLabels).toEqual(['系統概況', '目前告警', '服務指標', '回答滿意度', '日誌查詢', '告警規則'])
 		expect(wrapper.text()).not.toContain('通知設定')
 		expect(wrapper.text()).not.toContain('SMTP 主機')
 	})

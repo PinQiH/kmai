@@ -5,6 +5,7 @@ import { useTheme } from "vuetify"
 
 import DocumentVersionTimeline from "@/components/DocumentVersionTimeline.vue"
 import PageHeader from "@/components/PageHeader.vue"
+import { reportIssue } from "@/mocks/feedbackAdmin"
 import { useAppStore } from "@/stores/app"
 import type { ThemePreference } from "@/theme"
 import type { DocumentVersionEntry } from "@/types"
@@ -27,6 +28,8 @@ const issueTitle = ref("")
 const issueDescription = ref("")
 const isSaved = ref(false)
 const isIssueSubmitted = ref(false)
+const issueFiles = ref<File[]>([])
+const issueFileError = ref("")
 const emailTouched = ref(false)
 const currentPassword = ref("")
 const newPassword = ref("")
@@ -122,11 +125,45 @@ function updatePassword(): void {
     "密碼格式已通過；正式更新時，系統會再確認未與前三次密碼重複。"
 }
 
+// @ 只收點陣圖：SVG 可能夾帶腳本，截圖也不會是 SVG
+const ISSUE_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"]
+const ISSUE_MAX_FILES = 3
+const ISSUE_MAX_BYTES = 5 * 1024 * 1024
+
+function validateIssueFiles(files: File[]): string {
+  if (files.length > ISSUE_MAX_FILES) return `最多附上 ${ISSUE_MAX_FILES} 張截圖。`
+  if (files.some((file) => !ISSUE_IMAGE_TYPES.includes(file.type))) return "只能附上 PNG、JPG 或 WebP 圖片。"
+  if (files.some((file) => file.size > ISSUE_MAX_BYTES)) return "每張截圖不可超過 5 MB。"
+  return ""
+}
+
+function updateIssueFiles(value: File | File[] | null | undefined): void {
+  issueFiles.value = value ? (Array.isArray(value) ? value : [value]) : []
+  issueFileError.value = validateIssueFiles(issueFiles.value)
+}
+
 function submitIssue(): void {
   if (!issueTitle.value.trim() || !issueDescription.value.trim()) return
+  issueFileError.value = validateIssueFiles(issueFiles.value)
+  if (issueFileError.value) return
+  // TODO(api-integration): 改為串接問題回報 API（multipart 上傳），回報者由後端依登入身分帶入
+  reportIssue({
+    category: issueCategory.value,
+    title: issueTitle.value,
+    description: issueDescription.value,
+    attachments: issueFiles.value.map((file) => ({
+      id: crypto.randomUUID(),
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      url: URL.createObjectURL(file),
+    })),
+    reporter: { userId: "user-current", name: displayName.value, email: email.value },
+  })
   isIssueSubmitted.value = true
   issueTitle.value = ""
   issueDescription.value = ""
+  issueFiles.value = []
 }
 
 function syncTabFromRoute(): void {
@@ -303,6 +340,21 @@ onMounted(syncTabFromRoute)
           />
           <VTextField v-model="issueTitle" label="問題標題" />
           <VTextarea v-model="issueDescription" label="詳細說明" rows="5" />
+          <VFileInput
+            :model-value="issueFiles"
+            label="截圖（選填）"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            chips
+            show-size
+            prepend-icon="mdi-image-outline"
+            hint="最多 3 張，每張 5 MB 以內；請避免截到密碼或個資"
+            persistent-hint
+            :error-messages="issueFileError"
+            class="mb-4"
+            data-testid="issue-attachments"
+            @update:model-value="updateIssueFiles"
+          />
           <VAlert
             v-if="isIssueSubmitted"
             type="success"
@@ -313,7 +365,7 @@ onMounted(syncTabFromRoute)
           <VBtn
             type="submit"
             color="primary"
-            :disabled="!issueTitle.trim() || !issueDescription.trim()"
+            :disabled="!issueTitle.trim() || !issueDescription.trim() || Boolean(issueFileError)"
             >送出問題</VBtn
           >
         </VCard>

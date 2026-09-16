@@ -25,16 +25,6 @@ interface WorkspaceConfig {
 }
 
 const workspaceConfigs: Record<string, WorkspaceConfig> = {
-	feedback: {
-		eyebrow: '改善知識品質',
-		description: '從使用者回饋回看問題、回答、引用與檢索結果，找出需要修正的內容或設定。',
-		tabs: ['AI 回答回饋', '問題回報', '處理紀錄'],
-		items: [
-			{ title: '海外出差的住宿上限是多少？', description: '使用者表示引用的是舊版本 · 財務制度', status: '高優先', action: '查看診斷' },
-			{ title: '找不到新進人員設備申請流程', description: '搜尋無結果 · 可能缺少同義詞', status: '新進', action: '指派處理人' },
-			{ title: '文件預覽在行動裝置無法縮放', description: '問題回報 · iOS Safari', status: '審查中', action: '更新狀態' },
-		],
-	},
 	ai: {
 		eyebrow: '回答與檢索品質',
 		description: '管理問題路由、混合檢索、模型、提示詞與專有名詞。變更前可先測試，不影響目前服務。',
@@ -71,11 +61,6 @@ const workspaceConfigs: Record<string, WorkspaceConfig> = {
 type WorkspaceItem = WorkspaceConfig['items'][number]
 
 const workspaceTabItems: Record<string, WorkspaceItem[][]> = {
-	feedback: [
-		[{ title: '海外出差的住宿上限是多少？', description: '引用舊版本 · 回報者：陳小姐 · 今天 09:18', status: '高優先', action: '查看診斷' }, { title: '找不到設備申請流程', description: '搜尋無結果 · 可能缺少同義詞', status: '新進', action: '指派處理人' }],
-		[{ title: '文件預覽無法縮放', description: 'iOS Safari · 附有畫面資訊', status: '審查中', action: '更新狀態' }, { title: '無法下載附件', description: '財務部 · 差旅費用明細表', status: '待處理', action: '查看回報' }],
-		[{ title: '回饋 #FB-1042', description: '王小明 → 林怡君 · 新進 → 審查中', status: '處理中', action: '查看紀錄' }, { title: '問題 #IS-0821', description: '資訊部 · 已確認為瀏覽器相容問題', status: '已結案', action: '查看紀錄' }],
-	],
 	ai: [
 		[{ title: '單一主題路由', description: '優先限制在辨識出的知識主題', status: '已啟用', action: '編輯規則' }, { title: '跨文件問題路由', description: '需要比較或彙整時擴大檢索範圍', status: '已啟用', action: '編輯規則' }],
 		[{ title: '語意搜尋', description: '候選 20 筆 · 權重 60%', status: '已啟用', action: '調整參數' }, { title: '關鍵字搜尋', description: '候選 20 筆 · 權重 40%', status: '已啟用', action: '調整參數' }, { title: '知識圖譜擴充', description: '每個命中節點展開 2 層', status: '已啟用', action: '調整參數' }],

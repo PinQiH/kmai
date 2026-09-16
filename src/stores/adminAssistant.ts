@@ -4,19 +4,27 @@ import { useAssistantAuditStore } from '@/stores/assistantAudit'
 import { useNotebooksStore } from '@/stores/notebooks'
 import type {
 	AdminAssistantMessage,
+	AnswerModelId,
+	AnswerSettings,
+	AnswerStyleId,
 	AssistantLauncherEdge,
 	AssistantLauncherPosition,
 	AssistantSessionEndReason,
 	KnowledgeSourceOption,
 } from '@/types'
 import { createMockAdminAssistantAnswer } from '@/utils/adminAssistantMock'
+import { DEFAULT_ANSWER_MODEL_ID, DEFAULT_ANSWER_STYLE_ID, getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
 import { MODEL_ONLY_SOURCE } from '@/utils/knowledgeSources'
 
 export const ASSISTANT_IDLE_TIMEOUT_MS = 15 * 60 * 1000
 export const ASSISTANT_EXPIRY_WARNING_MS = 60 * 1000
 export const ASSISTANT_MOCK_RESPONSE_MS = 500
 
-const ASSISTANT_MODEL_LABEL = 'gpt-4.1-mini（Mock）'
+export interface AssistantScopedDocument {
+	id: string
+	name: string
+}
+
 const CURRENT_USER = {
 	id: 'user-current',
 	name: '王小明',
@@ -28,6 +36,10 @@ interface AdminAssistantState {
 	activeSessionId: string | null
 	messages: AdminAssistantMessage[]
 	selectedSource: KnowledgeSourceOption
+	/** 限定文件；空陣列代表使用整個來源，與前台問答一致 */
+	selectedDocuments: AssistantScopedDocument[]
+	answerStyleId: AnswerStyleId
+	answerModelId: AnswerModelId
 	webSearchOverride: boolean | null
 	isResponding: boolean
 	errorMessage: string
@@ -38,6 +50,23 @@ interface AdminAssistantState {
 	pendingRequestId: string | null
 	lastFailedQuestion: string
 	hasResponseFailure: boolean
+	/** 從回饋案件發起的複測；套用回報者當時的設定 */
+	retest: AssistantRetestContext | null
+	/** 帶入輸入框但尚未送出的問題，面板讀取後清空 */
+	draftQuestion: string
+}
+
+export interface AssistantRetestContext {
+	caseId: string
+	caseTitle: string
+	reporterName: string
+	question: string
+	sourceId: string
+	sourceName: string
+	/** 來源已無法使用（例如筆記本被刪除）時為 false，面板需提示改用的來源 */
+	sourceAvailable: boolean
+	settingLabels: string[]
+	webSearchEnabled: boolean
 }
 
 export interface SendAssistantQuestionInput {
@@ -60,6 +89,9 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 		activeSessionId: null,
 		messages: [],
 		selectedSource: cloneModelSource(),
+		selectedDocuments: [],
+		answerStyleId: DEFAULT_ANSWER_STYLE_ID,
+		answerModelId: DEFAULT_ANSWER_MODEL_ID,
 		webSearchOverride: null,
 		isResponding: false,
 		errorMessage: '',
@@ -70,11 +102,28 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 		pendingRequestId: null,
 		lastFailedQuestion: '',
 		hasResponseFailure: false,
+		retest: null,
+		draftQuestion: '',
 	}),
 	getters: {
 		isWebSearchEnabled(state): boolean {
 			if (!state.selectedSource.supportsWebSearch) return false
 			return state.webSearchOverride ?? state.selectedSource.defaultWebSearchEnabled
+		},
+		/** 只有知識庫與筆記本可以限定文件，模型一般知識沒有文件可選 */
+		supportsDocumentScope(state): boolean {
+			return state.selectedSource.kind === 'knowledge-base' || state.selectedSource.kind === 'notebook'
+		},
+		answerModelLabel(state): string {
+			return getAnswerModelLabel(state.answerModelId)
+		},
+		answerStyleLabel(state): string {
+			return getAnswerStyleLabel(state.answerStyleId)
+		},
+		scopeSummary(state): string {
+			if (!state.selectedDocuments.length) return state.selectedSource.name
+			if (state.selectedDocuments.length === 1) return `${state.selectedSource.name} · ${state.selectedDocuments[0].name}`
+			return `${state.selectedSource.name} · 已選 ${state.selectedDocuments.length} 份文件`
 		},
 	},
 	actions: {
@@ -85,9 +134,30 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 			this.isOpen = false
 		},
 		selectKnowledgeSource(source: KnowledgeSourceOption): void {
+			// @ 換來源後舊的限定文件已不屬於這個來源，一律清掉
+			if (this.selectedSource.id !== source.id) this.selectedDocuments = []
 			this.selectedSource = { ...source }
 			this.webSearchOverride = null
 			this.errorMessage = ''
+		},
+		/**
+		 * 設定限定文件；與前台問答一致，不選文件代表使用整個來源。
+		 * @param documents 目前來源中被選取的文件。
+		 */
+		setSelectedDocuments(documents: AssistantScopedDocument[]): void {
+			if (!this.supportsDocumentScope) {
+				this.selectedDocuments = []
+				return
+			}
+			const unique = new Map(documents.map((document) => [document.id, { ...document }]))
+			this.selectedDocuments = [...unique.values()]
+		},
+		clearSelectedDocuments(): void {
+			this.selectedDocuments = []
+		},
+		applyAnswerSettings(settings: AnswerSettings): void {
+			this.answerStyleId = settings.answerStyleId
+			this.answerModelId = settings.answerModelId
 		},
 		setWebSearchEnabled(isEnabled: boolean): void {
 			if (!this.selectedSource.supportsWebSearch) {
@@ -95,6 +165,31 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 				return
 			}
 			this.webSearchOverride = isEnabled
+		},
+		/**
+		 * 以回饋案件的提問與設定開啟小幫手複測；會結束進行中的對話，避免混入前後文。
+		 * @param context 複測脈絡。
+		 * @param source 對應的知識來源；已無法使用時傳 undefined，沿用目前來源。
+		 */
+		startRetest(
+			context: Omit<AssistantRetestContext, 'sourceAvailable'>,
+			source: KnowledgeSourceOption | undefined,
+			settings: { documents: AssistantScopedDocument[]; answerStyleId: AnswerStyleId; answerModelId: AnswerModelId },
+		): void {
+			if (this.activeSessionId) this.endSession('manual_end')
+			if (source) {
+				this.selectKnowledgeSource(source)
+				this.setWebSearchEnabled(context.webSearchEnabled)
+				this.setSelectedDocuments(settings.documents)
+			}
+			this.answerStyleId = settings.answerStyleId
+			this.answerModelId = settings.answerModelId
+			this.retest = { ...context, settingLabels: [...context.settingLabels], sourceAvailable: Boolean(source) }
+			this.draftQuestion = context.question
+			this.isOpen = true
+		},
+		clearRetest(): void {
+			this.retest = null
 		},
 		updateLauncherPosition(position: AssistantLauncherPosition, edge: AssistantLauncherEdge): void {
 			this.launcherPosition = { ...position }
@@ -110,7 +205,7 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 				userId: CURRENT_USER.id,
 				userName: CURRENT_USER.name,
 				department: CURRENT_USER.department,
-				modelLabel: ASSISTANT_MODEL_LABEL,
+				modelLabel: `${this.answerModelLabel}（Mock）`,
 			})
 			return sessionId
 		},
@@ -140,6 +235,7 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 			const requestId = `req-assistant-${crypto.randomUUID()}`
 			const sourceSnapshot = { ...this.selectedSource }
 			const webSearchEnabled = this.isWebSearchEnabled
+			const documentSnapshot = this.selectedDocuments.map((document) => ({ ...document }))
 			const userMessage: AdminAssistantMessage = {
 				id: crypto.randomUUID(),
 				role: 'user',
@@ -171,6 +267,9 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 					pageTitle: input.pageTitle,
 					source: sourceSnapshot,
 					webSearchEnabled,
+					documents: documentSnapshot,
+					answerStyleLabel: this.answerStyleLabel,
+					answerModelLabel: this.answerModelLabel,
 				})
 				const answeredAt = new Date().toISOString()
 				const assistantMessage: AdminAssistantMessage = {
@@ -262,6 +361,9 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 			this.activeSessionId = null
 			this.messages = []
 			this.selectedSource = cloneModelSource()
+			this.selectedDocuments = []
+			this.answerStyleId = DEFAULT_ANSWER_STYLE_ID
+			this.answerModelId = DEFAULT_ANSWER_MODEL_ID
 			this.webSearchOverride = null
 			this.isResponding = false
 			this.errorMessage = ''
@@ -270,6 +372,8 @@ export const useAdminAssistantStore = defineStore('admin-assistant', {
 			this.pendingRequestId = null
 			this.lastFailedQuestion = ''
 			this.hasResponseFailure = false
+			this.retest = null
+			this.draftQuestion = ''
 		},
 	},
 })

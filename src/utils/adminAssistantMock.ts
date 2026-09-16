@@ -11,6 +11,10 @@ interface CreateMockAssistantAnswerInput {
 	pageTitle: string
 	source: KnowledgeSourceOption
 	webSearchEnabled: boolean
+	/** 限定文件；空陣列代表整個來源 */
+	documents?: Array<{ id: string; name: string }>
+	answerStyleLabel?: string
+	answerModelLabel?: string
 }
 
 /**
@@ -31,8 +35,21 @@ export function createMockAdminAssistantAnswer(input: CreateMockAssistantAnswerI
 	}
 
 	if (input.webSearchEnabled) content += '這次回答也套用了網路搜尋的單次覆寫設定。'
+
+	// @ 假資料：實際檢索由後端執行，這裡只把套用的設定講清楚，避免誤以為是真的檢索結果
+	const scopedDocuments = input.documents ?? []
+	const appliedSettings = [
+		scopedDocuments.length ? `限定 ${scopedDocuments.length} 份文件（${scopedDocuments.map((document) => document.name).join('、')}）` : '',
+		input.answerModelLabel ?? '',
+		input.answerStyleLabel ? `${input.answerStyleLabel}風格` : '',
+	].filter(Boolean)
+	if (appliedSettings.length) content += `\n\n（本次設定：${input.source.name} · ${appliedSettings.join(' · ')}）`
+
+	if (input.source.kind === 'model') return { content, citations: [] }
+	const scopedIds = new Set(scopedDocuments.map((document) => document.id))
+	const available = scopedIds.size ? citations.filter((citation) => scopedIds.has(citation.documentId)) : citations
 	return {
 		content,
-		citations: input.source.kind === 'model' ? [] : citations.slice(0, 2).map((citation) => ({ ...citation })),
+		citations: available.slice(0, 2).map((citation) => ({ ...citation })),
 	}
 }

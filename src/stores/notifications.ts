@@ -270,6 +270,46 @@ export const useNotificationsStore = defineStore('notifications', {
 			return notificationId
 		},
 		/**
+		 * 由系統事件（例如回饋案件指派、結案）發送站內通知給指定使用者。
+		 * @param input 通知內容與收件人識別碼。
+		 * @returns 新通知識別碼；資料不完整或沒有有效收件人時回傳 null。
+		 */
+		sendSystemNotification(input: {
+			title: string
+			body: string
+			userIds: string[]
+			priority: AppNotification['priority']
+			actionTo: string | null
+			actionLabel: string | null
+			sourceLabel: string
+		}): string | null {
+			const title = input.title.trim()
+			const body = input.body.trim()
+			const actionTo = normalizeNotificationActionTarget(input.actionTo)
+			const recipients = resolveAudienceUsers(this.users, 'selected', null, null, input.userIds)
+			if (!title || !body || actionTo === undefined || recipients.length === 0) return null
+
+			const sentAt = new Date().toISOString()
+			const notificationId = `notification-system-${Date.parse(sentAt)}-${this.notifications.length + 1}`
+			this.notifications.unshift({
+				id: notificationId,
+				title,
+				body,
+				priority: input.priority,
+				source: 'automatic',
+				sourceLabel: input.sourceLabel,
+				audienceLabel: buildAudienceLabel('selected', recipients, null, null),
+				actionLabel: actionTo ? input.actionLabel?.trim() || '查看詳情' : null,
+				actionTo,
+				createdAt: sentAt,
+				sentAt,
+				createdBy: '系統自動通知',
+				recipients: recipients.map((user) => buildRecipient(user.id, sentAt)),
+			})
+			this.deliveryClock = Date.now()
+			return notificationId
+		},
+		/**
 		 * 更新前台判斷排程通知是否已到發送時間的基準時鐘。
 		 * @param now 目前時間戳，測試可傳入固定值。
 		 */

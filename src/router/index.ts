@@ -160,8 +160,8 @@ const routes: RouteRecordRaw[] = [
 	{
 		path: "/admin/feedback",
 		name: "admin-feedback",
-		component: () => import("@/views/admin/AdminWorkspaceView.vue"),
-		meta: { admin: true, workspace: "feedback", title: "回饋與問題" },
+		component: () => import("@/views/admin/AdminFeedbackView.vue"),
+		meta: { admin: true, title: "回饋與問題" },
 	},
 	{
 		path: "/admin/ai-settings",

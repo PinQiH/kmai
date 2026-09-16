@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
+import AnswerSettingsMenu from '@/components/AnswerSettingsMenu.vue'
+import { CURRENT_HANDLER, addCaseNote } from '@/mocks/feedbackAdmin'
+import { getEmployeeDocumentsBySourceId } from '@/repositories/knowledge.repository'
 import { useAdminAssistantStore } from '@/stores/adminAssistant'
 import { useNotebooksStore } from '@/stores/notebooks'
-import type { KnowledgeSourceOption } from '@/types'
+import type { AnswerSettings, KnowledgeSourceOption } from '@/types'
 
 const props = defineProps<{
 	pageTitle: string
@@ -23,6 +26,26 @@ const question = ref('')
 const composer = ref<HTMLTextAreaElement>()
 const isEndDialogOpen = ref(false)
 const isSourceDialogOpen = ref(false)
+const documentSearch = ref<string | null>('')
+const recordedMessageIds = ref<string[]>([])
+const recordError = ref('')
+
+// @ 從回饋案件發起複測時，問題先放進輸入框讓管理者確認或修改再送出
+watch(() => assistantStore.draftQuestion, (draft) => {
+	if (!draft) return
+	question.value = draft
+	assistantStore.draftQuestion = ''
+	recordedMessageIds.value = []
+	void nextTick(() => composer.value?.focus())
+}, { immediate: true })
+
+function recordRetestResult(messageId: string, content: string): void {
+	const retest = assistantStore.retest
+	if (!retest) return
+	const excerpt = content.length > 400 ? `${content.slice(0, 400)}…` : content
+	recordError.value = addCaseNote(retest.caseId, `複測結果（${assistantStore.scopeSummary} · ${assistantStore.answerModelLabel} · ${assistantStore.answerStyleLabel}風格）：\n${excerpt}`, CURRENT_HANDLER)
+	if (!recordError.value) recordedMessageIds.value.push(messageId)
+}
 
 const liveNotebook = computed(() => notebooksStore.notebooks.find((notebook) => notebook.id === assistantStore.selectedSource.id))
 const missingNotebook = computed(() => assistantStore.selectedSource.kind === 'notebook' && !liveNotebook.value)
@@ -30,6 +53,24 @@ const emptyNotebook = computed(() => assistantStore.selectedSource.kind === 'not
 const canSend = computed(() => (
 	question.value.trim().length > 0 && !assistantStore.isResponding && !emptyNotebook.value && !missingNotebook.value
 ))
+// > 限定文件：與前台問答同一套規則，知識庫取可見文件、筆記本取已完成處理的文件
+const availableDocuments = computed(() => {
+	const source = assistantStore.selectedSource
+	if (source.kind === 'knowledge-base') {
+		return getEmployeeDocumentsBySourceId(source.id).map((document) => ({ id: document.id, name: document.title }))
+	}
+	if (source.kind === 'notebook') {
+		return (liveNotebook.value?.documents ?? [])
+			.filter((document) => document.status === 'ready')
+			.map((document) => ({ id: document.id, name: document.name }))
+	}
+	return []
+})
+const filteredDocuments = computed(() => {
+	const keyword = documentSearch.value?.trim().toLocaleLowerCase('zh-TW') ?? ''
+	if (!keyword) return availableDocuments.value
+	return availableDocuments.value.filter((document) => document.name.toLocaleLowerCase('zh-TW').includes(keyword))
+})
 const webSearchSettingSource = computed(() => assistantStore.webSearchOverride === null ? 'default' : 'override')
 const webSearchTitle = computed(() => {
 	if (!assistantStore.selectedSource.supportsWebSearch) return '模型一般知識不使用網路搜尋'
@@ -64,6 +105,22 @@ function selectKnowledgeSource(sourceId: string | null): void {
 	const source = props.sources.find((item) => item.id === sourceId)
 	if (!source) return
 	assistantStore.selectKnowledgeSource(source)
+	documentSearch.value = ''
+}
+
+function isDocumentSelected(documentId: string): boolean {
+	return assistantStore.selectedDocuments.some((document) => document.id === documentId)
+}
+
+function toggleDocument(document: { id: string; name: string }, isSelected: boolean | null): void {
+	const documents = isSelected
+		? [...assistantStore.selectedDocuments, document]
+		: assistantStore.selectedDocuments.filter((selected) => selected.id !== document.id)
+	assistantStore.setSelectedDocuments(documents)
+}
+
+function applyAnswerSettings(settings: AnswerSettings): void {
+	assistantStore.applyAnswerSettings(settings)
 }
 
 function toggleWebSearch(): void {
@@ -121,8 +178,17 @@ onMounted(() => window.requestAnimationFrame(() => composer.value?.focus()))
 			</template>
 		</VAlert>
 
+		<div v-if="assistantStore.retest" class="assistant-retest" data-testid="assistant-retest">
+			<div class="assistant-retest-text">
+				<strong>複測「{{ assistantStore.retest.caseTitle }}」</strong>
+				<span v-if="assistantStore.retest.sourceAvailable">已套用 {{ assistantStore.retest.reporterName }} 當時的設定：{{ assistantStore.retest.sourceName }} · {{ assistantStore.retest.settingLabels.join(' · ') }}</span>
+				<span v-else class="text-warning">當時的來源「{{ assistantStore.retest.sourceName }}」已無法使用，改用 {{ assistantStore.selectedSource.name }}。</span>
+			</div>
+			<VBtn size="x-small" variant="text" aria-label="結束複測模式" @click="assistantStore.clearRetest()">結束複測</VBtn>
+		</div>
+
 		<div class="assistant-messages" role="log" aria-live="polite">
-			<div v-if="assistantStore.messages.length === 0" class="assistant-empty">
+			<div v-if="assistantStore.messages.length === 0 && !assistantStore.retest" class="assistant-empty">
 				<VIcon icon="mdi-sparkles" size="28" color="primary" aria-hidden="true" />
 				<h3 class="assistant-empty-title">快速問答與管理工作協助</h3>
 				<p class="assistant-empty-description">可測試不同知識來源、草擬通知與公告，或整理管理內容。對話閒置 15 分鐘後會自動清除。</p>
@@ -144,7 +210,12 @@ onMounted(() => window.requestAnimationFrame(() => composer.value?.focus()))
 						{{ citation.title }}
 					</VChip>
 				</div>
+				<div v-if="assistantStore.retest && message.role === 'assistant'" class="assistant-record">
+					<span v-if="recordedMessageIds.includes(message.id)"><VIcon icon="mdi-check" size="14" aria-hidden="true" /> 已記到這筆案件的處理紀錄</span>
+					<VBtn v-else size="x-small" variant="tonal" data-testid="assistant-record-retest" @click="recordRetestResult(message.id, message.content)">記到這筆案件</VBtn>
+				</div>
 			</article>
+			<p v-if="recordError" class="text-error text-body-2" role="alert">{{ recordError }}</p>
 			<div v-if="assistantStore.isResponding" class="assistant-thinking" role="status">
 				<VProgressCircular indeterminate size="18" width="2" />
 				正在整理回答…
@@ -179,8 +250,27 @@ onMounted(() => window.requestAnimationFrame(() => composer.value?.focus()))
 					@click="isSourceDialogOpen = true"
 				>
 					<VIcon icon="mdi-filter-variant" size="13" aria-hidden="true" />
-					<span class="assistant-tool-label">{{ assistantStore.selectedSource.name }}</span>
+					<span class="assistant-tool-label">{{ assistantStore.scopeSummary }}</span>
 				</button>
+				<AnswerSettingsMenu
+					:selected-answer-style-id="assistantStore.answerStyleId"
+					:selected-answer-model-id="assistantStore.answerModelId"
+					:is-responding="assistantStore.isResponding"
+					@apply="applyAnswerSettings"
+				>
+					<template #activator="{ activatorProps, isOpen }">
+						<button
+							v-bind="activatorProps"
+							type="button"
+							class="assistant-tool-chip"
+							data-testid="assistant-answer-settings"
+							:aria-expanded="isOpen"
+						>
+							<VIcon icon="mdi-tune-variant" size="13" aria-hidden="true" />
+							{{ assistantStore.answerStyleLabel }} · {{ assistantStore.answerModelLabel }}
+						</button>
+					</template>
+				</AnswerSettingsMenu>
 				<button
 					type="button"
 					class="assistant-tool-chip"
@@ -241,7 +331,47 @@ onMounted(() => window.requestAnimationFrame(() => composer.value?.focus()))
 						</template>
 					</VRadio>
 				</VRadioGroup>
+				<section v-if="assistantStore.supportsDocumentScope" class="assistant-scope" aria-labelledby="assistant-scope-title">
+					<div class="assistant-scope-head">
+						<h3 id="assistant-scope-title">限定文件（選填）</h3>
+						<span>{{ availableDocuments.length }} 份可用</span>
+					</div>
+					<p class="assistant-dialog-hint">不選擇文件時，會使用整個來源。</p>
+					<VTextField
+						v-if="availableDocuments.length > 0"
+						v-model="documentSearch"
+						label="搜尋文件"
+						prepend-inner-icon="mdi-magnify"
+						density="compact"
+						variant="outlined"
+						clearable
+						hide-details
+						data-testid="assistant-document-search"
+					/>
+					<p v-if="availableDocuments.length === 0" class="assistant-dialog-hint">這個來源目前沒有可限定的文件。</p>
+					<p v-else-if="filteredDocuments.length === 0" class="assistant-dialog-hint">找不到符合的文件，請調整搜尋文字。</p>
+					<fieldset v-else class="assistant-scope-options">
+						<legend class="assistant-scope-legend">選擇要限定的文件</legend>
+						<VCheckbox
+							v-for="document in filteredDocuments"
+							:key="document.id"
+							:model-value="isDocumentSelected(document.id)"
+							:label="document.name"
+							density="compact"
+							hide-details
+							:data-testid="`assistant-document-${document.id}`"
+							@update:model-value="toggleDocument(document, $event)"
+						/>
+					</fieldset>
+				</section>
 				<div class="assistant-dialog-actions">
+					<VBtn
+						v-if="assistantStore.selectedDocuments.length > 0"
+						variant="text"
+						data-testid="assistant-clear-documents"
+						@click="assistantStore.clearSelectedDocuments()"
+					>使用全部文件</VBtn>
+					<VSpacer />
 					<VBtn color="primary" variant="tonal" @click="isSourceDialogOpen = false">完成</VBtn>
 				</div>
 			</VCard>
@@ -330,6 +460,38 @@ onMounted(() => window.requestAnimationFrame(() => composer.value?.focus()))
 
 .assistant-alert {
 	margin: 10px 12px 0;
+}
+
+.assistant-retest {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-sm);
+	padding: 10px 14px;
+	border-bottom: 1px solid rgb(var(--v-theme-outline));
+	background: rgb(var(--v-theme-primary) / 6%);
+	font-size: 0.8rem;
+}
+
+.assistant-retest-text {
+	display: grid;
+	flex: 1 1 auto;
+	gap: 2px;
+	min-width: 0;
+}
+
+.assistant-retest-text span {
+	color: var(--ink-muted);
+	line-height: 1.5;
+}
+
+.assistant-record {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-top: 8px;
+	color: var(--ink-muted);
+	font-size: 0.74rem;
+	white-space: normal;
 }
 
 .assistant-messages {
@@ -559,8 +721,56 @@ onMounted(() => window.requestAnimationFrame(() => composer.value?.focus()))
 
 .assistant-dialog-actions {
 	display: flex;
+	align-items: center;
 	justify-content: flex-end;
 	margin-top: 20px;
+}
+
+.assistant-scope {
+	display: grid;
+	gap: 8px;
+	margin-top: 18px;
+	padding-top: 14px;
+	border-top: 1px solid rgb(var(--v-theme-outline));
+}
+
+.assistant-scope-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-sm);
+}
+
+.assistant-scope-head h3 {
+	color: var(--ink-strong);
+	font-size: 0.92rem;
+}
+
+.assistant-scope-head span {
+	color: var(--ink-muted);
+	font-size: 0.75rem;
+}
+
+.assistant-scope .assistant-dialog-hint {
+	margin: 0;
+}
+
+.assistant-scope-legend {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+.assistant-scope-options {
+	display: grid;
+	max-height: 210px;
+	overflow-y: auto;
+	margin: 0;
+	padding: 0;
+	border: 0;
 }
 
 @media (max-width: 600px) {

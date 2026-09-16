@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue"
+
 import AnimatedNumber from "@/components/AnimatedNumber.vue"
 import PageHeader from "@/components/PageHeader.vue"
+import { getOpenCases } from "@/mocks/feedbackAdmin"
 import {
   getHealthMetricsSnapshot,
   getRecentActivitiesSnapshot,
@@ -8,6 +11,7 @@ import {
 
 const healthMetrics = getHealthMetricsSnapshot()
 const recentActivities = getRecentActivitiesSnapshot()
+const openFeedbackCount = computed(() => getOpenCases().length)
 
 const metricColor = {
   good: "success",
@@ -134,7 +138,10 @@ const metricColor = {
               variant="tonal"
               prepend-icon="mdi-comment-alert-outline"
               to="/admin/feedback"
-              >處理使用者回饋 <VChip class="ml-2" size="x-small">8</VChip></VBtn
+              >處理使用者回饋
+              <VChip v-if="openFeedbackCount" class="ml-2" size="x-small">{{
+                openFeedbackCount
+              }}</VChip></VBtn
             >
             <VBtn
               variant="tonal"
