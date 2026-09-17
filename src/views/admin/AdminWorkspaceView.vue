@@ -4,18 +4,8 @@ import { useRoute } from 'vue-router'
 import { useTheme } from 'vuetify'
 
 import PageHeader from '@/components/PageHeader.vue'
-import { describeProfile, getAssignedProfile, getProfilesByKind, getUsage, usageAssignments, type UsageId } from '@/mocks/systemResources'
 import { useAppStore } from '@/stores/app'
 import { themeAccentLabels, type ThemeAccent } from '@/theme'
-
-// @ 模型參數集中在系統資源，這裡只選用哪個設定檔
-function profileItems(usageId: UsageId) {
-	return getProfilesByKind(getUsage(usageId).kind).map((profile) => ({ title: profile.name, subtitle: describeProfile(profile), value: profile.id }))
-}
-
-function assignedSummary(usageId: UsageId): string {
-	return describeProfile(getAssignedProfile(usageId))
-}
 
 interface WorkspaceConfig {
 	eyebrow: string
@@ -25,16 +15,6 @@ interface WorkspaceConfig {
 }
 
 const workspaceConfigs: Record<string, WorkspaceConfig> = {
-	ai: {
-		eyebrow: '回答與檢索品質',
-		description: '管理問題路由、混合檢索、模型、提示詞與專有名詞。變更前可先測試，不影響目前服務。',
-		tabs: ['問題路由', '知識檢索', '重新排序與引用', '回答模型', '工具調度', '提示詞與術語'],
-		items: [
-			{ title: '混合檢索', description: '語意搜尋 60% · 關鍵字搜尋 40% · 圖譜擴充已啟用', status: '已啟用', action: '調整權重' },
-			{ title: '引用規則', description: '最低分數 0.72 · 每次回答最多 6 筆引用', status: '已套用', action: '編輯規則' },
-			{ title: '專有名詞保護', description: '目前維護 126 個公司與產品名稱', status: '正常', action: '管理名詞' },
-		],
-	},
 	access: {
 		eyebrow: '身分與權限',
 		description: '管理使用者、角色與群組繼承關係，保護系統內建角色不被誤改。',
@@ -61,14 +41,6 @@ const workspaceConfigs: Record<string, WorkspaceConfig> = {
 type WorkspaceItem = WorkspaceConfig['items'][number]
 
 const workspaceTabItems: Record<string, WorkspaceItem[][]> = {
-	ai: [
-		[{ title: '單一主題路由', description: '優先限制在辨識出的知識主題', status: '已啟用', action: '編輯規則' }, { title: '跨文件問題路由', description: '需要比較或彙整時擴大檢索範圍', status: '已啟用', action: '編輯規則' }],
-		[{ title: '語意搜尋', description: '候選 20 筆 · 權重 60%', status: '已啟用', action: '調整參數' }, { title: '關鍵字搜尋', description: '候選 20 筆 · 權重 40%', status: '已啟用', action: '調整參數' }, { title: '知識圖譜擴充', description: '每個命中節點展開 2 層', status: '已啟用', action: '調整參數' }],
-		[{ title: '引用規則', description: '最低分數 0.72 · 最多 6 筆', status: '已套用', action: '編輯規則' }],
-		[],
-		[{ title: 'Agent 工具調度', description: '最多 6 次呼叫 · 45 秒時間預算', status: '已啟用', action: '編輯限制' }],
-		[{ title: '共用系統提示詞', description: '最後更新：2026-08-10 · 林怡君', status: '已發布', action: '編輯提示詞' }, { title: '回答風格', description: '簡潔、詳細、步驟式共 3 種', status: '正常', action: '管理風格' }, { title: '專有名詞保護', description: '126 個公司與產品名稱', status: '正常', action: '管理名詞' }],
-	],
 	access: [
 		[{ title: '王小明', description: 'employee@company.com · 產品企劃部', status: '已啟用', action: '管理帳號' }, { title: '林怡君', description: 'km.admin@company.com · 知識管理部', status: '已啟用', action: '管理帳號' }],
 		[{ title: '一般使用者', description: '1,024 位成員 · 搜尋、閱讀與問答', status: '系統角色', action: '查看權限' }, { title: '知識管理員', description: '8 位成員 · 文件、審核與回饋', status: '系統角色', action: '查看權限' }, { title: '部門內容維護者', description: '32 位成員 · 限所屬部門文件', status: '自訂角色', action: '編輯權限' }],
@@ -90,10 +62,6 @@ const search = ref('')
 const dialogItem = ref<WorkspaceConfig['items'][number] | null>(null)
 const showFilters = ref(false)
 const isSaved = ref(false)
-const semanticSearchEnabled = ref(true)
-const keywordSearchEnabled = ref(true)
-const graphExpansionEnabled = ref(true)
-const resultLimit = ref(20)
 const systemName = ref('Syscom Cubi')
 const defaultTheme = ref('跟隨作業系統')
 const defaultThemeAccent = ref<ThemeAccent>(appStore.themeAccent)
@@ -148,17 +116,7 @@ watch(workspaceKey, () => {
 		<VExpandTransition><VCard v-if="showFilters" class="surface-border pa-4 mb-4"><VSelect v-model="filterStatus" label="狀態" :items="['全部', ...Array.from(new Set(currentItems.map((item) => item.status).filter(Boolean))) ]" /></VCard></VExpandTransition>
 		<VAlert v-if="isSaved" type="success" variant="tonal" class="mb-4">目前工作區已更新。</VAlert>
 
-		<VCard v-if="workspaceKey === 'ai'" class="surface-border pa-5 mb-5">
-			<h2 class="section-heading mb-1">{{ config.tabs[activeTab] }}</h2><p class="text-body-2 text-medium-emphasis mb-5">調整目前分頁的 Mock 設定，儲存後只在本次瀏覽期間生效。</p>
-			<template v-if="activeTab === 0"><VSwitch label="啟用規則快速判斷" color="primary" model-value /><VSelect label="跨文件問題處理方式" :items="['自動擴大範圍', '先詢問使用者', '維持原主題']" /><VSelect v-model="usageAssignments.planner" label="規劃模型" :items="profileItems('planner')" :item-props="(item) => ({ subtitle: item.subtitle })" :hint="assignedSummary('planner')" persistent-hint /><RouterLink :to="{ path: '/admin/system-resources', query: { profile: usageAssignments.planner } }" class="resource-link">編輯系統資源中的模型設定檔</RouterLink></template>
-			<template v-else-if="activeTab === 1"><VSwitch v-model="semanticSearchEnabled" label="啟用語意搜尋" color="primary" /><VSwitch v-model="keywordSearchEnabled" label="啟用關鍵字搜尋" color="primary" /><VSwitch v-model="graphExpansionEnabled" label="啟用知識圖譜擴充" color="primary" /><VSlider v-model="resultLimit" label="每個管道取回數量" :min="5" :max="50" :step="5" thumb-label /></template>
-			<template v-else-if="activeTab === 2"><VSelect v-model="usageAssignments.rerank" label="Reranker" :items="profileItems('rerank')" :item-props="(item) => ({ subtitle: item.subtitle })" :hint="assignedSummary('rerank')" persistent-hint class="mb-2" /><RouterLink :to="{ path: '/admin/system-resources', query: { profile: usageAssignments.rerank } }" class="resource-link">編輯系統資源中的 Reranker 設定檔</RouterLink><VSlider label="引用證據最低分數" :model-value="72" :min="0" :max="100" thumb-label /><VTextField label="最多引用筆數" type="number" model-value="6" /></template>
-			<template v-else-if="activeTab === 3"><VSelect v-model="usageAssignments.answer" label="回答模型" :items="profileItems('answer')" :item-props="(item) => ({ subtitle: item.subtitle })" :hint="assignedSummary('answer')" persistent-hint /><RouterLink :to="{ path: '/admin/system-resources', query: { profile: usageAssignments.answer } }" class="resource-link">模型名稱、Temperature 等參數請到系統資源編輯</RouterLink></template>
-			<template v-else-if="activeTab === 4"><VSwitch label="啟用 Agent 工具調度" color="primary" model-value /><VCombobox label="可用工具" :items="['知識搜尋', '全文讀取', '版本比較', '文件摘要']" :model-value="['知識搜尋', '全文讀取']" multiple chips /><VTextField label="最多呼叫次數" type="number" model-value="6" /><VTextField label="時間預算（秒）" type="number" model-value="45" /></template>
-			<template v-else><VTextarea label="共用系統提示詞" rows="5" model-value="只根據可追溯的公司知識回答，資訊不足時明確說明。" /><VCombobox label="專有名詞保護" :items="['Syscom Cubi', 'ACME Cloud', 'Project Alpha']" :model-value="['Syscom Cubi', 'ACME Cloud']" multiple chips /></template>
-			<VBtn color="primary" @click="showSavedMessage">儲存目前設定</VBtn>
-		</VCard>
-		<VCard v-else-if="workspaceKey === 'access'" class="surface-border pa-5 mb-5">
+		<VCard v-if="workspaceKey === 'access'" class="surface-border pa-5 mb-5">
 			<h2 class="section-heading mb-4">快速新增使用者</h2><div class="access-form"><VTextField v-model="newUserEmail" label="公司電子郵件" type="email" hide-details /><VSelect label="角色" :items="['一般使用者', '知識管理員', '系統管理員']" hide-details /><VBtn color="primary" :disabled="!newUserEmail.includes('@')" @click="newUserEmail = ''; showSavedMessage()">新增使用者</VBtn></div>
 		</VCard>
 		<VCard v-else-if="workspaceKey === 'settings'" class="surface-border pa-5 mb-5">
@@ -183,7 +141,6 @@ watch(workspaceKey, () => {
 <style scoped>
 .workspace-toolbar { display: flex; align-items: center; gap: 8px; }
 .workspace-toolbar > :first-child { max-width: 380px; }
-.resource-link { display: inline-block; margin: 4px 0 20px; color: rgb(var(--v-theme-primary)); font-size: 0.84rem; text-underline-offset: 2px; }
 .access-form { display: grid; grid-template-columns: 1fr 220px auto; gap: 12px; align-items: center; }
 @media (max-width: 700px) { .workspace-toolbar { align-items: stretch; flex-direction: column; } .workspace-toolbar > :first-child { max-width: none; } .access-form { grid-template-columns: 1fr; } }
 </style>

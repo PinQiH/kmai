@@ -200,6 +200,7 @@ function percent(value: number): string {
 									</tbody>
 								</table>
 								<p v-else-if="step.hits" class="empty-note">沒有命中任何段落。</p>
+								<RouterLink v-if="step.id === 'rerank'" :to="{ path: '/admin/ai-settings', query: { section: 'citation' } }" class="link-button settings-link">調整引用門檻</RouterLink>
 							</VExpansionPanelText>
 						</VExpansionPanel>
 					</VExpansionPanels>
@@ -341,4 +342,5 @@ function percent(value: number): string {
 .form-actions { display: flex; justify-content: flex-end; }
 .link-button { color: rgb(var(--v-theme-primary)); font-size: 0.82rem; text-decoration: underline; text-underline-offset: 2px; }
 .link-button:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.settings-link { display: inline-block; margin-top: 8px; }
 </style>
