@@ -146,7 +146,7 @@ const metricColor = {
             <VBtn
               variant="tonal"
               prepend-icon="mdi-bell-ring-outline"
-              to="/admin/monitoring?tab=alerts"
+              to="/admin/monitoring?tab=overview"
               >查看營運告警
               <VChip class="ml-2" size="x-small" color="error">2</VChip></VBtn
             >

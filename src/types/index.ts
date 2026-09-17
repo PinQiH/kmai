@@ -161,6 +161,9 @@ export interface ThinkingStage {
 	detail: string
 	status: ThinkingStageStatus
 	elapsedMs: number
+	// > 後台稽核用：該階段實際呼叫的模型與 token 數，前台不顯示
+	modelLabel?: string
+	tokens?: number
 }
 
 // > 每則回答自帶的處理紀錄，回答完成後仍可展開查看
@@ -359,8 +362,19 @@ export interface AlertEvent {
 	observed: string
 	startedAt: string
 	durationLabel: string
-	notifiedCount: number
-	notifyResult: '已寄出' | '寄送失敗' | '未通知'
+	delivery: AlertDeliverySnapshot
+}
+
+// > 告警觸發當下依自動通知規則實際送出的結果。
+// > 必須是快照：規則之後可能被修改，歷史紀錄要反映「當時怎麼通知」，不可用現行規則即時推算。
+// > Email 是否真的寄達屬於後端 SMTP 的非同步結果，前端無從得知，因此這裡只記送出對象數，不記寄達與否。
+export type AlertDeliveryOutcome = 'notified' | 'no-rule' | 'silenced'
+
+export interface AlertDeliverySnapshot {
+	outcome: AlertDeliveryOutcome
+	matchedRuleNames: string[]
+	inAppRecipientCount: number
+	emailRecipientCount: number
 }
 
 // @ SMTP 帳密只由後端保管，型別中刻意不存在對應欄位
@@ -507,6 +521,20 @@ export interface NotificationPerformance {
 export type AdminRole = 'system-admin' | 'knowledge-admin' | null
 export type AdminQuestionRecordStatus = 'completed' | 'failed'
 
+// > 問答當下被限定的文件；空陣列代表未限定，整個知識範圍都可檢索
+export interface AdminQuestionScopeDocument {
+	id: string
+	title: string
+}
+
+// > token 用量不是問答內容，因此可直接顯示於列表，不需留下調閱稽核
+export interface AdminQuestionTokenUsage {
+	promptTokens: number
+	completionTokens: number
+	embeddingTokens: number
+	totalTokens: number
+}
+
 export interface AdminQuestionRecord {
 	id: string
 	conversationId: string
@@ -520,6 +548,8 @@ export interface AdminQuestionRecord {
 	status: AdminQuestionRecordStatus
 	modelLabel: string
 	knowledgeScopeLabel: string
+	scopedDocuments: AdminQuestionScopeDocument[]
+	tokenUsage: AdminQuestionTokenUsage | null
 	durationMs: number
 	requestId: string
 	citations: Citation[]
@@ -540,9 +570,23 @@ export interface SystemRecordEntry {
 	sourceId: string | null
 	sourceTo: string | null
 	actorLabel?: string
+	// > 稽核要能回答「誰」，光有姓名不夠，必須連帳號與來源 IP
+	actorAccount?: string
+	actorIp?: string
 	resourceLabel?: string
+	// > 對象要讓人看得懂，ID 是給機器對帳的，名稱才是給人讀的
+	resourceName?: string
 	operationScope?: string
+	// > operationScope 是機器碼，operationLabel 是同一件事的人話說法
+	operationLabel?: string
 	requestId?: string
+	// > 展開列顯示的詳情；由產生紀錄的一方決定要揭露哪些欄位，畫面只負責依序呈現
+	details?: SystemRecordDetail[]
+}
+
+export interface SystemRecordDetail {
+	label: string
+	value: string
 }
 
 // > AI 問答的問題大綱項目：以每一則使用者問題為節點

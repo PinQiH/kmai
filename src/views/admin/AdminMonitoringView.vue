@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 
@@ -28,10 +28,15 @@ import type {
 import {
 	ALL_FILTER,
 	countLogLevels,
+	describeAlertDeliverySnapshot,
 	describeAlertRule,
+	filterAlertEvents,
 	filterLogEntries,
+	isUnresolvedAlert,
 	summarizeAlertEvents,
 } from '@/utils/monitoring'
+import { formatNotificationTimestamp } from '@/utils/notifications'
+import type { SystemRecordTimeRange } from '@/utils/systemRecords'
 
 type TimeRange = '最近 1 小時' | '最近 6 小時' | '最近 24 小時' | '最近 7 天'
 type FeedbackTone = 'success' | 'error'
@@ -54,10 +59,13 @@ const focusedEventId = computed(() => typeof route.query.eventId === 'string' ? 
 watch(
 	() => route.query.tab,
 	(tab) => {
-		if (['overview', 'alerts', 'rules', 'metrics', 'logs'].includes(String(tab))) activeTab.value = String(tab)
+		// > 目前告警已併入系統概況；舊連結的 tab=alerts 仍要能用
+		if (tab === 'alerts') activeTab.value = 'overview'
+		else if (['overview', 'alert-history', 'rules', 'metrics', 'logs'].includes(String(tab))) activeTab.value = String(tab)
 	},
 	{ immediate: true },
 )
+
 
 // @ 狀態一律同時給顏色、圖示與文字，符合 DESIGN.md 的 Meaning Before Color Rule
 const statusMeta: Record<MetricStatus, { color: string; icon: string; label: string }> = {
@@ -143,6 +151,14 @@ const liveTailTemplates = getLogEntriesSnapshot()
 const logService = ref(ALL_FILTER)
 const logLevel = ref(ALL_FILTER)
 const logKeyword = ref('')
+// > 系統紀錄的 Request ID 以 ?keyword= 帶入，讓稽核可一路追到該次請求的服務日誌
+watch(
+	() => route.query.keyword,
+	(keyword) => {
+		if (typeof keyword === 'string' && keyword.trim()) logKeyword.value = keyword.trim()
+	},
+	{ immediate: true },
+)
 const isLiveTail = ref(false)
 const selectedLog = ref<LogEntry | null>(null)
 let liveTailTimer = 0
@@ -299,8 +315,113 @@ function testRule(rule: AlertRule): void {
 	notify(`已依「${result.matchedRuleNames.join('、')}」送出測試通知：${parts.join('、')}。站內通知可在通知管理的發送紀錄查看。`)
 }
 
-// > 告警紀錄
+// > 目前告警：只放尚未解除、仍需處理的；已解除的歷史移到告警紀錄
 const alertSummary = computed(() => summarizeAlertEvents(events.value))
+const unresolvedEvents = computed(() =>
+	events.value
+		.filter(isUnresolvedAlert)
+		.sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt)),
+)
+
+// > 告警紀錄：觸發、靜音、解除的完整歷史，供事後追溯
+const historyStatus = ref<AlertEventStatus | typeof ALL_FILTER>(ALL_FILTER)
+const historySeverity = ref<AlertSeverity | typeof ALL_FILTER>(ALL_FILTER)
+const historyKeyword = ref('')
+const historyTimeRange = ref<SystemRecordTimeRange>('all')
+const historyStatusOptions = [
+	{ title: '全部狀態', value: ALL_FILTER },
+	{ title: '觸發中', value: 'firing' },
+	{ title: '已靜音', value: 'silenced' },
+	{ title: '已解除', value: 'resolved' },
+]
+const historySeverityOptions = [
+	{ title: '全部嚴重度', value: ALL_FILTER },
+	{ title: '嚴重', value: 'critical' },
+	{ title: '警告', value: 'warning' },
+	{ title: '資訊', value: 'info' },
+]
+const historyTimeRangeOptions = [
+	{ title: '全部時間', value: 'all' },
+	{ title: '最近 1 小時', value: '1h' },
+	{ title: '最近 24 小時', value: '24h' },
+	{ title: '最近 7 天', value: '7d' },
+]
+const historyHeaders = [
+	{ title: '發生時間', key: 'occurredAt', width: 180 },
+	{ title: '告警規則', key: 'ruleName', minWidth: 220 },
+	{ title: '嚴重度', key: 'severity', width: 110 },
+	{ title: '狀態', key: 'status', width: 110 },
+	{ title: '觀測值', key: 'observed', minWidth: 180, sortable: false },
+	{ title: '', key: 'data-table-expand', width: 56 },
+]
+const historySortBy = [{ key: 'occurredAt', order: 'desc' as const }]
+const alertHistory = computed(() =>
+	filterAlertEvents(events.value, {
+		status: historyStatus.value,
+		severity: historySeverity.value,
+		keyword: historyKeyword.value,
+		timeRange: historyTimeRange.value,
+		now: notificationsStore.deliveryClock,
+	}),
+)
+const hasHistoryFilters = computed(
+	() =>
+		historyStatus.value !== ALL_FILTER ||
+		historySeverity.value !== ALL_FILTER ||
+		historyKeyword.value.trim().length > 0 ||
+		historyTimeRange.value !== 'all',
+)
+
+function resetHistoryFilters(): void {
+	historyStatus.value = ALL_FILTER
+	historySeverity.value = ALL_FILTER
+	historyKeyword.value = ''
+	historyTimeRange.value = 'all'
+}
+
+const expandedHistoryIds = ref<string[]>([])
+
+/**
+ * 切到系統概況並捲動到指定元素。
+ * @param elementId 目標元素 id；未指定時捲到目前告警區塊。
+ */
+async function scrollToCurrentAlerts(elementId = 'current-alerts'): Promise<void> {
+	activeTab.value = 'overview'
+	await nextTick()
+	// > 等 VWindow 切換後的第一個畫格，元素才有正確位置
+	await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+	const target = document.getElementById(elementId)
+	// ! VTimelineItem 外層是 display: contents，沒有版面框，捲動要對準內部的 body
+	const scrollTarget = target?.querySelector<HTMLElement>('.v-timeline-item__body') ?? target
+	scrollTarget?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+// > 從告警觸發通知點進來會帶 eventId；未解除的告警在系統概況，直接捲到該筆
+watch(
+	() => [route.query.tab, focusedEventId.value] as const,
+	([tab, eventId]) => {
+		if (!eventId || tab === 'alert-history') return
+		if (!unresolvedEvents.value.some((event) => event.id === eventId)) return
+		void scrollToCurrentAlerts(`alert-event-${eventId}`)
+	},
+	{ immediate: true },
+)
+
+// > 從通知點進來的已解除告警會帶 eventId；清掉篩選確保該筆可見，並直接展開
+watch(
+	() => [route.query.tab, focusedEventId.value] as const,
+	([tab, eventId]) => {
+		if (tab !== 'alert-history' || !eventId) return
+		if (!events.value.some((event) => event.id === eventId)) return
+		resetHistoryFilters()
+		expandedHistoryIds.value = [eventId]
+	},
+	{ immediate: true },
+)
+
+function historyRowProps({ item }: { item: AlertEvent }): Record<string, unknown> {
+	return item.id === focusedEventId.value ? { class: 'focused-history-row' } : {}
+}
 const healthyServiceCount = computed(() => services.value.filter((service) => service.status === 'good').length)
 const recentErrorCount = computed(() => logs.value.filter((entry) => entry.level === 'error').length)
 
@@ -336,9 +457,9 @@ onBeforeUnmount(() => {
 			class="mb-6"
 			:title="`有 ${alertSummary.firing} 個告警正在觸發`"
 		>
-			其中 {{ alertSummary.criticalFiring }} 個為嚴重等級，通知已寄送給值班收件人。
+			其中 {{ alertSummary.criticalFiring }} 個為嚴重等級。通知對象與管道依「通知管理 → 自動通知」的規則決定。
 			<template #append>
-				<VBtn variant="text" @click="activeTab = 'alerts'">查看告警紀錄</VBtn>
+				<VBtn variant="text" @click="scrollToCurrentAlerts()">處理目前告警</VBtn>
 			</template>
 		</VAlert>
 
@@ -355,7 +476,7 @@ onBeforeUnmount(() => {
 
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-5">
 			<VTab value="overview">系統概況</VTab>
-			<VTab value="alerts">目前告警</VTab>
+			<VTab value="alert-history">告警紀錄</VTab>
 			<VTab value="rules">告警規則</VTab>
 			<VTab value="metrics">服務指標</VTab>
 			<VTab value="logs">日誌查詢</VTab>
@@ -376,7 +497,7 @@ onBeforeUnmount(() => {
 						<VCard class="surface-border pa-5 h-100">
 							<p class="text-body-2 text-medium-emphasis">目前告警</p>
 							<p class="metric-value mt-2">{{ alertSummary.firing }}</p>
-							<VBtn class="mt-3" variant="text" size="small" @click="activeTab = 'alerts'">處理告警</VBtn>
+							<VBtn class="mt-3" variant="text" size="small" @click="scrollToCurrentAlerts()">查看目前告警</VBtn>
 						</VCard>
 					</VCol>
 					<VCol cols="12" md="4">
@@ -387,23 +508,31 @@ onBeforeUnmount(() => {
 						</VCard>
 					</VCol>
 				</VRow>
-				<VAlert type="info" variant="tonal">
-					營運監控負責偵測：指標、告警門檻與技術日誌。通知誰、走站內或 Email，以及發送紀錄，都在「通知管理 → 自動通知」的系統告警規則。
-				</VAlert>
-			</VWindowItem>
 
-			<!-- > 告警紀錄：觸發、靜音與解除的完整過程 -->
-			<VWindowItem value="alerts">
-				<div class="d-flex flex-wrap align-center ga-2 mb-5">
+				<!-- > 目前告警：只放尚未解除、仍需處理的告警，已解除的在告警紀錄 -->
+				<section id="current-alerts" aria-labelledby="current-alerts-title" class="current-alerts mb-6" data-testid="current-alerts">
+				<div class="d-flex flex-wrap align-center ga-2 mb-4">
+					<h2 id="current-alerts-title" class="section-heading mr-2">目前告警</h2>
 					<VChip color="error" variant="tonal" size="small">觸發中 {{ alertSummary.firing }}</VChip>
 					<VChip color="secondary" variant="tonal" size="small">已靜音 {{ alertSummary.silenced }}</VChip>
-					<VChip color="success" variant="tonal" size="small">已解除 {{ alertSummary.resolved }}</VChip>
+					<VSpacer />
+					<VBtn variant="text" size="small" append-icon="mdi-arrow-right" @click="activeTab = 'alert-history'">
+						查看已解除的告警紀錄
+					</VBtn>
 				</div>
 
-				<VCard class="surface-border pa-5">
+				<StatePanel
+					v-if="unresolvedEvents.length === 0"
+					icon="mdi-bell-check-outline"
+					title="目前沒有需要處理的告警"
+					description="所有告警都已解除。過去的觸發與處理過程可在「告警紀錄」查看。"
+					action-label="查看告警紀錄"
+					@action="activeTab = 'alert-history'"
+				/>
+				<VCard v-else class="surface-border pa-5">
 					<VTimeline side="end" density="compact" truncate-line="both">
 						<VTimelineItem
-							v-for="event in events"
+							v-for="event in unresolvedEvents"
 							:key="event.id"
 							:id="`alert-event-${event.id}`"
 							:class="{ 'focused-alert-event': event.id === focusedEventId }"
@@ -421,8 +550,8 @@ onBeforeUnmount(() => {
 							<p class="text-caption text-medium-emphasis mt-1">
 								觀測值 {{ event.observed }} · {{ event.startedAt }} · {{ event.durationLabel }}
 							</p>
-							<p class="text-caption mt-1" :class="event.notifyResult === '寄送失敗' ? 'text-error' : 'text-medium-emphasis'">
-								電子郵件通知：{{ event.notifyResult }}<template v-if="event.notifiedCount > 0">（{{ event.notifiedCount }} 位收件人）</template>
+							<p class="text-caption text-medium-emphasis mt-1">
+								{{ describeAlertDeliverySnapshot(event.delivery) }}
 							</p>
 							<VBtn
 								v-if="event.status === 'firing'"
@@ -437,6 +566,100 @@ onBeforeUnmount(() => {
 						</VTimelineItem>
 					</VTimeline>
 				</VCard>
+				</section>
+
+				<VAlert type="info" variant="tonal">
+					營運監控負責偵測：指標、告警門檻與技術日誌。通知誰、走站內或 Email，以及發送紀錄，都在「通知管理 → 自動通知」的系統告警規則。
+				</VAlert>
+			</VWindowItem>
+
+			<!-- > 告警紀錄：觸發、靜音、解除的完整歷史，供事後追溯 -->
+			<VWindowItem value="alert-history">
+				<div class="history-filters mb-5">
+					<VTextField
+						:model-value="historyKeyword"
+						label="搜尋告警紀錄"
+						placeholder="告警規則、觀測值或通知結果"
+						prepend-inner-icon="mdi-magnify"
+						clearable
+						hide-details
+						@update:model-value="historyKeyword = $event ?? ''"
+					/>
+					<VSelect v-model="historySeverity" :items="historySeverityOptions" label="嚴重度" hide-details />
+					<VSelect v-model="historyStatus" :items="historyStatusOptions" label="狀態" hide-details />
+					<VSelect v-model="historyTimeRange" :items="historyTimeRangeOptions" label="時間範圍" hide-details />
+				</div>
+				<p class="text-caption text-medium-emphasis mb-3">共 {{ alertHistory.length }} 筆符合條件</p>
+
+				<VCard v-if="alertHistory.length > 0" class="surface-border overflow-hidden" data-testid="alert-history-table">
+					<VDataTable
+						:headers="historyHeaders"
+						:items="alertHistory"
+						:items-per-page="25"
+						:sort-by="historySortBy"
+						v-model:expanded="expandedHistoryIds"
+						:row-props="historyRowProps"
+						item-value="id"
+						show-expand
+						hover
+					>
+						<template #item.occurredAt="{ item }">{{ formatNotificationTimestamp(item.occurredAt) }}</template>
+						<template #item.ruleName="{ item }">
+							<p class="font-weight-bold py-2">{{ item.ruleName }}</p>
+						</template>
+						<template #item.severity="{ item }">
+							<VChip :color="severityMeta[item.severity].color" size="small" variant="tonal">
+								<VIcon :icon="severityMeta[item.severity].icon" start size="14" aria-hidden="true" />
+								{{ severityMeta[item.severity].label }}
+							</VChip>
+						</template>
+						<template #item.status="{ item }">
+							<VChip :color="eventStatusMeta[item.status].color" size="small" variant="outlined">
+								{{ eventStatusMeta[item.status].label }}
+							</VChip>
+						</template>
+						<template #item.data-table-expand="{ internalItem, isExpanded, toggleExpand }">
+							<VBtn
+								:icon="isExpanded(internalItem) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+								:aria-label="`${isExpanded(internalItem) ? '收合' : '展開'}「${internalItem.raw.ruleName}」詳情`"
+								:aria-expanded="isExpanded(internalItem)"
+								variant="text"
+								size="small"
+								@click="toggleExpand(internalItem)"
+							/>
+						</template>
+						<template #expanded-row="{ columns, item }">
+							<tr class="expanded-detail-row">
+								<td :colspan="columns.length">
+									<dl class="alert-detail" data-testid="alert-history-detail">
+										<div><dt>持續／處理</dt><dd>{{ item.durationLabel }}</dd></div>
+										<div>
+											<dt>觸發時的通知</dt>
+											<dd data-testid="alert-history-delivery">
+												<span class="d-block">{{ describeAlertDeliverySnapshot(item.delivery) }}</span>
+												<RouterLink
+													v-if="item.delivery.outcome === 'notified'"
+													to="/admin/notifications?tab=notifications"
+													class="delivery-link"
+												>
+													在通知管理查看發送紀錄
+												</RouterLink>
+											</dd>
+										</div>
+									</dl>
+								</td>
+							</tr>
+						</template>
+					</VDataTable>
+				</VCard>
+				<StatePanel
+					v-else
+					icon="mdi-bell-off-outline"
+					:title="hasHistoryFilters ? '找不到符合條件的告警紀錄' : '目前沒有告警紀錄'"
+					:description="hasHistoryFilters ? '請調整搜尋字詞或篩選條件。' : '告警規則觸發後，完整過程會留存在這裡。'"
+					:action-label="hasHistoryFilters ? '清除篩選' : undefined"
+					@action="resetHistoryFilters"
+				/>
 			</VWindowItem>
 
 			<!-- > 告警規則：只判定什麼情況算異常；通知誰在通知管理設定 -->
@@ -740,6 +963,33 @@ onBeforeUnmount(() => {
 	overflow: visible;
 }
 
+.history-filters {
+	display: grid;
+	grid-template-columns: minmax(260px, 1.5fr) repeat(3, minmax(140px, 0.6fr));
+	gap: var(--space-sm);
+}
+
+.expanded-detail-row td {
+	background: rgb(var(--v-theme-surface-variant), 0.35);
+}
+
+.alert-detail {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-sm) var(--space-lg);
+	padding: var(--space-md) var(--space-sm);
+}
+
+.alert-detail div {
+	display: grid;
+	gap: 2px;
+}
+
+.alert-detail dt {
+	font-size: 0.75rem;
+	color: rgb(var(--v-theme-on-surface-variant));
+}
+
 .monitoring-toolbar {
 	display: flex;
 	align-items: center;
@@ -818,7 +1068,23 @@ onBeforeUnmount(() => {
 	font-size: 0.82rem;
 }
 
-.focused-alert-event {
+.delivery-link {
+	display: inline-block;
+	margin-top: 4px;
+	font-size: 0.8rem;
+	color: rgb(var(--v-theme-primary));
+}
+
+:deep(.focused-history-row) > td {
+	background: var(--tint-active);
+}
+
+.current-alerts {
+	scroll-margin-top: 88px;
+}
+
+/* ! VTimelineItem 外層是 display: contents，樣式要套在內部 body 才看得到 */
+:deep(.focused-alert-event > .v-timeline-item__body) {
 	padding: var(--space-sm);
 	border-radius: var(--radius-md);
 	background: var(--tint-hover);
@@ -840,7 +1106,18 @@ onBeforeUnmount(() => {
 	}
 }
 
+@media (max-width: 900px) {
+	.history-filters {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
 @media (max-width: 700px) {
+	.history-filters,
+	.alert-detail {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
 	.monitoring-toolbar > .v-input {
 		max-width: none !important;
 		width: 100%;

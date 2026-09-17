@@ -1,4 +1,13 @@
-import type { AlertEvent, AlertRule, LogEntry, LogLevel } from '@/types'
+import type {
+	AlertDeliverySnapshot,
+	AlertEvent,
+	AlertEventStatus,
+	AlertRule,
+	AlertSeverity,
+	LogEntry,
+	LogLevel,
+} from '@/types'
+import { getSystemRecordTimeCutoff, type SystemRecordTimeRange } from '@/utils/systemRecords'
 
 // > 篩選器的「不限制」選項；view 與 util 共用同一個字面值，避免兩邊各寫一份
 export const ALL_FILTER = '全部'
@@ -75,7 +84,11 @@ export function filterLogEntries(entries: LogEntry[], filter: LogFilter): LogEnt
 		if (filter.level !== ALL_FILTER && entry.level !== filter.level) return false
 		if (!keyword) return true
 
-		const haystack = `${entry.message} ${entry.service} ${entry.traceId}`.toLowerCase()
+		// > 也搜 fields，系統紀錄才能用 requestId 追到同一次請求的日誌
+		const fieldText = Object.entries(entry.fields)
+			.map(([key, value]) => `${key} ${value}`)
+			.join(' ')
+		const haystack = `${entry.message} ${entry.service} ${entry.traceId} ${fieldText}`.toLowerCase()
 		return haystack.includes(keyword)
 	})
 }
@@ -100,6 +113,63 @@ export function describeAlertRule(rule: AlertRule): string {
 	// @ 百分號緊貼數字，其餘單位（秒、件）中文習慣留一個空格
 	const unitText = rule.unit === '%' ? rule.unit : ` ${rule.unit}`
 	return `${rule.metricLabel} ${rule.comparison} ${rule.threshold}${unitText}，持續 ${rule.durationMinutes} 分鐘`
+}
+
+export interface AlertEventFilter {
+	status: AlertEventStatus | typeof ALL_FILTER
+	severity: AlertSeverity | typeof ALL_FILTER
+	keyword: string
+	timeRange: SystemRecordTimeRange
+	now: number
+}
+
+/**
+ * 判斷告警是否仍需處理。
+ * @param event 告警事件。
+ * @returns 觸發中或靜音中（尚未解除）回傳 true。
+ */
+export function isUnresolvedAlert(event: AlertEvent): boolean {
+	return event.status !== 'resolved'
+}
+
+/**
+ * 依狀態、嚴重度、時間與關鍵字篩選告警紀錄。
+ * @param events 告警事件。
+ * @param filter 篩選條件。
+ * @returns 依發生時間由新到舊排列的告警事件。
+ */
+export function filterAlertEvents(events: AlertEvent[], filter: AlertEventFilter): AlertEvent[] {
+	const keyword = filter.keyword.trim().toLocaleLowerCase('zh-TW')
+	const cutoff = getSystemRecordTimeCutoff(filter.timeRange, filter.now)
+
+	return events
+		.filter((event) => {
+			if (filter.status !== ALL_FILTER && event.status !== filter.status) return false
+			if (filter.severity !== ALL_FILTER && event.severity !== filter.severity) return false
+			if (Date.parse(event.occurredAt) < cutoff) return false
+			if (!keyword) return true
+			return `${event.ruleName} ${event.observed} ${event.delivery.matchedRuleNames.join(' ')}`
+				.toLocaleLowerCase('zh-TW')
+				.includes(keyword)
+		})
+		.sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))
+}
+
+/**
+ * 將告警觸發當下的送達快照轉成一行說明。
+ * @param delivery 送達快照。
+ * @returns 例如「依『嚴重告警通知值班主管』通知：站內 2 人、Email 1 位」。
+ */
+export function describeAlertDeliverySnapshot(delivery: AlertDeliverySnapshot): string {
+	if (delivery.outcome === 'silenced') return '觸發時在靜音期間，未通知'
+	if (delivery.outcome === 'no-rule' || delivery.matchedRuleNames.length === 0) return '沒有符合的自動通知規則，未通知'
+
+	const channels = [
+		delivery.inAppRecipientCount > 0 ? `站內 ${delivery.inAppRecipientCount} 人` : '',
+		delivery.emailRecipientCount > 0 ? `Email ${delivery.emailRecipientCount} 位` : '',
+	].filter(Boolean)
+	const rules = delivery.matchedRuleNames.map((name) => `「${name}」`).join('、')
+	return channels.length > 0 ? `依${rules}通知：${channels.join('、')}` : `符合${rules}，但沒有有效收件人`
 }
 
 export interface AlertSummary {

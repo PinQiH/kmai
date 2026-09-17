@@ -1,14 +1,9 @@
 import type {
 	AdminQuestionRecord,
 	AdminQuestionRecordStatus,
-	AlertEvent,
-	AppNotification,
-	AssistantAuditSession,
+	SystemRecordCategory,
 	SystemRecordEntry,
-	SystemRecordLevel,
 } from '@/types'
-import { formatNotificationTimestamp, summarizeNotificationPerformance } from '@/utils/notifications'
-import { buildAssistantSystemRecords } from '@/utils/assistantAudit'
 
 export type SystemRecordTimeRange = 'all' | '1h' | '24h' | '7d'
 
@@ -17,6 +12,13 @@ export interface AdminQuestionRecordFilters {
 	userId: string
 	department: string
 	status: AdminQuestionRecordStatus | 'all'
+	timeRange: SystemRecordTimeRange
+	now: number
+}
+
+export interface AuditRecordFilters {
+	keyword: string
+	actorLabel: string
 	timeRange: SystemRecordTimeRange
 	now: number
 }
@@ -66,69 +68,80 @@ export function filterAdminQuestionRecords(
 		.sort((left, right) => Date.parse(right.askedAt) - Date.parse(left.askedAt))
 }
 
-function notificationLevel(notification: AppNotification): SystemRecordLevel {
-	if (notification.priority === 'urgent') return 'error'
-	if (notification.priority === 'important') return 'warning'
-	return 'info'
+/**
+ * 依操作者、時間與關鍵字篩選操作稽核紀錄。
+ * @param records 已合併的稽核紀錄。
+ * @param filters 操作者、時間範圍與關鍵字條件。
+ * @returns 依發生時間由新到舊排列的稽核紀錄。
+ */
+export function filterAuditRecords(
+	records: SystemRecordEntry[],
+	filters: AuditRecordFilters,
+): SystemRecordEntry[] {
+	const normalizedKeyword = filters.keyword.trim().toLocaleLowerCase('zh-TW')
+	const cutoff = getSystemRecordTimeCutoff(filters.timeRange, filters.now)
+
+	return records
+		.filter((record) => {
+			const matchesActor = filters.actorLabel === 'all' || record.actorLabel === filters.actorLabel
+			const matchesTime = Date.parse(record.occurredAt) >= cutoff
+			const searchableText = [
+				record.actorLabel,
+				record.actorAccount,
+				record.actorIp,
+				record.resourceName,
+				record.resourceLabel ?? record.sourceId,
+				record.operationLabel ?? record.title,
+				record.operationScope,
+				record.requestId,
+				record.statusLabel,
+			]
+				.filter((field): field is string => Boolean(field))
+				.join(' ')
+				.toLocaleLowerCase('zh-TW')
+			const matchesKeyword = !normalizedKeyword || searchableText.includes(normalizedKeyword)
+			return matchesActor && matchesTime && matchesKeyword
+		})
+		.sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt))
 }
 
-function alertLevel(event: AlertEvent): SystemRecordLevel {
-	if (event.status === 'resolved') return 'success'
-	if (event.severity === 'critical') return 'error'
-	if (event.severity === 'warning') return 'warning'
-	return 'info'
+// > 系統事件只收沒有專屬紀錄頁的類別；通知、告警、AI 問答各自在工作頁留存，不在這裡重複出現
+export const SYSTEM_EVENT_CATEGORIES: readonly SystemRecordCategory[] = ['auth', 'job']
+
+function byNewestFirst(left: SystemRecordEntry, right: SystemRecordEntry): number {
+	return Date.parse(right.occurredAt) - Date.parse(left.occurredAt)
+}
+
+function cloneRecord(record: SystemRecordEntry): SystemRecordEntry {
+	return {
+		...record,
+		details: record.details?.map((detail) => ({ ...detail })),
+	}
 }
 
 /**
- * 合併基礎系統紀錄、站內通知與告警事件。
- * @param baseRecords 登入、AI、排程與稽核紀錄。
- * @param notifications 站內通知。
- * @param alertEvents 告警事件。
- * @param assistantSessions 目前頁籤中的後台 AI 小幫手稽核 session。
- * @returns 依發生時間由新到舊排列的統一紀錄。
+ * 取得系統事件分頁要顯示的紀錄。
+ * @param baseRecords 基礎系統紀錄。
+ * @returns 只含登入登出與排程工作、依發生時間由新到舊排列的紀錄。
  */
-export function buildSystemRecords(
-	baseRecords: SystemRecordEntry[],
-	notifications: AppNotification[],
-	alertEvents: AlertEvent[],
-	now = new Date(),
-	assistantSessions: AssistantAuditSession[] = [],
-): SystemRecordEntry[] {
-	const notificationRecords = notifications.map<SystemRecordEntry>((notification) => {
-		const performance = summarizeNotificationPerformance(notification)
-		const isScheduled = Date.parse(notification.sentAt) > now.getTime()
-		return {
-			id: `record-notification-${notification.id}`,
-			occurredAt: isScheduled ? notification.createdAt : notification.sentAt,
-			category: 'notification',
-			level: notificationLevel(notification),
-			title: isScheduled ? `已排程：${notification.title}` : notification.title,
-			summary: isScheduled
-				? `${notification.sourceLabel} · ${notification.audienceLabel} · 預定 ${formatNotificationTimestamp(notification.sentAt)} 發送`
-				: `${notification.sourceLabel} · ${notification.audienceLabel} · ${performance.viewedCount} 人已查看`,
-			statusLabel: isScheduled ? '已排程' : '已發送',
-			sourceId: notification.id,
-			sourceTo: `/admin/notifications?notificationId=${encodeURIComponent(notification.id)}`,
-		}
-	})
-	const alertRecords = alertEvents.map<SystemRecordEntry>((event) => ({
-		id: `record-alert-${event.id}`,
-		occurredAt: event.occurredAt,
-		category: 'alert',
-		level: alertLevel(event),
-		title: event.ruleName,
-		summary: `${event.observed} · ${event.durationLabel} · 電子郵件${event.notifyResult}`,
-		statusLabel: event.status === 'firing' ? '觸發中' : event.status === 'silenced' ? '已靜音' : '已解除',
-		sourceId: event.id,
-		sourceTo: `/admin/monitoring?tab=alerts&eventId=${encodeURIComponent(event.id)}`,
-	}))
+export function buildSystemEventRecords(baseRecords: SystemRecordEntry[]): SystemRecordEntry[] {
+	return baseRecords
+		.filter((record) => SYSTEM_EVENT_CATEGORIES.includes(record.category))
+		.map(cloneRecord)
+		.sort(byNewestFirst)
+}
 
-	return [
-		...baseRecords.map((record) => ({ ...record })),
-		...notificationRecords,
-		...alertRecords,
-		...buildAssistantSystemRecords(assistantSessions),
-	].sort(
-		(left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt),
-	)
+/**
+ * 合併基礎稽核紀錄與本頁產生的調閱、匯出稽核。
+ * @param baseRecords 基礎系統紀錄。
+ * @param inspectionRecords 調閱與匯出產生的稽核紀錄。
+ * @returns 只含操作稽核、依發生時間由新到舊排列的紀錄。
+ */
+export function buildAuditRecords(
+	baseRecords: SystemRecordEntry[],
+	inspectionRecords: SystemRecordEntry[],
+): SystemRecordEntry[] {
+	return [...inspectionRecords, ...baseRecords.filter((record) => record.category === 'audit')]
+		.map(cloneRecord)
+		.sort(byNewestFirst)
 }

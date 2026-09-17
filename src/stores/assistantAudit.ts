@@ -44,6 +44,18 @@ interface RecordContentInspectionInput {
 	operationScope: 'ai_question_content.inspect' | 'admin_assistant_content.inspect'
 }
 
+interface RecordRecordExportInput {
+	scope: 'system_event.export' | 'audit_record.export'
+	rowCount: number
+}
+
+// TODO(api-integration): 稽核的操作者身分應改由登入 session 提供，不可由前端自行決定。
+const AUDIT_ACTOR = {
+	label: '林怡君',
+	account: 'km.admin@company.com',
+	ip: '10.20.1.42',
+} as const
+
 function cloneSession(session: AssistantAuditSession): AssistantAuditSession {
 	return {
 		...session,
@@ -70,20 +82,52 @@ export const useAssistantAuditStore = defineStore('assistant-audit', {
 			const occurredAt = new Date().toISOString()
 			const sequence = this.inspectionRecords.length + 1
 			const requestId = `req-inspect-${Date.now()}-${sequence}`
+			const isAssistantScope = input.operationScope === 'admin_assistant_content.inspect'
+			const operationLabel = isAssistantScope ? '調閱小幫手對話內容' : '調閱 AI 問答內容'
 			this.inspectionRecords.unshift({
 				id: `audit-${input.resourceId}-${Date.now()}-${sequence}`,
 				occurredAt,
 				category: 'audit',
 				level: 'success',
-				title: '調閱 AI 問答內容',
-				summary: `系統管理員調閱資源 ${input.resourceId}。`,
+				title: operationLabel,
+				summary: `${AUDIT_ACTOR.label}調閱資源 ${input.resourceId}。`,
 				statusLabel: '成功',
 				sourceId: input.resourceId,
 				sourceTo: null,
-				actorLabel: '目前系統管理員',
+				actorLabel: AUDIT_ACTOR.label,
+				actorAccount: AUDIT_ACTOR.account,
+				actorIp: AUDIT_ACTOR.ip,
 				resourceLabel: input.resourceId,
+				resourceName: isAssistantScope ? '後台小幫手對話' : 'AI 問答紀錄',
 				operationScope: input.operationScope,
+				operationLabel,
 				requestId,
+			})
+		},
+		recordRecordExport(input: RecordRecordExportInput): void {
+			const occurredAt = new Date().toISOString()
+			const sequence = this.inspectionRecords.length + 1
+			const isAuditScope = input.scope === 'audit_record.export'
+			const resourceLabel = isAuditScope ? '操作稽核清單' : '系統事件清單'
+			const operationLabel = `匯出${resourceLabel}`
+			this.inspectionRecords.unshift({
+				id: `audit-export-${Date.now()}-${sequence}`,
+				occurredAt,
+				category: 'audit',
+				level: 'success',
+				title: operationLabel,
+				summary: `${AUDIT_ACTOR.label}匯出 ${resourceLabel} ${input.rowCount} 筆（僅欄位摘要，不含問答內容）。`,
+				statusLabel: '成功',
+				sourceId: null,
+				sourceTo: null,
+				actorLabel: AUDIT_ACTOR.label,
+				actorAccount: AUDIT_ACTOR.account,
+				actorIp: AUDIT_ACTOR.ip,
+				resourceLabel,
+				resourceName: `${resourceLabel}（${input.rowCount} 筆）`,
+				operationScope: input.scope,
+				operationLabel,
+				requestId: `req-export-${Date.now()}-${sequence}`,
 			})
 		},
 		startSession(input: StartAuditSessionInput): void {

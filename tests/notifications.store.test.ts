@@ -265,7 +265,15 @@ describe('notifications store', () => {
 		expect(result.inAppRecipientCount).toBeGreaterThan(0)
 		expect(result.emailRecipientCount).toBeGreaterThan(0)
 		expect(store.notifications).toHaveLength(before + 1)
-		expect(store.notifications[0]).toMatchObject({ title: '告警觸發：文件處理積壓過高', actionTo: '/admin/monitoring?tab=alerts&eventId=evt-01', priority: 'urgent' })
+		expect(store.notifications[0]).toMatchObject({ title: '告警觸發：文件處理積壓過高', actionTo: '/admin/monitoring?tab=overview&eventId=evt-01', priority: 'urgent' })
+	})
+
+	it('should link a resolved alert notification to alert history instead of current alerts', () => {
+		const store = useNotificationsStore()
+		store.notifyAlert({ ruleName: '請求錯誤率異常', severity: 'critical', observed: '已恢復', status: 'resolved', eventId: 'evt-04' })
+
+		// > 已解除的告警不在系統概況的目前告警，導到那裡會找不到該筆
+		expect(store.notifications[0]?.actionTo).toBe('/admin/monitoring?tab=alert-history&eventId=evt-04')
 	})
 
 	it('should save non-secret email channel settings without SMTP credentials', () => {

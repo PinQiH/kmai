@@ -97,7 +97,9 @@ describe('admin information architecture', () => {
 		const tabLabels = wrapper.findAll('[role="tab"]').map((tab) => tab.text())
 
 		// 順序＝現在怎麼了 → 要處理什麼 → 怎麼判定 → 診斷 → 細節；VWindowItem 需同序，否則切換動畫方向會相反
-		expect(tabLabels).toEqual(['系統概況', '目前告警', '告警規則', '服務指標', '日誌查詢'])
+		// 目前告警併入系統概況，避免「現在怎麼了」與「要處理什麼」拆成兩個頁籤
+		expect(tabLabels).toEqual(['系統概況', '告警紀錄', '告警規則', '服務指標', '日誌查詢'])
+		expect(wrapper.find('[data-testid="current-alerts"]').exists()).toBe(true)
 		expect(wrapper.text()).not.toContain('通知設定')
 		expect(wrapper.text()).not.toContain('SMTP 主機')
 		// 回答品質屬於知識管理員的閉環，放在回饋與問題頁

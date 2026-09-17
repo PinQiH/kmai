@@ -70,7 +70,7 @@ describe('admin notification management views', () => {
 		expect(wrapper.get('[data-testid="notification-performance-row"]').text()).toContain('點擊率')
 	})
 
-	it('should present notifications and alerts in the read-only system records table', async () => {
+	it('should keep only sign-in and scheduled job events in the system event table', async () => {
 		const pinia = createPinia()
 		setActivePinia(pinia)
 		const router = createRouter({
@@ -98,12 +98,13 @@ describe('admin notification management views', () => {
 		)
 		await flushPromises()
 
-		expect(wrapper.get('[data-testid="system-event-table"]').text()).toContain('通知')
-		expect(wrapper.get('[data-testid="system-event-table"]').text()).toContain('告警')
 		const eventCategories = wrapper
 			.findAll('[data-event-category]')
 			.map((chip) => chip.attributes('data-event-category'))
-		expect(new Set(eventCategories).size).toBeGreaterThanOrEqual(5)
+		// > 通知與告警各有專屬紀錄頁，不在系統事件重複出現
+		expect(new Set(eventCategories)).toEqual(new Set(['auth', 'job']))
+		expect(wrapper.text()).toContain('通知請至「通知管理 → 發送紀錄」')
+		expect(wrapper.text()).toContain('告警請至「營運監控 → 告警紀錄」')
 		expect(wrapper.text()).toContain('服務原始日誌請至「營運監控 → 日誌查詢」')
 	})
 

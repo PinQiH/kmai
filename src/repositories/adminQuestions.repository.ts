@@ -9,6 +9,8 @@ export function getAdminQuestionRecordsSnapshot(): AdminQuestionRecord[] {
 	return adminQuestionRecords.map((record) => ({
 		...record,
 		citations: record.citations.map((citation) => ({ ...citation })),
+		scopedDocuments: record.scopedDocuments.map((document) => ({ ...document })),
+		tokenUsage: record.tokenUsage ? { ...record.tokenUsage } : null,
 		trace: record.trace
 			? {
 				...record.trace,

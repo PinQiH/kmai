@@ -159,6 +159,18 @@ function buildRule(ruleId: string, input: NotificationRuleInput): AutomaticNotif
 	}
 }
 
+/**
+ * 組出告警通知要導向的營運監控連結。
+ * @param eventId 告警事件識別碼。
+ * @param status 通知對應的告警狀態。
+ * @returns 已解除的告警導向告警紀錄，其餘導向系統概況的目前告警。
+ */
+function alertEventLink(eventId: string, status: 'triggered' | 'resolved' | 'test'): string {
+	// ! 未解除的告警列在系統概況，已解除的只在告警紀錄
+	const tab = status === 'resolved' ? 'alert-history' : 'overview'
+	return `/admin/monitoring?tab=${tab}&eventId=${encodeURIComponent(eventId)}`
+}
+
 export const useNotificationsStore = defineStore('notifications', {
 	state: (): NotificationsState => ({
 		notifications: notifications.map(cloneNotification),
@@ -344,7 +356,7 @@ export const useNotificationsStore = defineStore('notifications', {
 					body: `${ALERT_SEVERITY_LABELS[input.severity]} · ${input.observed}`,
 					userIds: recipients.map((user) => user.id),
 					priority: rule.priority,
-					actionTo: input.eventId ? `/admin/monitoring?tab=alerts&eventId=${input.eventId}` : rule.actionTo,
+					actionTo: input.eventId ? alertEventLink(input.eventId, input.status) : rule.actionTo,
 					actionLabel: rule.actionLabel ?? '查看告警',
 					sourceLabel: rule.name,
 				})

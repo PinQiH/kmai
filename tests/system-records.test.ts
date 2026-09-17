@@ -1,28 +1,60 @@
 import { describe, expect, it } from 'vitest'
 
-import { alertEvents } from '../src/mocks/monitoring'
-import { notifications } from '../src/mocks/notifications'
 import { baseSystemRecords } from '../src/mocks/systemRecords'
-import { buildSystemRecords, getSystemRecordTimeCutoff } from '../src/utils/systemRecords'
-import type { AssistantAuditSession } from '../src/types'
+import type { SystemRecordEntry } from '../src/types'
+import {
+	buildAuditRecords,
+	buildSystemEventRecords,
+	getSystemRecordTimeCutoff,
+	SYSTEM_EVENT_CATEGORIES,
+} from '../src/utils/systemRecords'
 
 describe('system records', () => {
-	it('should merge base notification and alert records in descending time order', () => {
-		const records = buildSystemRecords(baseSystemRecords, notifications, alertEvents)
+	it('should keep only sign-in and scheduled job events in descending time order', () => {
+		const records = buildSystemEventRecords(baseSystemRecords)
 
-		expect(records.some((record) => record.category === 'notification')).toBe(true)
-		expect(records.some((record) => record.category === 'alert')).toBe(true)
+		expect(records.length).toBeGreaterThan(0)
+		expect(records.every((record) => SYSTEM_EVENT_CATEGORIES.includes(record.category))).toBe(true)
 		expect(records.every((record, index) => index === 0 || Date.parse(records[index - 1]!.occurredAt) >= Date.parse(record.occurredAt))).toBe(true)
 	})
 
-	it('should link notification and alert records back to their management pages', () => {
-		const records = buildSystemRecords(baseSystemRecords, notifications, alertEvents)
-		const notificationRecord = records.find((record) => record.category === 'notification')
-		const alertRecord = records.find((record) => record.category === 'alert')
+	it('should not leak audit, notification or alert records into system events', () => {
+		const mixed: SystemRecordEntry[] = [
+			...baseSystemRecords,
+			{ ...baseSystemRecords[0]!, id: 'fake-alert', category: 'alert' },
+			{ ...baseSystemRecords[0]!, id: 'fake-notification', category: 'notification' },
+		]
 
-		expect(notificationRecord?.sourceTo).toContain('/admin/notifications?notificationId=')
-		expect(alertRecord?.sourceTo).toContain('/admin/monitoring?tab=alerts&eventId=')
-		expect(records.find((record) => record.id === 'record-audit-document')?.sourceTo).toBe('/admin/documents/doc-001/manage')
+		const categories = new Set(buildSystemEventRecords(mixed).map((record) => record.category))
+
+		expect(categories).toEqual(new Set(['auth', 'job']))
+	})
+
+	it('should give every system event something to show when expanded', () => {
+		const records = buildSystemEventRecords(baseSystemRecords)
+
+		expect(records.every((record) => (record.details?.length ?? 0) > 0)).toBe(true)
+	})
+
+	it('should clone details so the view cannot mutate the source records', () => {
+		const [first] = buildSystemEventRecords(baseSystemRecords)
+		first!.details![0]!.value = '已修改'
+
+		const [again] = buildSystemEventRecords(baseSystemRecords)
+		expect(again!.details![0]!.value).not.toBe('已修改')
+	})
+
+	it('should merge base audits with inspection audits newest first', () => {
+		const inspection: SystemRecordEntry = {
+			...baseSystemRecords.find((record) => record.category === 'audit')!,
+			id: 'inspection-latest',
+			occurredAt: '2026-09-17T00:00:00.000Z',
+		}
+
+		const records = buildAuditRecords(baseSystemRecords, [inspection])
+
+		expect(records[0]?.id).toBe('inspection-latest')
+		expect(records.every((record) => record.category === 'audit')).toBe(true)
 	})
 
 	it('should calculate recent ranges from the current time instead of the latest record', () => {
@@ -31,69 +63,5 @@ describe('system records', () => {
 		expect(getSystemRecordTimeCutoff('1h', now)).toBe(Date.parse('2026-08-31T05:00:00.000Z'))
 		expect(getSystemRecordTimeCutoff('24h', now)).toBe(Date.parse('2026-08-30T06:00:00.000Z'))
 		expect(getSystemRecordTimeCutoff('all', now)).toBe(Number.NEGATIVE_INFINITY)
-	})
-
-	it('should reflect a changed alert status when records are rebuilt', () => {
-		const changedEvents = alertEvents.map((event, index) => index === 0 ? { ...event, status: 'silenced' as const } : event)
-		const records = buildSystemRecords(baseSystemRecords, notifications, changedEvents)
-		const changedRecord = records.find((record) => record.sourceId === changedEvents[0]?.id)
-
-		expect(changedRecord?.statusLabel).toBe('已靜音')
-	})
-
-	it('should represent a future notification as a schedule operation', () => {
-		const futureNotification = {
-			...notifications[0]!,
-			id: 'scheduled-notification',
-			createdAt: '2026-08-31T03:00:00.000Z',
-			sentAt: '2026-09-01T03:00:00.000Z',
-		}
-		const records = buildSystemRecords(
-			baseSystemRecords,
-			[futureNotification],
-			alertEvents,
-			new Date('2026-08-31T04:00:00.000Z'),
-		)
-		const scheduledRecord = records.find((record) => record.sourceId === futureNotification.id)
-
-		expect(scheduledRecord?.occurredAt).toBe(futureNotification.createdAt)
-		expect(scheduledRecord?.statusLabel).toBe('已排程')
-		expect(scheduledRecord?.title).toContain('已排程')
-	})
-
-	it('should index an assistant session as one AI system record', () => {
-		const assistantSession: AssistantAuditSession = {
-			id: 'assistant-session-1',
-			userId: 'user-current',
-			userName: '王小明',
-			department: '產品企劃部',
-			startedAt: '2026-08-31T04:00:00.000Z',
-			endedAt: '2026-08-31T04:05:00.000Z',
-			status: 'completed',
-			endReason: 'manual_end',
-			modelLabel: 'Mock model',
-			durationMs: 300000,
-			messages: [{
-				id: 'message-1',
-				role: 'user',
-				content: '如何使用通知管理？',
-				createdAt: '2026-08-31T04:00:00.000Z',
-				pageTitle: '通知管理',
-				routePath: '/admin/notifications',
-				sourceId: 'model',
-				sourceKind: 'model',
-				sourceLabel: '模型一般知識',
-				webSearchEnabled: false,
-				requestId: 'request-1',
-				redactedFields: [],
-			}],
-		}
-
-		const records = buildSystemRecords(baseSystemRecords, notifications, alertEvents, new Date(), [assistantSession])
-		const record = records.find((item) => item.sourceId === assistantSession.id)
-
-		expect(record?.category).toBe('ai')
-		expect(record?.title).toBe('後台 AI 小幫手對話')
-		expect(record?.sourceTo).toBe('/admin/logs?assistantSessionId=assistant-session-1')
 	})
 })

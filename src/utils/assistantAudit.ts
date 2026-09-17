@@ -1,4 +1,4 @@
-import type { AssistantRedactedField, AssistantAuditSession, SystemRecordEntry } from '@/types'
+import type { AssistantRedactedField, AssistantAuditSession } from '@/types'
 
 export interface SanitizedAuditContent {
 	content: string
@@ -57,7 +57,12 @@ export function sanitizeAuditContent(content: string): SanitizedAuditContent {
 	return { content: sanitizedContent, redactedFields: [...redactedFields] }
 }
 
-function sessionStatusLabel(session: AssistantAuditSession): string {
+/**
+ * 取得小幫手 session 的狀態文字。
+ * @param session 稽核 session。
+ * @returns 例如「已完成」「已逾時」。
+ */
+export function assistantSessionStatusLabel(session: AssistantAuditSession): string {
 	if (session.status === 'active') return '進行中'
 	if (session.status === 'expired') return '已逾時'
 	if (session.status === 'cancelled') return '已取消'
@@ -65,45 +70,24 @@ function sessionStatusLabel(session: AssistantAuditSession): string {
 	return '已完成'
 }
 
-function sessionEndReasonLabel(session: AssistantAuditSession): string {
+/**
+ * 取得小幫手 session 的結束原因文字。
+ * @param session 稽核 session。
+ * @returns 例如「手動結束」；尚未結束時回傳「尚未結束」。
+ */
+export function assistantSessionEndReasonLabel(session: AssistantAuditSession): string {
 	if (session.endReason === 'manual_end') return '手動結束'
 	if (session.endReason === 'idle_timeout') return '閒置逾時'
-	if (session.endReason === 'leave_admin') return '離開後台'
+	if (session.endReason === 'leave_admin') return '離開管理後台'
 	if (session.endReason === 'logout') return '登出'
-	return '進行中'
-}
-
-function sourceKindLabel(session: AssistantAuditSession): string {
-	const sourceKind = [...session.messages].reverse().find((message) => message.role === 'user')?.sourceKind
-	if (sourceKind === 'knowledge-base') return '知識庫'
-	if (sourceKind === 'notebook') return '筆記本'
-	return '模型'
+	return '尚未結束'
 }
 
 /**
- * 將短效 AI 小幫手稽核 session 轉成統一系統紀錄。
- * @param sessions 目前頁籤內保存的稽核 session。
- * @returns 可併入系統紀錄表的 AI 問答列。
+ * 計算 session 內使用者的提問數。
+ * @param session 稽核 session。
+ * @returns 使用者訊息筆數。
  */
-export function buildAssistantSystemRecords(sessions: AssistantAuditSession[]): SystemRecordEntry[] {
-	return sessions.map((session) => {
-		const questionCount = session.messages.filter((message) => message.role === 'user').length
-		const latestSource = [...session.messages].reverse().find((message) => message.role === 'user')?.sourceLabel ?? '模型一般知識'
-		const statusLabel = sessionStatusLabel(session)
-		return {
-			id: `record-assistant-${session.id}`,
-			occurredAt: session.endedAt ?? session.startedAt,
-			category: 'ai',
-			level: session.status === 'failed' ? 'error' : session.status === 'cancelled' ? 'warning' : 'success',
-			title: '後台 AI 小幫手對話',
-			summary: `${session.userName} · ${questionCount} 則提問 · ${sourceKindLabel(session)}／${latestSource} · ${sessionEndReasonLabel(session)}`,
-			statusLabel,
-			sourceId: session.id,
-			sourceTo: `/admin/logs?assistantSessionId=${encodeURIComponent(session.id)}`,
-			actorLabel: session.userName,
-			resourceLabel: session.id,
-			operationScope: 'admin.assistant.chat',
-			requestId: session.messages[0]?.requestId,
-		}
-	})
+export function countAssistantQuestions(session: AssistantAuditSession): number {
+	return session.messages.filter((message) => message.role === 'user').length
 }
