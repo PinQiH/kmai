@@ -554,7 +554,13 @@ export interface AdminQuestionRecord {
 	requestId: string
 	citations: Citation[]
 	trace: AnswerTrace | null
+	/** 問答來源；未填視為前台提問。 */
+	source?: AdminQuestionSource
+	/** 來自自動回信時，對應的信件 id。 */
+	mailId?: string
 }
+
+export type AdminQuestionSource = 'web' | 'mail'
 
 export type SystemRecordCategory = 'auth' | 'ai' | 'job' | 'audit' | 'notification' | 'alert'
 export type SystemRecordLevel = 'info' | 'success' | 'warning' | 'error'

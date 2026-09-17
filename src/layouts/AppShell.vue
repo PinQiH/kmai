@@ -56,6 +56,7 @@ const adminNavigationGroups: Array<{ title: string; items: NavigationItem[] }> =
 			{ title: "營運監控", icon: "mdi-chart-timeline-variant", to: "/admin/monitoring" },
 			{ title: "通知管理", icon: "mdi-bell-cog-outline", to: "/admin/notifications" },
 			{ title: "回饋與問題", icon: "mdi-comment-alert-outline", to: "/admin/feedback" },
+			{ title: "自動回信", icon: "mdi-email-fast-outline", to: "/admin/mail-bot" },
 			{ title: "系統紀錄", icon: "mdi-text-box-search-outline", to: "/admin/logs" },
 		],
 	},

@@ -13,6 +13,7 @@ import { systemRecordCategoryPalette } from '@/theme'
 import type {
 	AdminQuestionRecord,
 	AdminQuestionRecordStatus,
+	AdminQuestionSource,
 	AssistantAuditSession,
 	SystemRecordCategory,
 	SystemRecordEntry,
@@ -36,7 +37,7 @@ import {
 } from '@/utils/systemRecords'
 
 type SystemRecordTab = 'questions' | 'events' | 'audit'
-type QuestionView = 'answers' | 'assistant'
+type QuestionView = 'answers' | 'assistant' | 'mail'
 type CategoryFilter = SystemRecordCategory | 'all'
 type LevelFilter = SystemRecordLevel | 'all'
 
@@ -58,7 +59,7 @@ const routeMessageType = ref<'warning' | 'error'>('warning')
 const routeMessageVisible = ref(false)
 const drawerTriggerQuestionId = ref<string | null>(null)
 const assistantDetailOpen = ref(false)
-// > AI 問答紀錄分頁內再分「前台問答」與「後台小幫手對話」，兩者都含完整內容，同受系統管理員權限保護
+// > AI 問答紀錄分頁內再分「前台問答」「後台小幫手對話」「自動回信」，兩者都含完整內容，同受系統管理員權限保護
 const questionView = ref<QuestionView>('answers')
 
 const questionKeyword = ref('')
@@ -125,16 +126,16 @@ const timeRangeOptions = [
 	{ title: '最近 24 小時', value: '24h' },
 	{ title: '最近 7 天', value: '7d' },
 ]
-const questionHeaders = [
+const questionHeaders = computed(() => [
 	{ title: '提問時間', key: 'askedAt', width: 180 },
-	{ title: '使用者', key: 'userName', width: 210 },
+	{ title: questionView.value === 'mail' ? '寄件者' : '使用者', key: 'userName', width: 210 },
 	{ title: '問題摘要', key: 'question', minWidth: 320 },
 	{ title: '知識範圍／模型', key: 'knowledgeScopeLabel', width: 240 },
 	{ title: '狀態', key: 'status', width: 100 },
 	{ title: '耗時', key: 'durationMs', width: 120 },
 	{ title: 'Tokens', key: 'tokenUsage.totalTokens', width: 110, align: 'end' as const },
 	{ title: '', key: 'actions', sortable: false, align: 'end' as const, width: 110 },
-]
+])
 const eventHeaders = [
 	{ title: '發生時間', key: 'occurredAt', width: 180 },
 	{ title: '類別', key: 'category', width: 130 },
@@ -160,20 +161,27 @@ const assistantHeaders = [
 	{ title: '', key: 'actions', sortable: false, align: 'end' as const, width: 110 },
 ]
 
+const sourceQuestionRecords = computed(() => questionRecords.value.filter((record) => (record.source ?? 'web') === currentQuestionSource.value))
 const questionUserOptions = computed(() => [
-	{ title: '全部使用者', value: 'all' },
+	{ title: questionView.value === 'mail' ? '全部寄件者' : '全部使用者', value: 'all' },
 	...Array.from(
 		new Map(
-			questionRecords.value.map((record) => [
+			sourceQuestionRecords.value.map((record) => [
 				record.userId,
 				{ title: `${record.userName}（${record.userEmail}）`, value: record.userId },
 			]),
 		).values(),
 	),
 ])
+// > 自動回信也會走問答流程，與前台問答共用同一份紀錄與詳情；信件本身與回信統計在自動回信頁
+watch(questionView, () => {
+	questionUserFilter.value = 'all'
+	questionDepartmentFilter.value = 'all'
+})
+const currentQuestionSource = computed<AdminQuestionSource>(() => (questionView.value === 'mail' ? 'mail' : 'web'))
 const questionDepartmentOptions = computed(() => [
 	{ title: '全部部門', value: 'all' },
-	...Array.from(new Set(questionRecords.value.map((record) => record.department)))
+	...Array.from(new Set(sourceQuestionRecords.value.map((record) => record.department)))
 		.sort((left, right) => left.localeCompare(right, 'zh-TW'))
 		.map((department) => ({ title: department, value: department })),
 ])
@@ -183,6 +191,7 @@ const filteredQuestionRecords = computed(() =>
 		userId: questionUserFilter.value,
 		department: questionDepartmentFilter.value,
 		status: questionStatusFilter.value,
+		source: currentQuestionSource.value,
 		timeRange: questionTimeRangeFilter.value,
 		now: notificationsStore.deliveryClock,
 	}),
@@ -470,6 +479,7 @@ watch(
 			return
 		}
 
+		questionView.value = record.source === 'mail' ? 'mail' : 'answers'
 		if (selectedQuestion.value?.id !== record.id || !questionDrawerOpen.value) {
 			openQuestionRecord(record)
 		}
@@ -554,12 +564,18 @@ watch(
 					<VBtn value="answers" prepend-icon="mdi-message-text-outline">前台 AI 問答</VBtn>
 					<VBtn value="assistant" prepend-icon="mdi-robot-outline">
 						後台小幫手對話
-						<VChip size="x-small" variant="tonal" class="ml-2">{{ assistantSessions.length }}</VChip>
+					</VBtn>
+					<VBtn value="mail" prepend-icon="mdi-email-fast-outline" data-testid="question-view-mail">
+						自動回信
 					</VBtn>
 				</VBtnToggle>
 
-				<template v-if="questionView === 'answers'">
+				<template v-if="questionView === 'answers' || questionView === 'mail'">
 				<VAlert type="info" variant="tonal" class="mb-5">
+					<template v-if="questionView === 'mail'">
+						每一列是機器人為一封來信走的問答。信件內容、寄送結果與回信統計請到
+						<RouterLink to="/admin/mail-bot" class="font-weight-bold">自動回信</RouterLink>。<br />
+					</template>
 					每一列代表一次問答。開啟完整內容會留下調閱稽核，但稽核不會記錄問題、回答或引用原文。
 				</VAlert>
 
@@ -573,7 +589,7 @@ watch(
 						hide-details
 						@update:model-value="questionKeyword = $event ?? ''"
 					/>
-					<VSelect v-model="questionUserFilter" :items="questionUserOptions" label="使用者" hide-details />
+					<VSelect v-model="questionUserFilter" :items="questionUserOptions" :label="questionView === 'mail' ? '寄件者' : '使用者'" hide-details />
 					<VSelect
 						v-model="questionDepartmentFilter"
 						:items="questionDepartmentOptions"
@@ -630,6 +646,7 @@ watch(
 								<p>{{ item.knowledgeScopeLabel }}</p>
 								<p class="text-caption text-medium-emphasis mt-1">{{ item.modelLabel }}</p>
 								<VChip
+									v-if="item.source !== 'mail'"
 									:color="item.scopedDocuments.length > 0 ? 'primary' : undefined"
 									:prepend-icon="item.scopedDocuments.length > 0 ? 'mdi-file-check-outline' : 'mdi-earth'"
 									size="x-small"
@@ -965,6 +982,14 @@ watch(
 						<div><span>提問時間</span><strong>{{ formatNotificationTimestamp(selectedQuestion.askedAt) }}</strong></div>
 						<div><span>使用者</span><strong>{{ selectedQuestion.userEmail }}</strong></div>
 						<div><span>部門</span><strong>{{ selectedQuestion.department }}</strong></div>
+						<div>
+							<span>來源</span>
+							<strong v-if="selectedQuestion.source === 'mail' && selectedQuestion.mailId">
+								自動回信 ·
+								<RouterLink :to="{ path: '/admin/mail-bot', query: { mail: selectedQuestion.mailId } }" data-testid="question-mail-link">查看原始信件</RouterLink>
+							</strong>
+							<strong v-else>前台提問</strong>
+						</div>
 						<div><span>狀態</span><strong>{{ statusMeta[selectedQuestion.status].label }}</strong></div>
 						<div><span>知識範圍</span><strong>{{ selectedQuestion.knowledgeScopeLabel }}</strong></div>
 						<div><span>模型</span><strong>{{ selectedQuestion.modelLabel }}</strong></div>

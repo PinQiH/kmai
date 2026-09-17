@@ -1,6 +1,7 @@
 import type {
 	AdminQuestionRecord,
 	AdminQuestionRecordStatus,
+	AdminQuestionSource,
 	SystemRecordCategory,
 	SystemRecordEntry,
 } from '@/types'
@@ -14,6 +15,7 @@ export interface AdminQuestionRecordFilters {
 	status: AdminQuestionRecordStatus | 'all'
 	timeRange: SystemRecordTimeRange
 	now: number
+	source?: AdminQuestionSource | 'all'
 }
 
 export interface AuditRecordFilters {
@@ -54,6 +56,7 @@ export function filterAdminQuestionRecords(
 			const matchesUser = filters.userId === 'all' || record.userId === filters.userId
 			const matchesDepartment = filters.department === 'all' || record.department === filters.department
 			const matchesStatus = filters.status === 'all' || record.status === filters.status
+			const matchesSource = !filters.source || filters.source === 'all' || (record.source ?? 'web') === filters.source
 			const matchesTime = Date.parse(record.askedAt) >= cutoff
 			const searchableText = [
 				record.question,
@@ -63,7 +66,7 @@ export function filterAdminQuestionRecords(
 				record.requestId,
 			].join(' ').toLocaleLowerCase('zh-TW')
 			const matchesKeyword = !normalizedKeyword || searchableText.includes(normalizedKeyword)
-			return matchesUser && matchesDepartment && matchesStatus && matchesTime && matchesKeyword
+			return matchesUser && matchesDepartment && matchesStatus && matchesSource && matchesTime && matchesKeyword
 		})
 		.sort((left, right) => Date.parse(right.askedAt) - Date.parse(left.askedAt))
 }
