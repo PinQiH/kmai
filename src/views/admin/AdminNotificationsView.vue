@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
 import { ALERT_EVENT_TYPES, ALERT_SEVERITY_LABELS, useNotificationsStore } from '@/stores/notifications'
@@ -833,7 +834,13 @@ function sendTestEmail(): void {
 			</VCard>
 		</VDialog>
 
-		<VDialog :model-value="Boolean(deleteRuleTarget)" max-width="480" @update:model-value="deleteRuleTarget = null"><VCard v-if="deleteRuleTarget"><VCardTitle class="pa-6 pb-2">刪除自動通知規則？</VCardTitle><VCardText class="pa-6 pt-2">刪除「{{ deleteRuleTarget.name }}」後不再產生新通知；已發送的通知與成效紀錄會保留。</VCardText><VCardActions class="pa-5"><VSpacer /><VBtn @click="deleteRuleTarget = null">返回</VBtn><VBtn color="error" @click="confirmDeleteRule">確認刪除</VBtn></VCardActions></VCard></VDialog>
+		<ConfirmDialog
+			:model-value="Boolean(deleteRuleTarget)"
+			title="刪除自動通知規則？"
+			:description="`刪除「${deleteRuleTarget?.name ?? ''}」後不再產生新通知；已發送的通知與成效紀錄會保留。`"
+			@update:model-value="deleteRuleTarget = null"
+			@confirm="confirmDeleteRule"
+		/>
 	</div>
 </template>
 

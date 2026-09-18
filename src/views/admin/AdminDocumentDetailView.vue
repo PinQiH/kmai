@@ -7,6 +7,7 @@ import DocumentFileActions from "@/components/DocumentFileActions.vue"
 import DocumentChunkEditor from "@/components/DocumentChunkEditor.vue"
 import DocumentReprocessDialog from "@/components/DocumentReprocessDialog.vue"
 import DocumentStrategyEditor from "@/components/DocumentStrategyEditor.vue"
+import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import PageHeader from "@/components/PageHeader.vue"
 import StatePanel from "@/components/StatePanel.vue"
 import {
@@ -1035,22 +1036,13 @@ function viewChunks(fileId: string | undefined): void {
       ></VCard
     ></VDialog
   >
-  <VDialog
+  <ConfirmDialog
     :model-value="Boolean(deleteAttachmentTarget)"
-    max-width="440"
+    title="刪除附件？"
+    :description="`確定要刪除「${deleteAttachmentTarget?.name ?? ''}」嗎？`"
     @update:model-value="deleteAttachmentTarget = null"
-    ><VCard
-      ><VCardTitle>刪除附件</VCardTitle
-      ><VCardText
-        >確定要刪除「{{ deleteAttachmentTarget?.name }}」嗎？</VCardText
-      ><VCardActions
-        ><VSpacer /><VBtn @click="deleteAttachmentTarget = null">取消</VBtn
-        ><VBtn color="error" @click="confirmDeleteAttachment"
-          >確認刪除</VBtn
-        ></VCardActions
-      ></VCard
-    ></VDialog
-  >
+    @confirm="confirmDeleteAttachment"
+  />
 </template>
 <style scoped>
 .tab-note {

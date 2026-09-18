@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import {
 	aiConnections,
@@ -443,28 +444,30 @@ function runConnectionTest(connectionId: string): void {
 			</VWindowItem>
 		</VWindow>
 
-		<VDialog :model-value="Boolean(deleteTarget)" max-width="480" @update:model-value="deleteTarget = null">
-			<VCard v-if="deleteTarget">
-				<VCardTitle class="pa-6 pb-2">刪除「{{ deleteTarget.name }}」？</VCardTitle>
-				<VCardText class="pa-6 pt-2">
-					<template v-if="deleteBlockers.usages.length || deleteBlockers.references">
-						<p class="mb-2">這個設定檔仍在使用中，無法刪除：</p>
-						<ul class="blocker-list">
-							<li v-for="usage in deleteBlockers.usages" :key="usage.id">用途「{{ usage.name }}」</li>
-							<li v-if="deleteBlockers.references">{{ deleteBlockers.references }} 組處理策略直接指定</li>
-						</ul>
-						<p class="text-body-2 text-medium-emphasis mt-3">請先在「AI 與檢索設定」或文件處理策略改用其他設定檔。</p>
-					</template>
-					<p v-else>刪除後無法復原；已處理完成的文件不受影響。</p>
-				</VCardText>
-				<VCardActions class="pa-5">
-					<VSpacer />
-					<VBtn @click="deleteTarget = null">返回</VBtn>
-					<VBtn v-if="deleteBlockers.usages.length" color="primary" variant="tonal" :to="deleteBlockers.usages[0]!.pagePath">前往{{ deleteBlockers.usages[0]!.pageLabel }}</VBtn>
-					<VBtn v-else color="error" :disabled="Boolean(deleteBlockers.references)" @click="confirmDelete">確認刪除</VBtn>
-				</VCardActions>
-			</VCard>
-		</VDialog>
+		<ConfirmDialog
+			:model-value="Boolean(deleteTarget)"
+			:title="`刪除「${deleteTarget?.name ?? ''}」？`"
+			:max-width="480"
+			:hide-confirm="Boolean(deleteBlockers.usages.length)"
+			:confirm-disabled="Boolean(deleteBlockers.references)"
+			@update:model-value="deleteTarget = null"
+			@confirm="confirmDelete"
+		>
+			<template #default>
+				<template v-if="deleteBlockers.usages.length || deleteBlockers.references">
+					<p class="mb-2">這個設定檔仍在使用中，無法刪除：</p>
+					<ul class="blocker-list">
+						<li v-for="usage in deleteBlockers.usages" :key="usage.id">用途「{{ usage.name }}」</li>
+						<li v-if="deleteBlockers.references">{{ deleteBlockers.references }} 組處理策略直接指定</li>
+					</ul>
+					<p class="text-body-2 text-medium-emphasis mt-3">請先在「AI 與檢索設定」或文件處理策略改用其他設定檔。</p>
+				</template>
+				<p v-else>刪除後無法復原；已處理完成的文件不受影響。</p>
+			</template>
+			<template v-if="deleteBlockers.usages.length" #extra-actions>
+				<VBtn color="primary" variant="tonal" :to="deleteBlockers.usages[0]!.pagePath">前往{{ deleteBlockers.usages[0]!.pageLabel }}</VBtn>
+			</template>
+		</ConfirmDialog>
 	</div>
 </template>
 

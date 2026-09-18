@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 
 import AnimatedNumber from '@/components/AnimatedNumber.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import MetricSparkline from '@/components/MetricSparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
@@ -930,19 +931,13 @@ onBeforeUnmount(() => {
 		</VDialog>
 
 		<!-- > 刪除規則確認 -->
-		<VDialog :model-value="Boolean(deleteTarget)" max-width="460" @update:model-value="deleteTarget = null">
-			<VCard v-if="deleteTarget">
-				<VCardTitle class="pa-6 pb-2">刪除告警規則？</VCardTitle>
-				<VCardText class="pa-6 pt-2">
-					刪除「{{ deleteTarget.name }}」後，這個條件不再產生告警，也不會再寄送通知。已發生的告警紀錄會保留。
-				</VCardText>
-				<VCardActions class="pa-5">
-					<VSpacer />
-					<VBtn @click="deleteTarget = null">返回</VBtn>
-					<VBtn color="error" @click="confirmDeleteRule">確認刪除</VBtn>
-				</VCardActions>
-			</VCard>
-		</VDialog>
+		<ConfirmDialog
+			:model-value="Boolean(deleteTarget)"
+			title="刪除告警規則？"
+			:description="`刪除「${deleteTarget?.name ?? ''}」後，這個條件不再產生告警，也不會再寄送通知。已發生的告警紀錄會保留。`"
+			@update:model-value="deleteTarget = null"
+			@confirm="confirmDeleteRule"
+		/>
 	</div>
 </template>
 
