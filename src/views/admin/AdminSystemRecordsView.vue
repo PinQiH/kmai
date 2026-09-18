@@ -2,46 +2,39 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import AuditRecordsPanel from '@/components/AuditRecordsPanel.vue'
 import FilterSearchField from '@/components/FilterSearchField.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
-import { baseSystemRecords } from '@/mocks/systemRecords'
+import SystemEventsPanel from '@/components/SystemEventsPanel.vue'
 import { getAdminQuestionRecordsSnapshot } from '@/repositories/adminQuestions.repository'
 import { useAppStore } from '@/stores/app'
 import { useAssistantAuditStore } from '@/stores/assistantAudit'
 import { useNotificationsStore } from '@/stores/notifications'
-import { systemRecordCategoryPalette } from '@/theme'
 import type {
 	AdminQuestionRecord,
 	AdminQuestionRecordStatus,
 	AdminQuestionSource,
 	AssistantAuditSession,
-	SystemRecordCategory,
-	SystemRecordEntry,
-	SystemRecordLevel,
 } from '@/types'
 import {
 	assistantSessionEndReasonLabel,
 	assistantSessionStatusLabel,
 	countAssistantQuestions,
 } from '@/utils/assistantAudit'
-import { buildCsvFileName, downloadCsvFile, toCsvContent, type CsvColumn } from '@/utils/csv'
 import { formatDuration, formatNumber } from '@/utils/format'
 import { formatNotificationTimestamp } from '@/utils/notifications'
 import {
-	buildAuditRecords,
-	buildSystemEventRecords,
+	buildLogQueryLink,
 	filterAdminQuestionRecords,
-	filterAuditRecords,
-	getSystemRecordTimeCutoff,
-	SYSTEM_EVENT_CATEGORIES,
+	SYSTEM_RECORD_PAGE_SIZE,
+	SYSTEM_RECORD_PAGE_SIZE_OPTIONS,
+	SYSTEM_RECORD_TIME_RANGE_OPTIONS,
 	type SystemRecordTimeRange,
 } from '@/utils/systemRecords'
 
 type SystemRecordTab = 'questions' | 'events' | 'audit'
 type QuestionView = 'answers' | 'assistant' | 'mail'
-type CategoryFilter = SystemRecordCategory | 'all'
-type LevelFilter = SystemRecordLevel | 'all'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,63 +63,18 @@ const questionDepartmentFilter = ref('all')
 const questionStatusFilter = ref<AdminQuestionRecordStatus | 'all'>('all')
 const questionTimeRangeFilter = ref<SystemRecordTimeRange>('all')
 
-const eventKeyword = ref('')
-const categoryFilter = ref<CategoryFilter>('all')
-const levelFilter = ref<LevelFilter>('all')
-const eventTimeRangeFilter = ref<SystemRecordTimeRange>('all')
-
-const auditKeyword = ref('')
-const auditActorFilter = ref('all')
-const auditTimeRangeFilter = ref<SystemRecordTimeRange>('all')
-
 // > 時間序紀錄一律以發生時間新到舊為預設排序，避免使用者點過欄位後與預設脫鉤
-const ITEMS_PER_PAGE = 25
-const itemsPerPageOptions = [
-	{ title: '25', value: 25 },
-	{ title: '50', value: 50 },
-	{ title: '100', value: 100 },
-]
 const questionSortBy = [{ key: 'askedAt', order: 'desc' as const }]
-const eventSortBy = [{ key: 'occurredAt', order: 'desc' as const }]
-const auditSortBy = [{ key: 'occurredAt', order: 'desc' as const }]
 const assistantSortBy = [{ key: 'startedAt', order: 'desc' as const }]
 
-const categoryMeta: Record<SystemRecordCategory, { label: string; icon: string }> = {
-	auth: { label: '登入登出', icon: 'mdi-login-variant' },
-	ai: { label: 'AI 問答', icon: 'mdi-creation-outline' },
-	job: { label: '排程工作', icon: 'mdi-calendar-clock-outline' },
-	audit: { label: '操作稽核', icon: 'mdi-clipboard-text-search-outline' },
-	notification: { label: '通知', icon: 'mdi-bell-outline' },
-	alert: { label: '告警', icon: 'mdi-alert-outline' },
-}
-const levelMeta: Record<SystemRecordLevel, { label: string; color: string }> = {
-	info: { label: '資訊', color: 'info' },
-	success: { label: '成功', color: 'success' },
-	warning: { label: '警告', color: 'warning' },
-	error: { label: '失敗', color: 'error' },
-}
 const statusMeta: Record<AdminQuestionRecordStatus, { label: string; color: string }> = {
 	completed: { label: '完成', color: 'success' },
 	failed: { label: '失敗', color: 'error' },
 }
-const categoryOptions = [
-	{ title: '全部類別', value: 'all' },
-	...SYSTEM_EVENT_CATEGORIES.map((category) => ({ title: categoryMeta[category].label, value: category })),
-]
-const levelOptions = [
-	{ title: '全部等級', value: 'all' },
-	...Object.entries(levelMeta).map(([value, meta]) => ({ title: meta.label, value })),
-]
 const questionStatusOptions = [
 	{ title: '全部狀態', value: 'all' },
 	{ title: '完成', value: 'completed' },
 	{ title: '失敗', value: 'failed' },
-]
-const timeRangeOptions = [
-	{ title: '全部時間', value: 'all' },
-	{ title: '最近 1 小時', value: '1h' },
-	{ title: '最近 24 小時', value: '24h' },
-	{ title: '最近 7 天', value: '7d' },
 ]
 const questionHeaders = computed(() => [
 	{ title: '提問時間', key: 'askedAt', width: 180 },
@@ -138,21 +86,6 @@ const questionHeaders = computed(() => [
 	{ title: 'Tokens', key: 'tokenUsage.totalTokens', width: 110, align: 'end' as const },
 	{ title: '', key: 'actions', sortable: false, align: 'end' as const, width: 110 },
 ])
-const eventHeaders = [
-	{ title: '發生時間', key: 'occurredAt', width: 180 },
-	{ title: '類別', key: 'category', width: 130 },
-	{ title: '事件', key: 'title', minWidth: 320 },
-	{ title: '狀態', key: 'statusLabel', width: 120 },
-	{ title: '', key: 'data-table-expand', width: 56 },
-]
-const auditHeaders = [
-	{ title: '操作時間', key: 'occurredAt', width: 170 },
-	{ title: '操作者', key: 'actorLabel', width: 210 },
-	{ title: '操作項目', key: 'operationLabel', width: 210 },
-	{ title: '操作對象', key: 'resourceName', minWidth: 240 },
-	{ title: '結果', key: 'statusLabel', width: 100 },
-	{ title: 'Request ID', key: 'requestId', width: 210 },
-]
 const assistantHeaders = [
 	{ title: '開始時間', key: 'startedAt', width: 180 },
 	{ title: '使用者', key: 'userName', width: 200 },
@@ -217,53 +150,11 @@ const selectedAssistantSession = computed<AssistantAuditSession | null>(() => {
 	return sessionId ? assistantAuditStore.getSessionById(sessionId) : null
 })
 
-const allEventRecords = computed(() => buildSystemEventRecords(baseSystemRecords))
-const eventRecords = computed(() => {
-	const normalizedKeyword = eventKeyword.value.trim().toLocaleLowerCase('zh-TW')
-	const cutoff = getSystemRecordTimeCutoff(eventTimeRangeFilter.value, notificationsStore.deliveryClock)
-
-	return allEventRecords.value.filter((record) => {
-		const matchesCategory = categoryFilter.value === 'all' || record.category === categoryFilter.value
-		const matchesLevel = levelFilter.value === 'all' || record.level === levelFilter.value
-		const matchesTime = Date.parse(record.occurredAt) >= cutoff
-		// > 詳情也要搜得到，否則展開後才看得到的帳號、IP、排程名稱會找不到
-		const detailText = (record.details ?? []).map((detail) => detail.value).join(' ')
-		const searchableText = `${record.title} ${record.summary} ${record.statusLabel} ${detailText}`.toLocaleLowerCase('zh-TW')
-		return matchesCategory && matchesLevel && matchesTime && (!normalizedKeyword || searchableText.includes(normalizedKeyword))
-	})
-})
-const allAuditRecords = computed(() => buildAuditRecords(baseSystemRecords, assistantAuditStore.inspectionRecords))
 const assistantSessions = computed(() =>
 	assistantAuditStore.sessions.map((session) => ({
 		...session,
 		questionCount: countAssistantQuestions(session),
 	})),
-)
-const auditActorOptions = computed(() => [
-	{ title: '全部操作者', value: 'all' },
-	...Array.from(
-		new Set(
-			allAuditRecords.value
-				.map((record) => record.actorLabel)
-				.filter((actorLabel): actorLabel is string => Boolean(actorLabel)),
-		),
-	)
-		.sort((left, right) => left.localeCompare(right, 'zh-TW'))
-		.map((actorLabel) => ({ title: actorLabel, value: actorLabel })),
-])
-const auditRecords = computed(() =>
-	filterAuditRecords(allAuditRecords.value, {
-		keyword: auditKeyword.value,
-		actorLabel: auditActorFilter.value,
-		timeRange: auditTimeRangeFilter.value,
-		now: notificationsStore.deliveryClock,
-	}),
-)
-const hasAuditFilters = computed(
-	() =>
-		auditKeyword.value.trim().length > 0 ||
-		auditActorFilter.value !== 'all' ||
-		auditTimeRangeFilter.value !== 'all',
 )
 
 function firstQueryValue(value: unknown): string {
@@ -293,15 +184,6 @@ function questionSummary(question: string): string {
 	return question.length > 80 ? `${question.slice(0, 80)}…` : question
 }
 
-/**
- * 組出以 requestId 篩選服務日誌的連結。
- * @param requestId 問答或稽核紀錄的 Request ID。
- * @returns 營運監控日誌查詢頁的路徑。
- */
-function logQueryLink(requestId: string): string {
-	return `/admin/monitoring?tab=logs&keyword=${encodeURIComponent(requestId)}`
-}
-
 function scopedDocumentLabel(record: AdminQuestionRecord): string {
 	return record.scopedDocuments.length > 0 ? `限定 ${record.scopedDocuments.length} 份文件` : '未限定文件'
 }
@@ -312,55 +194,6 @@ function resetQuestionFilters(): void {
 	questionDepartmentFilter.value = 'all'
 	questionStatusFilter.value = 'all'
 	questionTimeRangeFilter.value = 'all'
-}
-
-function resetEventFilters(): void {
-	eventKeyword.value = ''
-	categoryFilter.value = 'all'
-	levelFilter.value = 'all'
-	eventTimeRangeFilter.value = 'all'
-}
-
-function resetAuditFilters(): void {
-	auditKeyword.value = ''
-	auditActorFilter.value = 'all'
-	auditTimeRangeFilter.value = 'all'
-}
-
-const eventCsvColumns: CsvColumn<SystemRecordEntry>[] = [
-	{ label: '時間', value: (record) => formatNotificationTimestamp(record.occurredAt) },
-	{ label: '類別', value: (record) => categoryMeta[record.category].label },
-	{ label: '事件', value: (record) => record.title },
-	{ label: '摘要', value: (record) => record.summary },
-	{ label: '狀態', value: (record) => record.statusLabel },
-	{ label: '詳情', value: (record) => (record.details ?? []).map((detail) => `${detail.label}：${detail.value}`).join('；') },
-	{ label: 'Request ID', value: (record) => record.requestId ?? '' },
-]
-// ! 稽核匯出只帶欄位摘要，不得加入問題、回答或引用原文
-const auditCsvColumns: CsvColumn<SystemRecordEntry>[] = [
-	{ label: '操作時間', value: (record) => formatNotificationTimestamp(record.occurredAt) },
-	{ label: '操作者', value: (record) => record.actorLabel ?? '' },
-	{ label: '帳號', value: (record) => record.actorAccount ?? '' },
-	{ label: '來源 IP', value: (record) => record.actorIp ?? '' },
-	{ label: '操作項目', value: (record) => record.operationLabel ?? record.title },
-	{ label: '操作代碼', value: (record) => record.operationScope ?? '' },
-	{ label: '操作對象', value: (record) => record.resourceName ?? '' },
-	{ label: '對象代碼', value: (record) => record.resourceLabel ?? record.sourceId ?? '' },
-	{ label: '結果', value: (record) => record.statusLabel },
-	{ label: 'Request ID', value: (record) => record.requestId ?? '' },
-]
-
-function exportEventRecords(): void {
-	if (eventRecords.value.length === 0) return
-	downloadCsvFile(buildCsvFileName('system-events'), toCsvContent(eventCsvColumns, eventRecords.value))
-	assistantAuditStore.recordRecordExport({ scope: 'system_event.export', rowCount: eventRecords.value.length })
-}
-
-function exportAuditRecords(): void {
-	if (auditRecords.value.length === 0) return
-	const rowCount = auditRecords.value.length
-	downloadCsvFile(buildCsvFileName('system-audit'), toCsvContent(auditCsvColumns, auditRecords.value))
-	assistantAuditStore.recordRecordExport({ scope: 'audit_record.export', rowCount })
 }
 
 function changeTab(value: unknown): void {
@@ -587,7 +420,7 @@ watch(
 					<VSelect v-model="questionStatusFilter" :items="questionStatusOptions" label="狀態" hide-details />
 					<VSelect
 						v-model="questionTimeRangeFilter"
-						:items="timeRangeOptions"
+						:items="SYSTEM_RECORD_TIME_RANGE_OPTIONS"
 						label="時間範圍"
 						hide-details
 					/>
@@ -610,8 +443,8 @@ watch(
 					<VDataTable
 						:headers="questionHeaders"
 						:items="filteredQuestionRecords"
-						:items-per-page="ITEMS_PER_PAGE"
-						:items-per-page-options="itemsPerPageOptions"
+						:items-per-page="SYSTEM_RECORD_PAGE_SIZE"
+						:items-per-page-options="SYSTEM_RECORD_PAGE_SIZE_OPTIONS"
 						:sort-by="questionSortBy"
 						item-value="id"
 						hover
@@ -693,8 +526,8 @@ watch(
 						<VDataTable
 							:headers="assistantHeaders"
 							:items="assistantSessions"
-							:items-per-page="ITEMS_PER_PAGE"
-							:items-per-page-options="itemsPerPageOptions"
+							:items-per-page="SYSTEM_RECORD_PAGE_SIZE"
+							:items-per-page-options="SYSTEM_RECORD_PAGE_SIZE_OPTIONS"
 							:sort-by="assistantSortBy"
 							item-value="id"
 							hover
@@ -723,218 +556,11 @@ watch(
 			</VWindowItem>
 
 			<VWindowItem value="events">
-				<VAlert type="info" variant="tonal" class="mb-5">
-					系統事件只收登入登出與排程工作，點選列尾的箭頭可展開詳情。
-					通知請至「通知管理 → 發送紀錄」，告警請至「營運監控 → 告警紀錄」，服務原始日誌請至「營運監控 → 日誌查詢」。
-				</VAlert>
-				<div class="event-filters mb-5">
-					<FilterSearchField
-						v-model="eventKeyword"
-						label="搜尋系統事件"
-						placeholder="事件、帳號、IP 或排程名稱"
-					/>
-					<VSelect v-model="categoryFilter" :items="categoryOptions" label="事件類別" hide-details />
-					<VSelect v-model="levelFilter" :items="levelOptions" label="等級" hide-details />
-					<VSelect v-model="eventTimeRangeFilter" :items="timeRangeOptions" label="時間範圍" hide-details />
-				</div>
-				<div class="records-toolbar mb-3">
-					<p class="text-caption text-medium-emphasis">共 {{ eventRecords.length }} 筆符合條件</p>
-					<VBtn
-						:disabled="eventRecords.length === 0"
-						prepend-icon="mdi-tray-arrow-down"
-						variant="tonal"
-						size="small"
-						data-testid="export-system-events"
-						@click="exportEventRecords"
-					>
-						匯出 CSV
-					</VBtn>
-				</div>
-				<VCard
-					v-if="eventRecords.length > 0"
-					class="surface-border overflow-hidden"
-					data-testid="system-event-table"
-				>
-					<VDataTable
-						:headers="eventHeaders"
-						:items="eventRecords"
-						:items-per-page="ITEMS_PER_PAGE"
-						:items-per-page-options="itemsPerPageOptions"
-						:sort-by="eventSortBy"
-						item-value="id"
-						show-expand
-						hover
-					>
-						<template #item.occurredAt="{ item }">
-							{{ formatNotificationTimestamp(item.occurredAt) }}
-						</template>
-						<template #item.category="{ item }">
-							<VChip
-								:color="systemRecordCategoryPalette[appStore.themeMode][item.category]"
-								size="small"
-								variant="tonal"
-								:data-event-category="item.category"
-							>
-								<VIcon :icon="categoryMeta[item.category].icon" start size="18" aria-hidden="true" />
-								{{ categoryMeta[item.category].label }}
-							</VChip>
-						</template>
-						<template #item.title="{ item }">
-							<div class="py-2">
-								<p class="font-weight-bold">{{ item.title }}</p>
-								<p class="text-caption text-medium-emphasis mt-1">{{ item.summary }}</p>
-							</div>
-						</template>
-						<template #item.statusLabel="{ item }">
-							<VChip :color="levelMeta[item.level].color" size="small" variant="outlined">
-								{{ item.statusLabel }}
-							</VChip>
-						</template>
-						<template #item.data-table-expand="{ internalItem, isExpanded, toggleExpand }">
-							<VBtn
-								:icon="isExpanded(internalItem) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
-								:aria-label="`${isExpanded(internalItem) ? '收合' : '展開'}「${internalItem.raw.title}」詳情`"
-								:aria-expanded="isExpanded(internalItem)"
-								variant="text"
-								size="small"
-								@click="toggleExpand(internalItem)"
-							/>
-						</template>
-						<template #expanded-row="{ columns, item }">
-							<tr class="expanded-detail-row">
-								<td :colspan="columns.length">
-									<dl class="event-detail" data-testid="system-event-detail">
-										<div v-for="detail in item.details ?? []" :key="detail.label">
-											<dt>{{ detail.label }}</dt>
-											<dd>{{ detail.value }}</dd>
-										</div>
-										<div v-if="item.requestId">
-											<dt>Request ID</dt>
-											<dd>
-												<VBtn
-													:to="logQueryLink(item.requestId)"
-													variant="text"
-													size="small"
-													class="request-id-link"
-													append-icon="mdi-open-in-new"
-												>
-													{{ item.requestId }}
-												</VBtn>
-											</dd>
-										</div>
-										<p v-if="!item.details?.length && !item.requestId" class="text-medium-emphasis">
-											這筆事件沒有額外詳情。
-										</p>
-									</dl>
-								</td>
-							</tr>
-						</template>
-					</VDataTable>
-				</VCard>
-				<StatePanel
-					v-else
-					icon="mdi-text-search"
-					title="找不到符合條件的系統事件"
-					description="請調整搜尋字詞或篩選條件。"
-					action-label="清除所有篩選"
-					@action="resetEventFilters"
-				/>
+				<SystemEventsPanel />
 			</VWindowItem>
 
 			<VWindowItem value="audit">
-				<VAlert type="info" variant="tonal" class="mb-5">
-					記錄受管制的特權操作，包含操作者帳號與來源 IP、操作項目、操作對象與結果，不保存被調閱的內容。
-					各 API 呼叫的逐筆結果屬於服務日誌，點選 Request ID 可查看該次請求的完整日誌。
-				</VAlert>
-				<div class="audit-filters mb-5">
-					<FilterSearchField
-						v-model="auditKeyword"
-						label="搜尋操作稽核"
-						placeholder="操作者、資源、操作範圍、Request ID 或狀態"
-					/>
-					<VSelect v-model="auditActorFilter" :items="auditActorOptions" label="操作者" hide-details />
-					<VSelect v-model="auditTimeRangeFilter" :items="timeRangeOptions" label="時間範圍" hide-details />
-				</div>
-				<div class="records-toolbar mb-3">
-					<p class="text-caption text-medium-emphasis">共 {{ auditRecords.length }} 筆符合條件</p>
-					<VBtn
-						:disabled="auditRecords.length === 0"
-						prepend-icon="mdi-tray-arrow-down"
-						variant="tonal"
-						size="small"
-						data-testid="export-audit-records"
-						@click="exportAuditRecords"
-					>
-						匯出 CSV
-					</VBtn>
-				</div>
-				<VCard v-if="auditRecords.length > 0" class="surface-border overflow-hidden" data-testid="audit-record-table">
-					<VDataTable
-						:headers="auditHeaders"
-						:items="auditRecords"
-						:items-per-page="ITEMS_PER_PAGE"
-						:items-per-page-options="itemsPerPageOptions"
-						:sort-by="auditSortBy"
-						item-value="id"
-						hover
-					>
-						<template #item.occurredAt="{ item }">
-							{{ formatNotificationTimestamp(item.occurredAt) }}
-						</template>
-						<template #item.actorLabel="{ item }">
-							<div class="py-2">
-								<p class="font-weight-bold">{{ item.actorLabel ?? '—' }}</p>
-								<p v-if="item.actorAccount" class="text-caption text-medium-emphasis">{{ item.actorAccount }}</p>
-								<p v-if="item.actorIp" class="text-caption text-medium-emphasis">來源 IP {{ item.actorIp }}</p>
-							</div>
-						</template>
-						<template #item.operationLabel="{ item }">
-							<div class="py-2">
-								<p class="font-weight-medium">{{ item.operationLabel ?? item.title }}</p>
-								<p v-if="item.operationScope" class="text-caption text-medium-emphasis mono-hint">
-									{{ item.operationScope }}
-								</p>
-							</div>
-						</template>
-						<template #item.resourceName="{ item }">
-							<div class="py-2">
-								<p>{{ item.resourceName ?? item.resourceLabel ?? item.sourceId ?? '—' }}</p>
-								<p v-if="item.resourceLabel" class="text-caption text-medium-emphasis mono-hint">
-									{{ item.resourceLabel }}
-								</p>
-							</div>
-						</template>
-						<template #item.requestId="{ item }">
-							<VBtn
-								v-if="item.requestId"
-								:to="logQueryLink(item.requestId)"
-								variant="text"
-								size="small"
-								class="request-id-link"
-								append-icon="mdi-open-in-new"
-								data-testid="audit-request-id-link"
-							>
-								{{ item.requestId }}
-							</VBtn>
-							<span v-else class="text-caption text-medium-emphasis">—</span>
-						</template>
-						<template #item.statusLabel="{ item }">
-							<VChip :color="levelMeta[item.level].color" size="small" variant="outlined">
-								{{ item.statusLabel }}
-							</VChip>
-						</template>
-					</VDataTable>
-				</VCard>
-				<StatePanel
-					v-else
-					icon="mdi-clipboard-text-search-outline"
-					:title="hasAuditFilters ? '找不到符合條件的操作稽核' : '目前沒有操作稽核'"
-					:description="
-						hasAuditFilters ? '請調整搜尋字詞或篩選條件。' : '管理者執行受控操作後，稽核紀錄會顯示在這裡。'
-					"
-					:action-label="hasAuditFilters ? '清除篩選' : undefined"
-					@action="resetAuditFilters"
-				/>
+				<AuditRecordsPanel />
 			</VWindowItem>
 		</VWindow>
 
@@ -1071,7 +697,7 @@ watch(
 								<dt>Request ID</dt>
 								<dd>
 									<VBtn
-										:to="logQueryLink(selectedQuestion.requestId)"
+										:to="buildLogQueryLink(selectedQuestion.requestId)"
 										variant="text"
 										size="small"
 										class="request-id-link"
@@ -1155,48 +781,6 @@ watch(
 	gap: var(--space-sm);
 }
 
-.event-filters {
-	display: grid;
-	grid-template-columns: minmax(280px, 1.5fr) repeat(3, minmax(150px, 0.65fr));
-	gap: var(--space-sm);
-}
-
-.audit-filters {
-	display: grid;
-	grid-template-columns: minmax(280px, 1.5fr) repeat(2, minmax(150px, 0.65fr));
-	gap: var(--space-sm);
-}
-
-.expanded-detail-row td {
-	background: rgb(var(--v-theme-surface-variant), 0.35);
-}
-
-.event-detail {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: var(--space-sm) var(--space-lg);
-	padding: var(--space-md) var(--space-sm);
-}
-
-.event-detail div {
-	display: grid;
-	gap: 2px;
-}
-
-.event-detail dt {
-	font-size: 0.75rem;
-	color: rgb(var(--v-theme-on-surface-variant));
-}
-
-.event-detail dd {
-	overflow-wrap: anywhere;
-}
-
-.mono-hint {
-	font-family: var(--font-mono);
-	font-size: 0.72rem;
-}
-
 .request-id-link {
 	padding-inline: 4px;
 	font-family: var(--font-mono);
@@ -1228,13 +812,6 @@ watch(
 
 .token-usage dd {
 	font-variant-numeric: tabular-nums;
-}
-
-.records-toolbar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-sm);
 }
 
 :deep(.v-data-table table) {
@@ -1378,18 +955,8 @@ watch(
 	}
 }
 
-@media (max-width: 900px) {
-	.event-filters,
-	.audit-filters {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-}
-
 @media (max-width: 600px) {
 	.question-filters,
-	.event-filters,
-	.audit-filters,
-	.event-detail,
 	.detail-grid {
 		grid-template-columns: minmax(0, 1fr);
 	}

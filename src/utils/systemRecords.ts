@@ -4,6 +4,7 @@ import type {
 	AdminQuestionSource,
 	SystemRecordCategory,
 	SystemRecordEntry,
+	SystemRecordLevel,
 } from '@/types'
 
 export type SystemRecordTimeRange = 'all' | '1h' | '24h' | '7d'
@@ -147,4 +148,38 @@ export function buildAuditRecords(
 	return [...inspectionRecords, ...baseRecords.filter((record) => record.category === 'audit')]
 		.map(cloneRecord)
 		.sort(byNewestFirst)
+}
+
+// > 系統紀錄頁各分頁共用的表格與篩選設定
+// @ 時間序紀錄一律以發生時間新到舊為預設排序，每頁筆數與時間範圍選項各分頁一致
+
+export const SYSTEM_RECORD_PAGE_SIZE = 25
+
+export const SYSTEM_RECORD_PAGE_SIZE_OPTIONS = [
+	{ title: '25', value: 25 },
+	{ title: '50', value: 50 },
+	{ title: '100', value: 100 },
+]
+
+export const SYSTEM_RECORD_TIME_RANGE_OPTIONS: Array<{ title: string; value: SystemRecordTimeRange }> = [
+	{ title: '全部時間', value: 'all' },
+	{ title: '最近 1 小時', value: '1h' },
+	{ title: '最近 24 小時', value: '24h' },
+	{ title: '最近 7 天', value: '7d' },
+]
+
+export const SYSTEM_RECORD_LEVEL_META: Record<SystemRecordLevel, { label: string; color: string }> = {
+	info: { label: '資訊', color: 'info' },
+	success: { label: '成功', color: 'success' },
+	warning: { label: '警告', color: 'warning' },
+	error: { label: '失敗', color: 'error' },
+}
+
+/**
+ * 組出以 requestId 篩選服務日誌的連結。
+ * @param requestId 問答或稽核紀錄的 Request ID。
+ * @returns 營運監控日誌查詢頁的路徑。
+ */
+export function buildLogQueryLink(requestId: string): string {
+	return `/admin/monitoring?tab=logs&keyword=${encodeURIComponent(requestId)}`
 }
