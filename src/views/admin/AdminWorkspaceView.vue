@@ -15,16 +15,6 @@ interface WorkspaceConfig {
 }
 
 const workspaceConfigs: Record<string, WorkspaceConfig> = {
-	access: {
-		eyebrow: '身分與權限',
-		description: '管理使用者、角色與群組繼承關係，保護系統內建角色不被誤改。',
-		tabs: ['使用者', '角色與權限', '群組'],
-		items: [
-			{ title: '王小明', description: 'employee@company.com · 產品企劃部 · 一般使用者', status: '已啟用', action: '管理帳號' },
-			{ title: '知識管理員', description: '8 位成員 · 可管理文件、審核與回饋', status: '系統角色', action: '查看權限' },
-			{ title: '產品事業群', description: '4 個子群組 · 86 位成員 · 繼承 2 個角色', status: '群組', action: '展開群組' },
-		],
-	},
 	settings: {
 		eyebrow: '產品與治理',
 		description: '維護品牌外觀、版本公告、隱私權政策與全公司預設配色。',
@@ -41,11 +31,6 @@ const workspaceConfigs: Record<string, WorkspaceConfig> = {
 type WorkspaceItem = WorkspaceConfig['items'][number]
 
 const workspaceTabItems: Record<string, WorkspaceItem[][]> = {
-	access: [
-		[{ title: '王小明', description: 'employee@company.com · 產品企劃部', status: '已啟用', action: '管理帳號' }, { title: '林怡君', description: 'km.admin@company.com · 知識管理部', status: '已啟用', action: '管理帳號' }],
-		[{ title: '一般使用者', description: '1,024 位成員 · 搜尋、閱讀與問答', status: '系統角色', action: '查看權限' }, { title: '知識管理員', description: '8 位成員 · 文件、審核與回饋', status: '系統角色', action: '查看權限' }, { title: '部門內容維護者', description: '32 位成員 · 限所屬部門文件', status: '自訂角色', action: '編輯權限' }],
-		[{ title: '公司', description: '6 個事業群 · 1,064 位成員', status: '根群組', action: '展開群組' }, { title: '產品事業群', description: '4 個子群組 · 86 位成員', status: '群組', action: '管理角色' }],
-	],
 	settings: [
 		[{ title: '品牌外觀', description: '系統名稱、Logo、瀏覽器標題與圖示', status: '已發布', action: '編輯外觀' }],
 		[{ title: '0.1.0', description: '目前版本 · 發布於 2026-08-14', status: '目前版本', action: '編輯說明' }, { title: '0.2.0 草稿', description: '尚未發布 · 3 項更新', status: '草稿', action: '預覽版本' }],
@@ -65,7 +50,6 @@ const isSaved = ref(false)
 const systemName = ref('Syscom Cubi')
 const defaultTheme = ref('跟隨作業系統')
 const defaultThemeAccent = ref<ThemeAccent>(appStore.themeAccent)
-const newUserEmail = ref('')
 const filterStatus = ref('全部')
 
 const workspaceKey = computed(() => String(route.meta.workspace ?? 'settings'))
@@ -116,10 +100,7 @@ watch(workspaceKey, () => {
 		<VExpandTransition><VCard v-if="showFilters" class="surface-border pa-4 mb-4"><VSelect v-model="filterStatus" label="狀態" :items="['全部', ...Array.from(new Set(currentItems.map((item) => item.status).filter(Boolean))) ]" /></VCard></VExpandTransition>
 		<VAlert v-if="isSaved" type="success" variant="tonal" class="mb-4">目前工作區已更新。</VAlert>
 
-		<VCard v-if="workspaceKey === 'access'" class="surface-border pa-5 mb-5">
-			<h2 class="section-heading mb-4">快速新增使用者</h2><div class="access-form"><VTextField v-model="newUserEmail" label="公司電子郵件" type="email" hide-details /><VSelect label="角色" :items="['一般使用者', '知識管理員', '系統管理員']" hide-details /><VBtn color="primary" :disabled="!newUserEmail.includes('@')" @click="newUserEmail = ''; showSavedMessage()">新增使用者</VBtn></div>
-		</VCard>
-		<VCard v-else-if="workspaceKey === 'settings'" class="surface-border pa-5 mb-5">
+		<VCard v-if="workspaceKey === 'settings'" class="surface-border pa-5 mb-5">
 			<h2 class="section-heading mb-4">品牌與預設外觀</h2><VTextField v-model="systemName" label="系統名稱" /><VFileInput label="Logo" accept="image/png,image/svg+xml" prepend-icon="mdi-image-outline" /><VSelect v-model="defaultTheme" label="預設主題" :items="['淺色', '深色', '跟隨作業系統']" /><VRadioGroup v-model="defaultThemeAccent" label="系統預設配色"><VRadio value="indigo" :label="themeAccentLabels.indigo" /><VRadio value="red" :label="themeAccentLabels.red" /></VRadioGroup><VBtn color="primary" @click="applySystemAppearance">套用外觀</VBtn>
 		</VCard>
 		<VCard v-if="visibleItems.length" class="surface-border">
@@ -141,6 +122,5 @@ watch(workspaceKey, () => {
 <style scoped>
 .workspace-toolbar { display: flex; align-items: center; gap: 8px; }
 .workspace-toolbar > :first-child { max-width: 380px; }
-.access-form { display: grid; grid-template-columns: 1fr 220px auto; gap: 12px; align-items: center; }
-@media (max-width: 700px) { .workspace-toolbar { align-items: stretch; flex-direction: column; } .workspace-toolbar > :first-child { max-width: none; } .access-form { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .workspace-toolbar { align-items: stretch; flex-direction: column; } .workspace-toolbar > :first-child { max-width: none; } }
 </style>

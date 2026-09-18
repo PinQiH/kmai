@@ -178,8 +178,8 @@ const routes: RouteRecordRaw[] = [
 	{
 		path: "/admin/access",
 		name: "admin-access",
-		component: () => import("@/views/admin/AdminWorkspaceView.vue"),
-		meta: { admin: true, workspace: "access", title: "使用者與存取" },
+		component: () => import("@/views/admin/AdminAccessView.vue"),
+		meta: { admin: true, title: "使用者與存取" },
 	},
 	{
 		path: "/admin/mail-bot",
