@@ -2,6 +2,7 @@ import { reactive } from 'vue'
 
 import { getProfile, usageAssignments } from '@/mocks/systemResources'
 import type { AnswerStyleId } from '@/types'
+import { formatNumber } from '@/utils/format'
 
 // > AI 與檢索設定：問答流程的執行參數。模型本身在系統資源定義，這裡只選用設定檔 id
 // TODO(api-integration): 欄位對齊舊版 /v2/model-settings 的 retrieval、prompts；串接時改由後端讀寫
@@ -142,12 +143,12 @@ export function validateAiSettings(settings: AiSettings): Partial<Record<AiSetti
 		if (!agent.tools.length) errors.agent = '啟用工具調度時，至少要開放一個工具。'
 		else if (outOfRange(agent.maxSteps, L.maxSteps)) errors.agent = `最多呼叫次數必須是 ${L.maxSteps.min} 到 ${L.maxSteps.max} 的整數。`
 		else if (outOfRange(agent.budgetSeconds, L.budgetSeconds)) errors.agent = `時間預算必須是 ${L.budgetSeconds.min} 到 ${L.budgetSeconds.max} 秒的整數。`
-		else if (outOfRange(agent.readMaxChars, L.readMaxChars)) errors.agent = `全文讀取上限必須是 ${L.readMaxChars.min.toLocaleString()} 到 ${L.readMaxChars.max.toLocaleString()} 字的整數。`
+		else if (outOfRange(agent.readMaxChars, L.readMaxChars)) errors.agent = `全文讀取上限必須是 ${formatNumber(L.readMaxChars.min)} 到 ${formatNumber(L.readMaxChars.max)} 字的整數。`
 		else if (!getProfile(settings.models.planner)) errors.agent = '請選擇規劃模型。'
 	}
 
 	if (!prompts.systemBase.trim()) errors.prompt = '共用系統提示詞不能空白。'
-	else if (prompts.systemBase.length > L.systemBaseMaxLength) errors.prompt = `共用系統提示詞最多 ${L.systemBaseMaxLength.toLocaleString()} 字。`
+	else if (prompts.systemBase.length > L.systemBaseMaxLength) errors.prompt = `共用系統提示詞最多 ${formatNumber(L.systemBaseMaxLength)} 字。`
 
 	if (prompts.styles.some((style) => !style.name.trim() || !style.instruction.trim())) errors.styles = '每種回答風格都需要名稱與指令。'
 	else if (prompts.styles.some((style) => style.instruction.length > L.instructionMaxLength)) errors.styles = `風格指令最多 ${L.instructionMaxLength} 字。`
@@ -199,7 +200,7 @@ const FIELD_SPECS: FieldSpec[] = [
 	['agent', '可用工具', (s) => toolNames(s.agent.tools)],
 	['agent', '最多呼叫次數', (s) => String(s.agent.maxSteps)],
 	['agent', '時間預算', (s) => `${s.agent.budgetSeconds} 秒`],
-	['agent', '全文讀取上限', (s) => `${s.agent.readMaxChars.toLocaleString()} 字`],
+	['agent', '全文讀取上限', (s) => `${formatNumber(s.agent.readMaxChars)} 字`],
 	['agent', '規劃模型', (s) => profileName(s.models.planner)],
 	['prompt', '共用系統提示詞', (s) => clip(s.prompts.systemBase)],
 	['styles', '預設回答風格', (s) => s.prompts.styles.find((style) => style.isDefault)?.name ?? '未指定'],

@@ -26,6 +26,7 @@ import {
 	countAssistantQuestions,
 } from '@/utils/assistantAudit'
 import { buildCsvFileName, downloadCsvFile, toCsvContent, type CsvColumn } from '@/utils/csv'
+import { formatDuration, formatNumber } from '@/utils/format'
 import { formatNotificationTimestamp } from '@/utils/notifications'
 import {
 	buildAuditRecords,
@@ -288,18 +289,8 @@ function loadQuestionRecords(): void {
 	}
 }
 
-function formatDuration(durationMs: number): string {
-	if (durationMs < 1000) return `${durationMs} ms`
-	return `${(durationMs / 1000).toFixed(1)} 秒`
-}
-
 function questionSummary(question: string): string {
 	return question.length > 80 ? `${question.slice(0, 80)}…` : question
-}
-
-function formatTokens(total: number | null | undefined): string {
-	if (total === null || total === undefined) return '—'
-	return total.toLocaleString('zh-TW')
 }
 
 /**
@@ -663,7 +654,7 @@ watch(
 						<template #item.durationMs="{ item }">{{ formatDuration(item.durationMs) }}</template>
 						<template #item.tokenUsage.totalTokens="{ item }">
 							<span class="tabular" data-testid="question-token-total">
-								{{ formatTokens(item.tokenUsage?.totalTokens) }}
+								{{ formatNumber(item.tokenUsage?.totalTokens) }}
 							</span>
 						</template>
 						<template #item.actions="{ item }">
@@ -985,7 +976,7 @@ watch(
 						<div><span>限定文件</span><strong>{{ scopedDocumentLabel(selectedQuestion) }}</strong></div>
 						<div>
 							<span>Tokens</span>
-							<strong>{{ formatTokens(selectedQuestion.tokenUsage?.totalTokens) }}</strong>
+							<strong>{{ formatNumber(selectedQuestion.tokenUsage?.totalTokens) }}</strong>
 						</div>
 					</div>
 
@@ -1011,10 +1002,10 @@ watch(
 					<section v-if="selectedQuestion.tokenUsage" class="detail-section">
 						<h3>Token 用量</h3>
 						<dl class="token-usage" data-testid="question-token-usage">
-							<div><dt>提問（prompt）</dt><dd>{{ formatTokens(selectedQuestion.tokenUsage.promptTokens) }}</dd></div>
-							<div><dt>回答（completion）</dt><dd>{{ formatTokens(selectedQuestion.tokenUsage.completionTokens) }}</dd></div>
-							<div><dt>向量化（embedding）</dt><dd>{{ formatTokens(selectedQuestion.tokenUsage.embeddingTokens) }}</dd></div>
-							<div><dt>合計</dt><dd class="font-weight-bold">{{ formatTokens(selectedQuestion.tokenUsage.totalTokens) }}</dd></div>
+							<div><dt>提問（prompt）</dt><dd>{{ formatNumber(selectedQuestion.tokenUsage.promptTokens) }}</dd></div>
+							<div><dt>回答（completion）</dt><dd>{{ formatNumber(selectedQuestion.tokenUsage.completionTokens) }}</dd></div>
+							<div><dt>向量化（embedding）</dt><dd>{{ formatNumber(selectedQuestion.tokenUsage.embeddingTokens) }}</dd></div>
+							<div><dt>合計</dt><dd class="font-weight-bold">{{ formatNumber(selectedQuestion.tokenUsage.totalTokens) }}</dd></div>
 						</dl>
 					</section>
 
@@ -1047,7 +1038,7 @@ watch(
 								<div>
 									<p class="font-weight-medium">{{ stage.label }} · {{ formatDuration(stage.elapsedMs) }}</p>
 									<p v-if="stage.modelLabel" class="text-caption text-medium-emphasis">
-										{{ stage.modelLabel }} · {{ formatTokens(stage.tokens) }} tokens
+										{{ stage.modelLabel }} · {{ formatNumber(stage.tokens) }} tokens
 									</p>
 									<p class="text-caption text-medium-emphasis">{{ stage.detail }}</p>
 								</div>

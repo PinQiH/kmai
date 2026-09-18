@@ -25,6 +25,7 @@ import {
 import { workspaceDocuments } from '@/mocks/documentWorkspace'
 import StatusChip from '@/components/StatusChip.vue'
 import { getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
+import { formatNumber } from '@/utils/format'
 
 interface ComponentProps {
 	caseId: string | null
@@ -176,7 +177,7 @@ function percent(value: number): string {
 				</section>
 
 				<section v-if="item.run" class="drawer-section" aria-labelledby="run-title">
-					<h3 id="run-title">檢索過程 <span>{{ item.run.totalMs.toLocaleString() }} ms · {{ item.run.requestId }}</span></h3>
+					<h3 id="run-title">檢索過程 <span>{{ formatNumber(item.run.totalMs) }} ms · {{ item.run.requestId }}</span></h3>
 					<VExpansionPanels variant="accordion" multiple class="run-panels">
 						<VExpansionPanel v-for="step in item.run.steps" :key="step.id" elevation="0">
 							<VExpansionPanelTitle class="run-title">

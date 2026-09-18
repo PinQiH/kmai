@@ -39,6 +39,7 @@ import { useAdminAssistantStore } from '@/stores/adminAssistant'
 import { useNotebooksStore } from '@/stores/notebooks'
 import { useToastStore } from '@/stores/toast'
 import { getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
+import { formatNumber } from '@/utils/format'
 import { buildKnowledgeSourceOptions } from '@/utils/knowledgeSources'
 
 type FeedbackTab = 'overview' | 'queue' | 'documents' | 'closed'
@@ -284,18 +285,18 @@ function retest(caseId: string): void {
 						</div>
 						<div>
 							<dt>有幫助</dt>
-							<dd>{{ answerSatisfaction.helpful.toLocaleString() }}</dd>
-							<span>共 {{ answerSatisfaction.rated.toLocaleString() }} 筆評價</span>
+							<dd>{{ formatNumber(answerSatisfaction.helpful) }}</dd>
+							<span>共 {{ formatNumber(answerSatisfaction.rated) }} 筆評價</span>
 						</div>
 						<div>
 							<dt>倒讚</dt>
-							<dd :class="{ 'text-error': answerSatisfaction.unhelpful > 0 }">{{ answerSatisfaction.unhelpful.toLocaleString() }}</dd>
+							<dd :class="{ 'text-error': answerSatisfaction.unhelpful > 0 }">{{ formatNumber(answerSatisfaction.unhelpful) }}</dd>
 							<span>每筆倒讚都會成為待處理案件</span>
 						</div>
 						<div>
 							<dt>評價率</dt>
 							<dd>{{ answerSatisfaction.ratedRate }}%</dd>
-							<span>{{ answerSatisfaction.answered.toLocaleString() }} 次回答中有評價的比例</span>
+							<span>{{ formatNumber(answerSatisfaction.answered) }} 次回答中有評價的比例</span>
 						</div>
 					</dl>
 					<VCard class="surface-border pa-5">
@@ -362,7 +363,7 @@ function retest(caseId: string): void {
 										<tr v-for="row in satisfactionBySource" :key="row.id">
 											<td>{{ row.label }}</td>
 											<td class="num">{{ formatRate(breakdownRate(row)) }}</td>
-											<td class="num">{{ row.unhelpful.toLocaleString() }}</td>
+											<td class="num">{{ formatNumber(row.unhelpful) }}</td>
 										</tr>
 									</tbody>
 								</table>
@@ -372,7 +373,7 @@ function retest(caseId: string): void {
 										<tr v-for="row in satisfactionByModel" :key="row.id">
 											<td>{{ row.label }}</td>
 											<td class="num">{{ formatRate(breakdownRate(row)) }}</td>
-											<td class="num">{{ row.unhelpful.toLocaleString() }}</td>
+											<td class="num">{{ formatNumber(row.unhelpful) }}</td>
 										</tr>
 									</tbody>
 								</table>
