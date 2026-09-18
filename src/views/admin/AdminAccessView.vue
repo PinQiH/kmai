@@ -33,6 +33,7 @@ import {
 	type IssuedCredential,
 	type UserStatus,
 } from '@/mocks/access'
+import { useToastStore } from '@/stores/toast'
 
 type AccessTab = 'users' | 'roles' | 'groups'
 const tabs: AccessTab[] = ['users', 'roles', 'groups']
@@ -64,11 +65,9 @@ function confirmLeave(): void {
 	router.push(target)
 }
 
-const message = ref('')
-const messageTone = ref<'success' | 'error' | 'warning'>('success')
+const toastStore = useToastStore()
 function notify(text: string, tone: 'success' | 'error' | 'warning' = 'success'): void {
-	message.value = text
-	messageTone.value = tone
+	toastStore.show(text, tone)
 }
 
 // > 使用者清單
@@ -232,7 +231,6 @@ function directRoleNames(user: AccessUser): string[] {
 			<template #actions><VBtn color="primary" prepend-icon="mdi-plus" data-testid="access-create" @click="startCreate">{{ createLabel }}</VBtn></template>
 		</PageHeader>
 
-		<VAlert v-if="message" :type="messageTone" variant="tonal" density="compact" closable class="mb-5" role="status" @click:close="message = ''">{{ message }}</VAlert>
 
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-5">
 			<VTab value="users">使用者 <span class="tab-count">{{ accessState.users.length }}</span></VTab>

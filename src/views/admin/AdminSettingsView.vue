@@ -38,6 +38,7 @@ import {
 import { diffLines } from '@/utils/lineDiff'
 import { useAppStore } from '@/stores/app'
 import { themeAccentLabels, type ThemeAccent, type ThemePreference } from '@/theme'
+import { useToastStore } from '@/stores/toast'
 
 type SettingsTab = 'brand' | 'appearance' | 'releases' | 'privacy'
 const tabs: SettingsTab[] = ['brand', 'appearance', 'releases', 'privacy']
@@ -54,11 +55,9 @@ watch(activeTab, (tab) => {
 	if (next !== route.query.tab) router.replace({ query: { ...route.query, tab: next } })
 })
 
-const message = ref('')
-const messageTone = ref<'success' | 'error' | 'warning'>('success')
+const toastStore = useToastStore()
 function notify(text: string, tone: 'success' | 'error' | 'warning' = 'success'): void {
-	message.value = text
-	messageTone.value = tone
+	toastStore.show(text, tone)
 }
 
 // > 品牌外觀
@@ -300,7 +299,6 @@ const tabDirty = computed<Record<SettingsTab, boolean>>(() => ({ brand: brandDir
 			<VTab value="privacy">隱私權政策<span v-if="tabDirty.privacy" class="dirty-dot" aria-label="有未儲存的修改" /><VChip v-if="settingsState.privacyDraft" size="x-small" variant="tonal" color="warning" class="ms-2">草稿</VChip></VTab>
 		</VTabs>
 
-		<VAlert v-if="message" :type="messageTone" variant="tonal" closable class="mb-4" role="status" @click:close="message = ''">{{ message }}</VAlert>
 
 		<VWindow v-model="activeTab">
 			<!-- 品牌外觀 -->

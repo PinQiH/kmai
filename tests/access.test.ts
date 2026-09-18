@@ -1,3 +1,4 @@
+import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
@@ -146,7 +147,7 @@ describe('AdminAccessView', () => {
 	it('15. 清單顯示使用者、繼承角色標記與帳號概況', async () => {
 		const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/admin/access', component: AdminAccessView }] })
 		await router.push('/admin/access')
-		const wrapper = mount(AdminAccessView, { global: { plugins: [router, createVuetify({ components, directives })] } })
+		const wrapper = mount(AdminAccessView, { global: { plugins: [router, createPinia(), createVuetify({ components, directives })] } })
 		await flushPromises()
 		expect(wrapper.text()).toContain('王小明')
 		expect(wrapper.text()).toContain('一般使用者*')

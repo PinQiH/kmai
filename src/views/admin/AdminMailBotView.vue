@@ -35,6 +35,7 @@ import {
 	type MailStatus,
 } from '@/mocks/mailBot'
 import { describeProfile, getProfile, getProfilesByKind } from '@/mocks/systemResources'
+import { useToastStore } from '@/stores/toast'
 
 type MailBotTab = 'messages' | 'stats' | 'settings'
 type StatusFilter = MailStatus | 'all'
@@ -57,11 +58,9 @@ watch(activeTab, (tab) => {
 	if (next !== route.query.tab) router.replace({ query: { ...route.query, tab: next } })
 })
 
-const message = ref('')
-const messageTone = ref<'success' | 'error' | 'info'>('success')
+const toastStore = useToastStore()
 function notify(text: string, tone: 'success' | 'error' | 'info' = 'success'): void {
-	message.value = text
-	messageTone.value = tone
+	toastStore.show(text, tone)
 }
 
 const settings = computed(() => mailBotState.settings)
@@ -253,7 +252,6 @@ function handleSubmitMfaCode(): void {
 	<div class="page-shell">
 		<PageHeader eyebrow="信件自動化" title="自動回信" description="寄到機器人信箱、且主旨符合規則的來信，會用 AI 問答找答案後回信，回覆最後附上 AI 警語；可以設定直接寄出，或先由管理者審核。這裡查看每封信的處理結果，並設定信箱與觸發條件。" />
 
-		<VAlert v-if="message" :type="messageTone" variant="tonal" density="compact" closable class="mb-5" role="status" @click:close="message = ''">{{ message }}</VAlert>
 
 		<div class="mailbox-bar">
 			<VIcon icon="mdi-email-outline" size="20" class="text-medium-emphasis" />

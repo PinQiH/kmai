@@ -5,6 +5,7 @@ import { useDisplay, useTheme } from "vuetify"
 
 import brandLogoUrl from "@/assets/brand/kmai-logo.png"
 import AdminAssistantWidget from "@/components/AdminAssistantWidget.vue"
+import AppToaster from "@/components/AppToaster.vue"
 import ConversationHistoryPanel from "@/components/ConversationHistoryPanel.vue"
 import ConversationSearchDialog from "@/components/ConversationSearchDialog.vue"
 import NotificationMenu from "@/components/NotificationMenu.vue"
@@ -351,6 +352,8 @@ async function handleLogout(): Promise<void> {
     <ConversationSearchDialog v-model="isSearchOpen" />
     <AdminAssistantWidget v-if="isAdminWorkspace" />
   </template>
+  <!-- 頂列高 64px，通知落在其下方 12px；公開頁沒有頂列 -->
+  <AppToaster :top="isPublicPage ? 16 : 76" />
 </template>
 
 <style scoped>

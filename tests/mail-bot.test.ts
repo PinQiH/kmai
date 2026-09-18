@@ -1,3 +1,4 @@
+import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
@@ -20,6 +21,7 @@ import {
 	summarizeMailReplies,
 	testSubjectPattern,
 } from '@/mocks/mailBot'
+import { useToastStore } from '@/stores/toast'
 import { getAdminQuestionRecordsSnapshot } from '@/repositories/adminQuestions.repository'
 import { filterAdminQuestionRecords } from '@/utils/systemRecords'
 import AdminMailBotView from '@/views/admin/AdminMailBotView.vue'
@@ -109,7 +111,7 @@ describe('AdminMailBotView', () => {
 		const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/admin/mail-bot', component: AdminMailBotView }, { path: '/admin/logs', component: stub }, { path: '/admin/ai-settings', component: stub }] })
 		await router.push(path)
 		await router.isReady()
-		const wrapper = mount({ template: '<VApp><RouterView /></VApp>' }, { global: { plugins: [router, createVuetify({ components, directives })] }, attachTo: document.body })
+		const wrapper = mount({ template: '<VApp><RouterView /></VApp>' }, { global: { plugins: [router, createPinia(), createVuetify({ components, directives })] }, attachTo: document.body })
 		await flushPromises()
 		return { wrapper, router }
 	}
@@ -128,7 +130,7 @@ describe('AdminMailBotView', () => {
 		expect(wrapper.text()).toContain('待審核，尚未寄出')
 		await wrapper.find('[data-testid="mail-approve"]').trigger('click')
 		expect(getMail('mail-1004')?.status).toBe('replied')
-		expect(wrapper.text()).toContain('已寄出回覆給 ytchang@syscom.com.tw')
+		expect(useToastStore().items[0]?.title).toContain('已寄出回覆給 ytchang@syscom.com.tw')
 		wrapper.unmount()
 	})
 

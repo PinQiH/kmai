@@ -37,6 +37,7 @@ import {
 } from '@/utils/monitoring'
 import { formatNotificationTimestamp } from '@/utils/notifications'
 import type { SystemRecordTimeRange } from '@/utils/systemRecords'
+import { useToastStore } from '@/stores/toast'
 
 type TimeRange = '最近 1 小時' | '最近 6 小時' | '最近 24 小時' | '最近 7 天'
 type FeedbackTone = 'success' | 'error'
@@ -52,8 +53,6 @@ const logs = ref(getLogEntriesSnapshot())
 // @ 送達對象由通知管理維護，這裡只讀來顯示，避免兩邊各有一套收件人
 
 const activeTab = ref('overview')
-const feedbackMessage = ref('')
-const feedbackTone = ref<FeedbackTone>('success')
 const focusedEventId = computed(() => typeof route.query.eventId === 'string' ? route.query.eventId : null)
 
 watch(
@@ -100,9 +99,9 @@ const sparklineTone: Record<MetricStatus, 'primary' | 'warning' | 'error'> = {
 	critical: 'error',
 }
 
+const toastStore = useToastStore()
 function notify(message: string, tone: FeedbackTone = 'success'): void {
-	feedbackMessage.value = message
-	feedbackTone.value = tone
+	toastStore.show(message, tone)
 }
 
 // > 服務指標
@@ -463,16 +462,6 @@ onBeforeUnmount(() => {
 			</template>
 		</VAlert>
 
-		<VAlert
-			v-if="feedbackMessage"
-			:type="feedbackTone"
-			variant="tonal"
-			closable
-			class="mb-4"
-			@click:close="feedbackMessage = ''"
-		>
-			{{ feedbackMessage }}
-		</VAlert>
 
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-5">
 			<VTab value="overview">系統概況</VTab>

@@ -29,6 +29,7 @@ import {
 	summarizeNotificationPerformance,
 } from '@/utils/notifications'
 import { isValidEmail } from '@/utils/monitoring'
+import { useToastStore } from '@/stores/toast'
 
 type AdminNotificationTab = 'notifications' | 'rules' | 'delivery'
 type FeedbackTone = 'success' | 'error' | 'info'
@@ -46,8 +47,6 @@ const notificationsStore = useNotificationsStore()
 
 const activeTab = ref<AdminNotificationTab>('notifications')
 const search = ref('')
-const feedbackMessage = ref('')
-const feedbackTone = ref<FeedbackTone>('success')
 const formError = ref('')
 const isSendDialogOpen = ref(false)
 const isSending = ref(false)
@@ -285,9 +284,9 @@ function createEmptyRuleDraft(): NotificationRuleInput {
 	}
 }
 
+const toastStore = useToastStore()
 function notify(message: string, tone: FeedbackTone = 'success'): void {
-	feedbackMessage.value = message
-	feedbackTone.value = tone
+	toastStore.show(message, tone)
 }
 
 function resolveAction(mode: ActionMode, customUrl: string, customLabel: string | null): ActionResolution {
@@ -557,7 +556,6 @@ function sendTestEmail(): void {
 		</PageHeader>
 
 		<VAlert type="info" variant="tonal" class="mb-6">這是純前端 Mock，不會寄送 Email 或保存資料；排程通知只模擬預定時間，重新整理後會還原通知、規則與成效紀錄。</VAlert>
-		<VAlert v-if="feedbackMessage" :type="feedbackTone" variant="tonal" closable class="mb-6" role="status" @click:close="feedbackMessage = ''">{{ feedbackMessage }}</VAlert>
 
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-5">
 			<VTab value="notifications">發送紀錄</VTab>

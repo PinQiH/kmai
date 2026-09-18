@@ -25,6 +25,7 @@ import {
 } from '@/mocks/documentStrategies'
 import { workspaceDocuments } from '@/mocks/documentWorkspace'
 import type { DocumentProcessingFile } from '@/types'
+import { useToastStore } from '@/stores/toast'
 
 type ProcessingTab = 'attention' | 'all' | 'strategy'
 type ProcessingStatus = '已完成' | '處理中' | '部分失敗' | '失敗' | '等待中' | '已取消'
@@ -127,8 +128,6 @@ const isDetailOpen = ref(false)
 const cancelTarget = ref<ProcessingJob | null>(null)
 const reprocessJobId = ref<string | null>(null)
 const reprocessScope = ref<ReprocessScope>('all')
-const feedbackMessage = ref('')
-const feedbackTone = ref<'success' | 'error' | 'info'>('success')
 const strategyScope = ref<string>('global')
 
 const documentIds = computed(() => {
@@ -192,9 +191,9 @@ const fileStateColor: Record<DocumentProcessingFile['state'], string> = {
 	未執行: 'secondary',
 }
 
+const toastStore = useToastStore()
 function notify(message: string, tone: 'success' | 'error' | 'info' = 'success'): void {
-	feedbackMessage.value = message
-	feedbackTone.value = tone
+	toastStore.show(message, tone)
 }
 
 function toggleExpanded(jobId: string): void {
@@ -300,17 +299,6 @@ const strategyFileTypeId = computed(() => (strategyScope.value === 'global' ? un
 			</template>
 		</PageHeader>
 
-		<VAlert
-			v-if="feedbackMessage"
-			:type="feedbackTone"
-			variant="tonal"
-			closable
-			class="mb-5"
-			role="status"
-			@click:close="feedbackMessage = ''"
-		>
-			{{ feedbackMessage }}
-		</VAlert>
 
 		<VTabs v-model="activeTab" color="primary" class="mb-4">
 			<VTab value="attention">需要處理 <VChip size="x-small" color="error" class="ml-2">{{ attentionJobs.length }}</VChip></VTab>
