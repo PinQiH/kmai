@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
 import { baseSystemRecords } from '@/mocks/systemRecords'
@@ -580,14 +581,10 @@ watch(
 				</VAlert>
 
 				<div class="question-filters mb-5">
-					<VTextField
-						:model-value="questionKeyword"
+					<FilterSearchField
+						v-model="questionKeyword"
 						label="搜尋問答紀錄"
 						placeholder="問題、回答、姓名、Email 或 Request ID"
-						prepend-inner-icon="mdi-magnify"
-						clearable
-						hide-details
-						@update:model-value="questionKeyword = $event ?? ''"
 					/>
 					<VSelect v-model="questionUserFilter" :items="questionUserOptions" :label="questionView === 'mail' ? '寄件者' : '使用者'" hide-details />
 					<VSelect
@@ -740,14 +737,10 @@ watch(
 					通知請至「通知管理 → 發送紀錄」，告警請至「營運監控 → 告警紀錄」，服務原始日誌請至「營運監控 → 日誌查詢」。
 				</VAlert>
 				<div class="event-filters mb-5">
-					<VTextField
-						:model-value="eventKeyword"
+					<FilterSearchField
+						v-model="eventKeyword"
 						label="搜尋系統事件"
 						placeholder="事件、帳號、IP 或排程名稱"
-						prepend-inner-icon="mdi-magnify"
-						clearable
-						hide-details
-						@update:model-value="eventKeyword = $event ?? ''"
 					/>
 					<VSelect v-model="categoryFilter" :items="categoryOptions" label="事件類別" hide-details />
 					<VSelect v-model="levelFilter" :items="levelOptions" label="等級" hide-details />
@@ -863,14 +856,10 @@ watch(
 					各 API 呼叫的逐筆結果屬於服務日誌，點選 Request ID 可查看該次請求的完整日誌。
 				</VAlert>
 				<div class="audit-filters mb-5">
-					<VTextField
-						:model-value="auditKeyword"
+					<FilterSearchField
+						v-model="auditKeyword"
 						label="搜尋操作稽核"
 						placeholder="操作者、資源、操作範圍、Request ID 或狀態"
-						prepend-inner-icon="mdi-magnify"
-						clearable
-						hide-details
-						@update:model-value="auditKeyword = $event ?? ''"
 					/>
 					<VSelect v-model="auditActorFilter" :items="auditActorOptions" label="操作者" hide-details />
 					<VSelect v-model="auditTimeRangeFilter" :items="timeRangeOptions" label="時間範圍" hide-details />

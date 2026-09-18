@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import AnimatedNumber from '@/components/AnimatedNumber.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import MetricSparkline from '@/components/MetricSparkline.vue'
@@ -566,14 +567,10 @@ onBeforeUnmount(() => {
 			<!-- > 告警紀錄：觸發、靜音、解除的完整歷史，供事後追溯 -->
 			<VWindowItem value="alert-history">
 				<div class="history-filters mb-5">
-					<VTextField
-						:model-value="historyKeyword"
+					<FilterSearchField
+						v-model="historyKeyword"
 						label="搜尋告警紀錄"
 						placeholder="告警規則、觀測值或通知結果"
-						prepend-inner-icon="mdi-magnify"
-						clearable
-						hide-details
-						@update:model-value="historyKeyword = $event ?? ''"
 					/>
 					<VSelect v-model="historySeverity" :items="historySeverityOptions" label="嚴重度" hide-details />
 					<VSelect v-model="historyStatus" :items="historyStatusOptions" label="狀態" hide-details />
@@ -801,12 +798,9 @@ onBeforeUnmount(() => {
 				<div class="monitoring-toolbar mb-4">
 					<VSelect v-model="logService" :items="serviceOptions" label="服務" hide-details max-width="220" />
 					<VSelect v-model="logLevel" :items="levelOptions" label="等級" hide-details max-width="180" />
-					<VTextField
+					<FilterSearchField
 						v-model="logKeyword"
 						label="關鍵字或 Trace ID"
-						prepend-inner-icon="mdi-magnify"
-						hide-details
-						clearable
 					/>
 					<VSwitch v-model="isLiveTail" color="primary" label="即時追蹤" hide-details density="compact" />
 				</div>

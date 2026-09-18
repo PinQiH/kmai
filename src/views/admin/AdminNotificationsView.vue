@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
@@ -567,7 +568,7 @@ function sendTestEmail(): void {
 		<VWindow v-model="activeTab" class="notification-window">
 			<VWindowItem value="notifications">
 				<div class="admin-toolbar mb-5">
-					<VTextField :model-value="search" label="搜尋通知" placeholder="輸入標題、來源或發送對象" prepend-inner-icon="mdi-magnify" clearable hide-details @update:model-value="search = $event ?? ''" />
+					<FilterSearchField v-model="search" label="搜尋通知" placeholder="輸入標題、來源或發送對象" />
 					<VBtn variant="outlined" prepend-icon="mdi-bell-plus-outline" @click="openSendDialog">新增站內通知</VBtn>
 				</div>
 

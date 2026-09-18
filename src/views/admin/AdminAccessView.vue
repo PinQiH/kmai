@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import AccessGroupsPanel from '@/components/AccessGroupsPanel.vue'
 import AccessRolesPanel from '@/components/AccessRolesPanel.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -239,7 +240,7 @@ function directRoleNames(user: AccessUser): string[] {
 
 				<div class="filters">
 					<VBtn color="primary" prepend-icon="mdi-account-plus-outline" height="40" data-testid="access-create" @click="openEditor(null)">新增使用者</VBtn>
-					<VTextField v-model="keyword" label="搜尋名稱、帳號或 Email" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable />
+					<FilterSearchField v-model="keyword" label="搜尋名稱、帳號或 Email" density="compact" />
 					<VSelect v-model="statusFilter" label="狀態" :items="statuses.map((value) => ({ value, title: USER_STATUS_LABELS[value] }))" density="compact" hide-details clearable />
 					<VSelect v-model="roleFilter" label="角色（含繼承）" :items="roleOptions" density="compact" hide-details clearable />
 					<VAutocomplete v-model="groupFilter" label="群組（含子群組）" :items="groupOptions" density="compact" hide-details clearable />

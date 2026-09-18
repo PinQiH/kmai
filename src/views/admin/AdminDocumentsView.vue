@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
 import { workspaceDocuments } from "@/mocks/documentWorkspace"
+import FilterSearchField from "@/components/FilterSearchField.vue"
 import DocumentBatchReprocessDialog from "@/components/DocumentBatchReprocessDialog.vue"
 import DocumentPreviewDrawer from "@/components/DocumentPreviewDrawer.vue"
 import {
@@ -430,12 +431,9 @@ function approveSelected(): void {
     <VCard class="surface-border">
       <div class="filter-bar">
         <div class="filter-primary">
-          <VTextField
+          <FilterSearchField
             v-model="search"
             label="搜尋標題、單位、擁有者或標籤"
-            prepend-inner-icon="mdi-magnify"
-            hide-details
-            clearable
             density="comfortable"
           />
           <VSelect

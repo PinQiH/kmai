@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
+
 import {
 	GROUP_TYPE_LABELS,
 	SOURCE_LABELS,
@@ -129,7 +131,7 @@ defineExpose({ isDirty })
 	<div class="split">
 		<section class="list-pane" aria-label="群組階層">
 			<VBtn color="primary" variant="tonal" block prepend-icon="mdi-account-multiple-plus-outline" class="mb-3" data-testid="groups-create" :active="isCreating" @click="requestSelect(null)">新增群組</VBtn>
-			<VTextField v-model="search" label="搜尋群組" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable class="mb-3" />
+			<FilterSearchField v-model="search" label="搜尋群組" density="compact" class="mb-3" />
 			<ul class="item-list">
 				<li v-if="isCreating"><span class="item-row is-active"><span class="item-top"><strong>新群組</strong></span><span class="item-sub">尚未儲存</span></span></li>
 				<li v-for="{ group, depth } in tree" :key="group.id">

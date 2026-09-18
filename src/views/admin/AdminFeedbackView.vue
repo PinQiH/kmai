@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import FeedbackCaseDrawer from '@/components/FeedbackCaseDrawer.vue'
 import MetricSparkline from '@/components/MetricSparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -383,7 +384,7 @@ function retest(caseId: string): void {
 
 			<VWindowItem value="queue">
 				<div class="toolbar">
-					<VTextField v-model="search" density="compact" placeholder="搜尋問題、原因或回報者" prepend-inner-icon="mdi-magnify" aria-label="搜尋待處理案件" hide-details clearable class="toolbar-search" data-testid="feedback-search" />
+					<FilterSearchField v-model="search" density="compact" placeholder="搜尋問題、原因或回報者" aria-label="搜尋待處理案件" class="toolbar-search" data-testid="feedback-search" />
 					<VBtnToggle v-model="kindFilter" mandatory density="compact" variant="outlined" divided color="primary" aria-label="依類型篩選">
 						<VBtn value="all">全部 {{ kindCounts.all }}</VBtn>
 						<VBtn value="answer">{{ FEEDBACK_KIND_LABELS.answer }} {{ kindCounts.answer }}</VBtn>
@@ -465,7 +466,7 @@ function retest(caseId: string): void {
 
 			<VWindowItem value="closed">
 				<div class="toolbar">
-					<VTextField v-model="closedSearch" density="compact" placeholder="搜尋問題或處理說明" prepend-inner-icon="mdi-magnify" aria-label="搜尋已結案案件" hide-details clearable class="toolbar-search" />
+					<FilterSearchField v-model="closedSearch" density="compact" placeholder="搜尋問題或處理說明" aria-label="搜尋已結案案件" class="toolbar-search" />
 				</div>
 				<p v-if="closedRows.length" class="result-count" aria-live="polite">共 {{ closedRows.length }} 筆<template v-if="closedPageCount > 1"> · {{ rangeLabel(closedPage, closedRows.length) }}</template></p>
 				<div v-if="!closedRows.length" class="empty-state" role="status">

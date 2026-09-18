@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import DocumentLifecycleTrail from '@/components/DocumentLifecycleTrail.vue'
 import DocumentReprocessDialog from '@/components/DocumentReprocessDialog.vue'
 import DocumentStrategyEditor from '@/components/DocumentStrategyEditor.vue'
@@ -308,13 +309,10 @@ const strategyFileTypeId = computed(() => (strategyScope.value === 'global' ? un
 
 		<!-- @ 工具列放在 VWindow 外面：VWindow 預設 overflow hidden，放裡面會把浮動 label 裁掉一半 -->
 		<div v-if="activeTab !== 'strategy'" class="list-toolbar">
-			<VTextField
+			<FilterSearchField
 				v-model="searchQuery"
 				label="搜尋文件或附件名稱"
-				prepend-inner-icon="mdi-magnify"
 				density="compact"
-				clearable
-				hide-details
 				class="toolbar-search"
 				data-testid="processing-search"
 			/>

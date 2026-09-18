@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDisplay } from 'vuetify'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import AnswerMessage from '@/components/AnswerMessage.vue'
 import AnswerSettingsMenu from '@/components/AnswerSettingsMenu.vue'
 import CitationSourcePanel from '@/components/CitationSourcePanel.vue'
@@ -848,15 +849,12 @@ watch(
 							<span class="document-count">{{ availableSourceDocuments.length }} 份可用</span>
 						</div>
 
-						<VTextField
+						<FilterSearchField
 							v-if="availableSourceDocuments.length > 0"
 							v-model="documentSearch"
 							label="搜尋文件"
-							prepend-inner-icon="mdi-magnify"
 							variant="outlined"
 							density="compact"
-							clearable
-							hide-details
 							data-testid="document-scope-search"
 						/>
 

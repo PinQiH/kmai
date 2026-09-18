@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import GraphEntityDrawer from '@/components/GraphEntityDrawer.vue'
 import GraphRebuildDialog from '@/components/GraphRebuildDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -348,7 +349,7 @@ function scopeName(value: GraphScope): string {
 
 			<VWindowItem value="entities">
 				<div class="toolbar">
-					<VTextField v-model="entitySearch" density="compact" placeholder="搜尋名稱或別名" prepend-inner-icon="mdi-magnify" aria-label="搜尋實體" hide-details clearable class="toolbar-search" data-testid="entity-search" />
+					<FilterSearchField v-model="entitySearch" density="compact" placeholder="搜尋名稱或別名" aria-label="搜尋實體" class="toolbar-search" data-testid="entity-search" />
 					<VSelect v-model="entityType" :items="entityTypeOptions" density="compact" hide-details aria-label="類型" class="toolbar-select" />
 					<VSelect v-model="entityFilter" :items="entityFilterOptions" density="compact" hide-details aria-label="需處理的實體" class="toolbar-select" data-testid="entity-filter" />
 				</div>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
+
 import {
 	CAPABILITIES,
 	RESOURCE_LABELS,
@@ -121,7 +123,7 @@ defineExpose({ isDirty })
 	<div class="split">
 		<section class="list-pane" aria-label="角色清單">
 			<VBtn color="primary" variant="tonal" block prepend-icon="mdi-shield-plus-outline" class="mb-3" data-testid="roles-create" :active="isCreating" @click="requestSelect(null)">新增角色</VBtn>
-			<VTextField v-model="search" label="搜尋角色" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable class="mb-3" />
+			<FilterSearchField v-model="search" label="搜尋角色" density="compact" class="mb-3" />
 			<ul class="item-list">
 				<li v-if="isCreating"><span class="item-row is-active"><span class="item-top"><strong>新角色</strong></span><span class="item-sub">尚未儲存</span></span></li>
 				<li v-for="role in filteredRoles" :key="role.id">

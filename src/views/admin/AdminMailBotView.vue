@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { aiSettingsState } from '@/mocks/aiSettings'
 import {
@@ -280,7 +281,7 @@ function handleSubmitMfaCode(): void {
 						<VChip value="all" variant="outlined" filter>全部 {{ mailBotState.mails.length }}</VChip>
 						<VChip v-for="status in MAIL_STATUSES" :key="status" :value="status" variant="outlined" filter>{{ MAIL_STATUS_LABELS[status] }} {{ statusCounts[status] }}</VChip>
 					</VChipGroup>
-					<VTextField v-model="keywordInput" label="搜尋主旨或寄件者" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable class="mail-search" @keyup.enter="applyKeyword" @click:clear="keywordInput = ''; applyKeyword()" />
+					<FilterSearchField v-model="keywordInput" label="搜尋主旨或寄件者" density="compact" class="mail-search" @keyup.enter="applyKeyword" @click:clear="keywordInput = ''; applyKeyword()" />
 				</div>
 				<p class="refresh-line">
 					每 15 秒自動更新 · 最後更新 <time :datetime="lastRefreshedAt">{{ formatMailTime(lastRefreshedAt) }}</time>

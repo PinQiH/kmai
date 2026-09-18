@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import {
@@ -262,7 +263,7 @@ function runConnectionTest(connectionId: string): void {
 				<div class="resource-layout">
 					<nav class="profile-index" aria-label="設定檔清單">
 						<div class="index-tools">
-							<VTextField v-model="search" density="compact" placeholder="搜尋名稱、模型、服務商或用途" prepend-inner-icon="mdi-magnify" aria-label="搜尋設定檔" hide-details clearable data-testid="profile-search" />
+							<FilterSearchField v-model="search" density="compact" placeholder="搜尋名稱、模型、服務商或用途" aria-label="搜尋設定檔" data-testid="profile-search" />
 							<div class="filter-chips" role="group" aria-label="依類型篩選">
 								<button type="button" class="filter-chip" :aria-pressed="kindFilter === 'all'" @click="kindFilter = 'all'">全部<span>{{ aiProfiles.length }}</span></button>
 								<button v-for="kind in kinds" :key="kind" type="button" class="filter-chip" :aria-pressed="kindFilter === kind" @click="kindFilter = kind">{{ resourceKindLabels[kind] }}<span>{{ kindCounts[kind] }}</span></button>

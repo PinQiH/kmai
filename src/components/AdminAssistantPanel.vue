@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import AnswerSettingsMenu from '@/components/AnswerSettingsMenu.vue'
 import { CURRENT_HANDLER, addCaseNote } from '@/mocks/feedbackAdmin'
 import { getEmployeeDocumentsBySourceId } from '@/repositories/knowledge.repository'
@@ -337,15 +338,12 @@ onMounted(() => window.requestAnimationFrame(() => composer.value?.focus()))
 						<span>{{ availableDocuments.length }} 份可用</span>
 					</div>
 					<p class="assistant-dialog-hint">不選擇文件時，會使用整個來源。</p>
-					<VTextField
+					<FilterSearchField
 						v-if="availableDocuments.length > 0"
 						v-model="documentSearch"
 						label="搜尋文件"
-						prepend-inner-icon="mdi-magnify"
 						density="compact"
 						variant="outlined"
-						clearable
-						hide-details
 						data-testid="assistant-document-search"
 					/>
 					<p v-if="availableDocuments.length === 0" class="assistant-dialog-hint">這個來源目前沒有可限定的文件。</p>

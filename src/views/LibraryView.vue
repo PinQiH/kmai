@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import DocumentCard from '@/components/DocumentCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
@@ -71,7 +72,7 @@ watch(
 			</template>
 		</PageHeader>
 		<div class="library-toolbar mb-4" :class="{ 'is-graph': activeView === 'graph' }">
-			<VTextField v-if="activeView === 'documents'" v-model="search" label="搜尋知識庫" prepend-inner-icon="mdi-magnify" hide-details clearable />
+			<FilterSearchField v-if="activeView === 'documents'" v-model="search" label="搜尋知識庫" />
 			<div class="d-flex flex-wrap ga-2" role="group" aria-label="選擇知識庫">
 				<VBtn :variant="selectedKnowledgeSourceId === 'all' ? 'flat' : 'outlined'" :color="selectedKnowledgeSourceId === 'all' ? 'primary' : undefined" size="small" :aria-pressed="selectedKnowledgeSourceId === 'all'" data-testid="library-source-all" @click="selectKnowledgeSource('all')">全部</VBtn>
 				<VBtn v-for="source in knowledgeSources" :key="source.id" :variant="selectedKnowledgeSourceId === source.id ? 'flat' : 'outlined'" :color="selectedKnowledgeSourceId === source.id ? 'primary' : undefined" size="small" :aria-pressed="selectedKnowledgeSourceId === source.id" :data-testid="`library-source-${source.id}`" @click="selectKnowledgeSource(source.id)">{{ source.name }}</VBtn>

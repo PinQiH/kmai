@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 
 import { useRoute } from 'vue-router'
 import { useTheme } from 'vuetify'
 
+import FilterSearchField from '@/components/FilterSearchField.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import {
 	GRAPH_CLUSTERS,
@@ -427,14 +428,11 @@ onBeforeUnmount(() => {
 		>
 			<section class="graph-workspace surface-border" aria-label="知識圖譜工作區">
 				<div class="graph-toolbar">
-					<VTextField
+					<FilterSearchField
 						v-model="search"
 						label="搜尋節點"
-						prepend-inner-icon="mdi-magnify"
 						density="compact"
 						variant="outlined"
-						hide-details
-						clearable
 					/>
 					<VSelect
 						v-model="selectedType"
