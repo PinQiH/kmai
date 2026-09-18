@@ -64,7 +64,7 @@ function liveRole(tone: ToastTone): 'alert' | 'status' {
 				@keydown.esc.stop="toastStore.dismiss(toast.id)"
 			>
 				<span class="toast__stamp" aria-hidden="true">
-					<VIcon :icon="toneMeta[toast.tone].icon" size="16" />
+					<VIcon :icon="toneMeta[toast.tone].icon" size="18" />
 				</span>
 				<div class="toast__body">
 					<p class="toast__title">
@@ -107,7 +107,7 @@ function liveRole(tone: ToastTone): 'alert' | 'status' {
 	top: var(--toaster-top);
 	right: 16px;
 	z-index: 2600;
-	width: min(380px, calc(100vw - 32px));
+	width: min(400px, calc(100vw - 32px));
 	pointer-events: none;
 }
 
@@ -127,27 +127,28 @@ function liveRole(tone: ToastTone): 'alert' | 'status' {
 	--toast-on-accent: rgb(var(--v-theme-on-success));
 	position: relative;
 	display: grid;
-	grid-template-columns: 28px minmax(0, 1fr) 32px;
+	grid-template-columns: 32px minmax(0, 1fr) 32px;
 	column-gap: 12px;
 	align-items: start;
 	width: 100%;
 	padding: 14px 8px 14px 14px;
 	overflow: hidden;
 	color: var(--ink-strong);
-	background: rgb(var(--v-theme-surface));
-	border: 1px solid rgb(var(--v-theme-outline));
+	/* @ 紙面混入 5% 狀態色、框線混入 35%：在白色內容區上仍能一眼認出，又不變成整塊色底 */
+	background: color-mix(in srgb, var(--toast-accent) 5%, rgb(var(--v-theme-surface)));
+	border: 1px solid color-mix(in srgb, var(--toast-accent) 35%, rgb(var(--v-theme-outline)));
 	border-radius: var(--radius-md);
 	box-shadow:
-		0 12px 28px -14px rgba(32, 36, 40, 0.32),
-		0 2px 6px -2px rgba(32, 36, 40, 0.1);
+		0 18px 40px -16px rgba(32, 36, 40, 0.42),
+		0 4px 10px -4px rgba(32, 36, 40, 0.16);
 	pointer-events: auto;
 }
 
 .v-theme--kmaiDark .toast,
 .v-theme--kmaiRedDark .toast {
 	box-shadow:
-		0 14px 32px -12px rgba(0, 0, 0, 0.55),
-		0 2px 6px -2px rgba(0, 0, 0, 0.35);
+		0 20px 44px -14px rgba(0, 0, 0, 0.7),
+		0 4px 10px -4px rgba(0, 0, 0, 0.45);
 }
 
 .toast:focus-visible {
@@ -168,17 +169,18 @@ function liveRole(tone: ToastTone): 'alert' | 'status' {
 .toast--error {
 	--toast-accent: rgb(var(--v-theme-error));
 	--toast-on-accent: rgb(var(--v-theme-on-error));
-	/* @ 錯誤不自動消失，改以邊框帶一點狀態色，和成功通知在周邊視覺就能分辨 */
-	border-color: color-mix(in srgb, rgb(var(--v-theme-error)) 45%, rgb(var(--v-theme-outline)));
+	/* @ 錯誤不自動消失，框線狀態色再加重，和成功通知在周邊視覺就能分辨 */
+	border-color: color-mix(in srgb, rgb(var(--v-theme-error)) 60%, rgb(var(--v-theme-outline)));
 }
 
 /* > 狀態圖章：實心圓＋粗筆畫圖示；形狀與文字標籤並存，不只靠顏色 */
 .toast__stamp {
 	display: grid;
 	place-items: center;
-	width: 28px;
-	height: 28px;
-	margin-top: -2px;
+	position: relative;
+	width: 32px;
+	height: 32px;
+	margin-top: -3px;
 	color: var(--toast-on-accent);
 	background: var(--toast-accent);
 	border-radius: 50%;
@@ -296,6 +298,23 @@ function liveRole(tone: ToastTone): 'alert' | 'status' {
 		filter 280ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* > 圖章外圈擴散一次：通知出現時把視線拉過來，只發生在進場，不循環 */
+.toast__stamp::after {
+	position: absolute;
+	inset: 0;
+	content: '';
+	border: 2px solid var(--toast-accent);
+	border-radius: 50%;
+	opacity: 0;
+	pointer-events: none;
+	animation: toast-ripple 900ms cubic-bezier(0.16, 1, 0.3, 1) 220ms both;
+}
+
+@keyframes toast-ripple {
+	from { opacity: 0.55; transform: scale(1); }
+	to { opacity: 0; transform: scale(1.6); }
+}
+
 .toast-enter-active .toast__stamp {
 	animation: toast-stamp 380ms cubic-bezier(0.16, 1, 0.3, 1) 90ms both;
 }
@@ -342,7 +361,8 @@ function liveRole(tone: ToastTone): 'alert' | 'status' {
 		filter: none;
 	}
 
-	.toast-enter-active .toast__stamp {
+	.toast-enter-active .toast__stamp,
+	.toast__stamp::after {
 		animation: none;
 	}
 
