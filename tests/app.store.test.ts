@@ -3,13 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ThemeInstance } from 'vuetify'
 
 import { useAppStore } from '@/stores/app'
-import { themeAccentLabels } from '@/theme'
+import { baseThemeColors } from '@/theme'
+import { extractImagePalette } from '@/utils/imagePalette'
 
-// @ 只需要 store 實際會寫入的那一格，不必造出完整的 Vuetify 主題實例
+// @ 只需要 store 實際會讀寫的欄位，不必造出完整的 Vuetify 主題實例
 function createThemeStub(): ThemeInstance {
 	const name = { value: '' }
+	const themes = {
+		value: {
+			kmaiBackdropLight: { dark: false, colors: { ...baseThemeColors.light } },
+			kmaiBackdropDark: { dark: true, colors: { ...baseThemeColors.dark } },
+		},
+	}
 	return {
 		global: { name },
+		themes,
 		change(themeName: string): void {
 			name.value = themeName
 		},
@@ -86,23 +94,30 @@ describe('app store theme', () => {
 		setActivePinia(createPinia())
 	})
 
-	it('should keep the accent and the light/dark mode independent', () => {
+	it('should keep the backdrop and the light/dark mode independent', () => {
 		const store = useAppStore()
 		const theme = createThemeStub()
+		// @ 一張全綠的 2×2 圖片
+		const palette = extractImagePalette(new Uint8ClampedArray(Array.from({ length: 4 }, () => [40, 140, 70, 255]).flat()))
 
-		store.setThemeAccent(theme, 'red')
+		store.setBackdrop(theme, { imageUrl: 'data:image/jpeg;base64,AAAA', palette })
 
 		expect(store.themeMode).toBe('light')
-		expect(themeAccentLabels[store.themeAccent]).toBe('Syscom 紅')
-		expect(theme.global.name.value).toBe('kmaiRedLight')
+		expect(theme.global.name.value).toBe('kmaiBackdropLight')
+		expect(theme.themes.value.kmaiBackdropLight.colors.primary).not.toBe(baseThemeColors.light.primary)
+		expect(store.backdropScrim).toMatch(/^rgba\(/)
 
 		store.toggleTheme(theme)
 
-		// @ 切換明暗不得把強調色重設回預設，這是兩條軸分開的核心契約
-		expect(store.themeAccent).toBe('red')
-		expect(store.themePreference).toBe('dark')
+		// @ 切換明暗不得清掉背景圖，這是兩條軸分開的核心契約
+		expect(store.backdrop).not.toBeNull()
 		expect(store.themeMode).toBe('dark')
-		expect(theme.global.name.value).toBe('kmaiRedDark')
+		expect(theme.global.name.value).toBe('kmaiBackdropDark')
+
+		store.setBackdrop(theme, null)
+
+		expect(store.backdrop).toBeNull()
+		expect(theme.global.name.value).toBe('kmaiDark')
 	})
 
 	it('should follow browser color scheme changes while system mode is selected', () => {
@@ -166,12 +181,11 @@ describe('app store theme', () => {
 		expect(theme.global.name.value).toBe('kmaiLight')
 	})
 
-	it('should fall back to the default accent for a fresh session', () => {
+	it('should start without a backdrop for a fresh session', () => {
 		const store = useAppStore()
 
-		expect(store.themeAccent).toBe('indigo')
+		expect(store.backdrop).toBeNull()
 		expect(store.themePreference).toBe('system')
-		expect(themeAccentLabels[store.themeAccent]).toBe('Cubi 藍')
 		expect(store.themeName).toBe('kmaiLight')
 	})
 })

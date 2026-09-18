@@ -1,30 +1,48 @@
 import { describe, expect, it } from 'vitest'
 import type { ThemeDefinition } from 'vuetify'
 
-import {
-	clusterPalette,
-	darkTheme,
-	lightTheme,
-	redDarkTheme,
-	redLightTheme,
-	resolveThemeName,
-	systemRecordCategoryPalette,
-	themeAccentLabels,
-} from '../src/theme'
+import { clusterPalette, darkTheme, lightTheme, resolveThemeName, systemRecordCategoryPalette } from '../src/theme'
+import { buildBackdropTheme, extractImagePalette } from '../src/utils/imagePalette'
 import { contrastRatio, deltaE, relativeLuminance } from './helpers/color'
 
 /*
  * > 主題語意色的可見性與可分辨性
- * @ 起因：加入 Syscom 紅強調色後，品牌紅與 error 紅會撞在一起——
- *   「刪除」與「儲存」變成同一種紅，破壞性操作看不出來。
- *   純靠肉眼分不出「這兩個紅有沒有差」，這裡把門檻釘死。
+ * @ 起因：主色若與 error 紅太接近，「刪除」與「儲存」會變成同一種紅，破壞性操作看不出來。
+ *   背景圖配色的主色由使用者的圖片決定，任何色相都可能出現，
+ *   所以用一圈色相（每 15°）加上灰階與極亮、極暗的圖片，把門檻釘死。
  */
 
+// - 以單一顏色填滿的 2×2 圖片，模擬「整張圖都是這個顏色」
+function solidImage(red: number, green: number, blue: number): Uint8ClampedArray {
+	return new Uint8ClampedArray(Array.from({ length: 4 }, () => [red, green, blue, 255]).flat())
+}
+
+function hueToRgb(hue: number): [number, number, number] {
+	const channel = (n: number): number => {
+		const k = (n + hue / 30) % 12
+		return Math.round((0.5 - 0.4 * Math.max(-1, Math.min(k - 3, 9 - k, 1))) * 255)
+	}
+	return [channel(0), channel(8), channel(4)]
+}
+
+const backdropSamples: Array<{ label: string; pixels: Uint8ClampedArray }> = [
+	...Array.from({ length: 24 }, (_, index) => ({ label: `色相 ${index * 15}°`, pixels: solidImage(...hueToRgb(index * 15)) })),
+	{ label: '灰階', pixels: solidImage(128, 128, 128) },
+	{ label: '近白', pixels: solidImage(250, 248, 240) },
+	{ label: '近黑', pixels: solidImage(12, 14, 20) },
+	{ label: '品牌紅', pixels: solidImage(199, 0, 10) },
+]
+
 const themes: Array<{ name: string; theme: ThemeDefinition }> = [
-	{ name: '靛藍-淺', theme: lightTheme },
-	{ name: '靛藍-深', theme: darkTheme },
-	{ name: 'Syscom 紅-淺', theme: redLightTheme },
-	{ name: 'Syscom 紅-深', theme: redDarkTheme },
+	{ name: '預設-淺', theme: lightTheme },
+	{ name: '預設-深', theme: darkTheme },
+	...backdropSamples.flatMap(({ label, pixels }) => {
+		const { themes: generated } = buildBackdropTheme(extractImagePalette(pixels))
+		return [
+			{ name: `背景圖（${label}）-淺`, theme: generated.light },
+			{ name: `背景圖（${label}）-深`, theme: generated.dark },
+		]
+	}),
 ]
 
 // @ 這四個都會被當成文字或圖示色使用，門檻是文字的 AA 4.5:1
@@ -70,38 +88,43 @@ describe('主題語意色', () => {
 		}
 	})
 
-	it('03. Syscom 紅主題用的是品牌色，且沒有沿用原本的 error 紅', () => {
-		expect(colorOf(redLightTheme, 'primary')).toBe('#C7000A')
-		expect(colorOf(redLightTheme, 'primary-darken-1')).toBe('#930000')
+	it('03. 紅色背景圖的主色是紅色時，error 會換成別的色相', () => {
+		const { themes: generated } = buildBackdropTheme(extractImagePalette(solidImage(199, 0, 10)))
 
-		// @ 沿用 #B42318 的話與品牌紅只有 ΔE 14，正是這個測試要擋的情況
-		expect(colorOf(redLightTheme, 'error')).not.toBe(colorOf(lightTheme, 'error'))
-		expect(colorOf(redDarkTheme, 'error')).not.toBe(colorOf(darkTheme, 'error'))
+		// @ 沿用 #B42318 的話與紅色主色只有 ΔE 14，正是這個測試要擋的情況
+		expect(colorOf(generated.light, 'error')).not.toBe(colorOf(lightTheme, 'error'))
+		expect(colorOf(generated.dark, 'error')).not.toBe(colorOf(darkTheme, 'error'))
 	})
 
-	it('04. Syscom 紅主題的 info 仍是藍色，與紅色主色分得開', () => {
-		for (const theme of [redLightTheme, redDarkTheme]) {
-			const difference = deltaE(colorOf(theme, 'info'), colorOf(theme, 'primary'))
-			expect(difference, `info 與 primary 的感知差異只有 ΔE ${difference.toFixed(1)}`).toBeGreaterThan(25)
-		}
+	it('04. 灰階圖片沒有可用色相，主色退回 Cubi 藍的色相', () => {
+		const { themes: generated } = buildBackdropTheme(extractImagePalette(solidImage(128, 128, 128)))
+		const difference = deltaE(colorOf(generated.light, 'primary'), colorOf(lightTheme, 'primary'))
+
+		expect(difference, `灰階圖片的主色與 Cubi 藍差了 ΔE ${difference.toFixed(1)}`).toBeLessThan(15)
 	})
 
 	it('05. 深色版的主色必須比淺色版亮，否則就是漏了主題切換', () => {
-		expect(relativeLuminance(colorOf(darkTheme, 'primary'))).toBeGreaterThan(relativeLuminance(colorOf(lightTheme, 'primary')))
-		expect(relativeLuminance(colorOf(redDarkTheme, 'primary'))).toBeGreaterThan(relativeLuminance(colorOf(redLightTheme, 'primary')))
+		for (const { name, theme } of themes.filter((item) => item.name.endsWith('-深'))) {
+			const light = themes.find((item) => item.name === name.replace(/-深$/, '-淺'))?.theme
+			if (!light) throw new Error(`${name} 缺少對應的淺色主題`)
+			expect(relativeLuminance(colorOf(theme, 'primary')), name).toBeGreaterThan(relativeLuminance(colorOf(light, 'primary')))
+		}
 	})
 
-	it('06. 強調色與明暗模式是兩條獨立的軸，四種組合都有對應主題', () => {
-		expect(resolveThemeName('indigo', 'light')).toBe('kmaiLight')
-		expect(resolveThemeName('indigo', 'dark')).toBe('kmaiDark')
-		expect(resolveThemeName('red', 'light')).toBe('kmaiRedLight')
-		expect(resolveThemeName('red', 'dark')).toBe('kmaiRedDark')
+	it('06. 明暗模式與背景圖是兩條獨立的軸，四種組合都有對應主題', () => {
+		expect(resolveThemeName('light')).toBe('kmaiLight')
+		expect(resolveThemeName('dark')).toBe('kmaiDark')
+		expect(resolveThemeName('light', true)).toBe('kmaiBackdropLight')
+		expect(resolveThemeName('dark', true)).toBe('kmaiBackdropDark')
 	})
 
-	it('07. 系統預設配色為 Cubi 藍，且管理介面使用正式名稱', () => {
-		expect(resolveThemeName('indigo', 'light')).toBe('kmaiLight')
-		expect(themeAccentLabels.indigo).toBe('Cubi 藍')
-		expect(themeAccentLabels.red).toBe('Syscom 紅')
+	it('07. 背景圖遮罩隨圖片亮度調整：越暗的圖，淺色模式遮罩越濃', () => {
+		const alpha = (rgba: string): number => Number(rgba.match(/([\d.]+)\)$/)?.[1])
+		const darkImage = buildBackdropTheme(extractImagePalette(solidImage(12, 14, 20)))
+		const brightImage = buildBackdropTheme(extractImagePalette(solidImage(250, 248, 240)))
+
+		expect(alpha(darkImage.scrim.light)).toBeGreaterThan(alpha(brightImage.scrim.light))
+		expect(alpha(brightImage.scrim.dark)).toBeGreaterThan(alpha(darkImage.scrim.dark))
 	})
 
 	it('08. 每個主題的 surface variant 文字都達到文字的 AA 門檻', () => {

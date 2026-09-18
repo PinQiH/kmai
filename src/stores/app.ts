@@ -1,13 +1,20 @@
 import { defineStore } from 'pinia'
 import type { ThemeInstance } from 'vuetify'
 
-import { settingsState } from '@/mocks/systemSettings'
-import { resolveThemeName, type ThemeAccent, type ThemeMode, type ThemePreference } from '@/theme'
+import { APPEARANCE_STORAGE_KEY, settingsState, syncAppearanceFromStorage } from '@/mocks/systemSettings'
+import { resolveThemeName, type ThemeMode, type ThemePreference } from '@/theme'
 import type { AdminRole } from '@/types'
+import { buildBackdropTheme, type BackdropTheme, type ImagePalette } from '@/utils/imagePalette'
 
 const SYSTEM_COLOR_SCHEME_QUERY = '(prefers-color-scheme: dark)'
 
 let removeSystemThemeListener: (() => void) | null = null
+let removeAppearanceStorageListener: (() => void) | null = null
+
+interface BackdropState {
+	imageUrl: string
+	scrim: BackdropTheme['scrim']
+}
 
 interface AppState {
 	adminRole: AdminRole
@@ -19,7 +26,8 @@ interface AppState {
 	// @ 明暗偏好與實際套用模式分開，system 才能持續跟隨瀏覽器設定
 	themePreference: ThemePreference
 	themeMode: ThemeMode
-	themeAccent: ThemeAccent
+	// @ 目前套用中的背景圖；來源是後台「預設外觀」，前台只讀不寫
+	backdrop: BackdropState | null
 }
 
 // - 取得瀏覽器深淺色偏好
@@ -44,11 +52,12 @@ export const useAppStore = defineStore('app', {
 		// @ 新工作階段的預設外觀由管理端「系統設定」決定
 		themePreference: settingsState.appearance.themePreference,
 		themeMode: 'light',
-		themeAccent: settingsState.appearance.themeAccent,
+		backdrop: null,
 	}),
 	getters: {
 		// @ 單一來源：任何要套用主題的地方都經過這裡，避免各處自己拼主題名稱
-		themeName: (state): string => resolveThemeName(state.themeAccent, state.themeMode),
+		themeName: (state): string => resolveThemeName(state.themeMode, state.backdrop !== null),
+		backdropScrim: (state): string | null => state.backdrop?.scrim[state.themeMode] ?? null,
 	},
 	actions: {
 		applyTheme(theme: ThemeInstance): void {
@@ -57,13 +66,27 @@ export const useAppStore = defineStore('app', {
 		disposeTheme(): void {
 			removeSystemThemeListener?.()
 			removeSystemThemeListener = null
+			removeAppearanceStorageListener?.()
+			removeAppearanceStorageListener = null
 		},
 		initializeTheme(theme: ThemeInstance): void {
 			this.disposeTheme()
 
 			const colorSchemeQuery = getSystemColorSchemeQuery()
 			if (this.themePreference === 'system') this.themeMode = resolveSystemThemeMode(colorSchemeQuery)
-			this.applyTheme(theme)
+			// TODO(api-integration): 系統背景圖改由設定 API 取得
+			this.setBackdrop(theme, settingsState.appearance.backdrop)
+
+			// @ 後台在另一個分頁儲存背景圖時，已開啟的前台分頁即時跟著換
+			if (typeof window !== 'undefined') {
+				const handleAppearanceStorage = (event: StorageEvent): void => {
+					if (event.key !== APPEARANCE_STORAGE_KEY) return
+					syncAppearanceFromStorage()
+					this.setBackdrop(theme, settingsState.appearance.backdrop)
+				}
+				window.addEventListener('storage', handleAppearanceStorage)
+				removeAppearanceStorageListener = () => window.removeEventListener('storage', handleAppearanceStorage)
+			}
 
 			if (!colorSchemeQuery || typeof colorSchemeQuery.addEventListener !== 'function') return
 			const handleSystemThemeChange = (event: MediaQueryListEvent): void => {
@@ -86,9 +109,23 @@ export const useAppStore = defineStore('app', {
 		toggleTheme(theme: ThemeInstance): void {
 			this.setThemePreference(theme, this.themeMode === 'light' ? 'dark' : 'light')
 		},
-		// - 切換強調色不影響明暗模式，兩者互不覆蓋
-		setThemeAccent(theme: ThemeInstance, accent: ThemeAccent): void {
-			this.themeAccent = accent
+		/*
+		 * - 套用背景圖與由圖片算出的配色；傳入 null 則回到預設配色
+		 * !! 背景圖主題須已在 createVuetify 註冊（createThemeDefinitions），
+		 *    這裡只改寫顏色；未註冊的主題名稱 theme.change 會直接報錯。
+		 */
+		setBackdrop(theme: ThemeInstance, source: { imageUrl: string; palette: ImagePalette } | null): void {
+			if (!source) {
+				this.backdrop = null
+				this.applyTheme(theme)
+				return
+			}
+			const backdrop = buildBackdropTheme(source.palette)
+			for (const mode of ['light', 'dark'] as const) {
+				const registered = theme.themes.value[resolveThemeName(mode, true)]
+				if (registered) Object.assign(registered.colors, backdrop.themes[mode].colors)
+			}
+			this.backdrop = { imageUrl: source.imageUrl, scrim: backdrop.scrim }
 			this.applyTheme(theme)
 		},
 		toggleNavigation(): void {

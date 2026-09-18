@@ -11,7 +11,7 @@ import { zhHant } from 'vuetify/locale'
 import App from '@/App.vue'
 import { router } from '@/router'
 import { pinia } from '@/stores'
-import { darkTheme, lightTheme, redDarkTheme, redLightTheme } from '@/theme'
+import { createThemeDefinitions } from '@/theme'
 
 const vuetify = createVuetify({
 	components,
@@ -23,12 +23,7 @@ const vuetify = createVuetify({
 	},
 	theme: {
 		defaultTheme: 'kmaiLight',
-		themes: {
-			kmaiLight: lightTheme,
-			kmaiDark: darkTheme,
-			kmaiRedLight: redLightTheme,
-			kmaiRedDark: redDarkTheme,
-		},
+		themes: createThemeDefinitions(),
 	},
 	defaults: {
 		VBtn: { rounded: 'lg', elevation: 0 },

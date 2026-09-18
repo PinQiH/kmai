@@ -299,3 +299,53 @@ body {
 		font-size: 1.75rem;
 	}
 }
+
+/*
+ * > 背景圖模式（後台 系統設定 → 預設外觀 → 背景圖）
+ * @ 背景圖固定在視窗後方並疊一層遮罩；側欄、頂列與頁面卡片改成半透明毛玻璃。
+ *   卡片透明度刻意比側欄低，因為卡片承載主要閱讀內容。
+ * @ 巢狀卡片不再疊一次毛玻璃：多層 backdrop-filter 很耗效能，視覺上也會越疊越霧。
+ * !! 顏色對比是以不透明的 surface 計算；遮罩與高不透明度是為了讓實際對比接近計算值。
+ */
+.v-application.has-backdrop {
+	background-color: rgb(var(--v-theme-background));
+	background-image: linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)), var(--backdrop-image);
+	background-position: center;
+	background-size: cover;
+	background-attachment: fixed;
+}
+
+/*
+ * @ 側欄與頂列只放導覽文字，透明度可以比內容卡片高，讓背景圖的顏色透出來；
+ *   0.78 疊上淺色遮罩後幾乎是白色，看不出有背景圖。
+ * @ 頂列與側欄使用相同透明度，視覺上是同一層外框。
+ */
+.has-backdrop .v-navigation-drawer {
+	background: rgba(var(--v-theme-surface), 0.55);
+	backdrop-filter: blur(24px) saturate(1.3);
+}
+
+/* !! 必須帶 .v-toolbar：Vuetify 的 .v-app-bar.v-toolbar 同為兩個 class 且較晚載入，權重相同會蓋掉這裡 */
+.has-backdrop .v-app-bar.v-toolbar {
+	background: rgba(var(--v-theme-surface), 0.55);
+	backdrop-filter: blur(24px) saturate(1.3);
+}
+
+/* !! VList 自帶不透明的 surface 底色，會把半透明側欄整片蓋成白色 */
+.has-backdrop .v-navigation-drawer .v-list {
+	background: transparent;
+}
+
+.has-backdrop .v-main .v-card:not(.v-card .v-card) {
+	background: rgba(var(--v-theme-surface), 0.88);
+	backdrop-filter: blur(14px);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+	.has-backdrop .v-navigation-drawer,
+	.has-backdrop .v-app-bar.v-toolbar,
+	.has-backdrop .v-main .v-card {
+		background: rgb(var(--v-theme-surface));
+		backdrop-filter: none;
+	}
+}

@@ -145,7 +145,7 @@ function liveRole(tone: ToastTone): 'alert' | 'status' {
 }
 
 .v-theme--kmaiDark .toast,
-.v-theme--kmaiRedDark .toast {
+.v-theme--kmaiBackdropDark .toast {
 	box-shadow:
 		0 20px 44px -14px rgba(0, 0, 0, 0.7),
 		0 4px 10px -4px rgba(0, 0, 0, 0.45);

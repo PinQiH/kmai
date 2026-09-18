@@ -9,7 +9,7 @@ import * as directives from 'vuetify/directives'
 
 import { useAppStore } from '../src/stores/app'
 import { getCase } from '../src/mocks/feedbackAdmin'
-import { darkTheme, lightTheme, redDarkTheme, redLightTheme } from '../src/theme'
+import { createThemeDefinitions } from '../src/theme'
 import AccountView from '../src/views/AccountView.vue'
 
 globalThis.ResizeObserver = class ResizeObserverStub {
@@ -39,12 +39,7 @@ async function mountAccountView(initialRoute = '/account'): Promise<VueWrapper> 
 					directives,
 					theme: {
 						defaultTheme: 'kmaiLight',
-						themes: {
-							kmaiLight: lightTheme,
-							kmaiDark: darkTheme,
-							kmaiRedLight: redLightTheme,
-							kmaiRedDark: redDarkTheme,
-						},
+						themes: createThemeDefinitions(),
 					},
 				}),
 				router,

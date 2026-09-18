@@ -37,7 +37,8 @@ import {
 } from '@/mocks/systemSettings'
 import { diffLines } from '@/utils/lineDiff'
 import { useAppStore } from '@/stores/app'
-import { themeAccentLabels, type ThemeAccent, type ThemePreference } from '@/theme'
+import type { ThemePreference } from '@/theme'
+import { BackdropImageError, readBackdropImage } from '@/utils/imagePalette'
 import { useToastStore } from '@/stores/toast'
 
 type SettingsTab = 'brand' | 'appearance' | 'releases' | 'privacy'
@@ -115,16 +116,51 @@ function revertBrand(): void {
 // > 預設外觀
 
 const appearanceForm = reactive<AppearanceDefaults>({ ...settingsState.appearance })
-const appearanceDirty = computed(() => appearanceForm.themePreference !== settingsState.appearance.themePreference || appearanceForm.themeAccent !== settingsState.appearance.themeAccent)
+const appearanceDirty = computed(() => appearanceForm.themePreference !== settingsState.appearance.themePreference || appearanceForm.backdrop?.imageUrl !== settingsState.appearance.backdrop?.imageUrl)
 const preferences = Object.keys(THEME_PREFERENCE_LABELS) as ThemePreference[]
-const accents = Object.keys(themeAccentLabels) as ThemeAccent[]
+
+const backdropInput = ref<HTMLInputElement | null>(null)
+const backdropError = ref('')
+const isBackdropLoading = ref(false)
+
+async function onBackdropSelected(event: Event): Promise<void> {
+	const input = event.target as HTMLInputElement
+	const file = input.files?.[0]
+	// @ 清空讓同一個檔案可以再選一次
+	input.value = ''
+	if (!file) return
+	backdropError.value = ''
+	isBackdropLoading.value = true
+	try {
+		const { imageUrl, palette } = await readBackdropImage(file)
+		appearanceForm.backdrop = { imageUrl, fileName: file.name, palette }
+	} catch (error) {
+		backdropError.value = error instanceof BackdropImageError ? error.message : '圖片處理失敗，請換一張再試。'
+	} finally {
+		isBackdropLoading.value = false
+	}
+}
+
+function removeBackdrop(): void {
+	appearanceForm.backdrop = null
+	backdropError.value = ''
+}
+
+function revertAppearance(): void {
+	Object.assign(appearanceForm, settingsState.appearance)
+	backdropError.value = ''
+}
 
 function submitAppearance(): void {
-	saveAppearanceDefaults(appearanceForm)
+	const saveError = saveAppearanceDefaults(appearanceForm)
+	if (saveError) {
+		backdropError.value = saveError
+		return
+	}
 	// @ 管理者自己的畫面同步套用，才能立即確認效果
-	appStore.setThemeAccent(theme, appearanceForm.themeAccent)
+	appStore.setBackdrop(theme, appearanceForm.backdrop)
 	appStore.setThemePreference(theme, appearanceForm.themePreference)
-	notify('預設外觀已儲存，並已套用到你目前的畫面。')
+	notify(appearanceForm.backdrop ? '預設外觀已儲存，背景圖與配色已套用到所有使用者。' : '預設外觀已儲存，並已套用到你目前的畫面。')
 }
 
 // > 版本
@@ -358,7 +394,7 @@ const tabDirty = computed<Record<SettingsTab, boolean>>(() => ({ brand: brandDir
 			<VWindowItem value="appearance">
 				<form class="settings-pane narrow" @submit.prevent="submitAppearance">
 					<h2 class="pane-heading">全公司預設外觀</h2>
-					<p class="note mb-5">新登入的使用者會套用這組設定；使用者仍可在帳號頁改成自己的偏好。</p>
+					<p class="note mb-5">明暗模式是新使用者的預設值，使用者可在帳號頁自行更改；背景圖套用到所有使用者，只能在這裡設定。</p>
 					<fieldset class="choice-group">
 						<legend class="field-label">明暗模式</legend>
 						<VBtnToggle v-model="appearanceForm.themePreference" mandatory color="primary" variant="outlined" divided density="comfortable">
@@ -366,15 +402,38 @@ const tabDirty = computed<Record<SettingsTab, boolean>>(() => ({ brand: brandDir
 						</VBtnToggle>
 					</fieldset>
 					<fieldset class="choice-group">
-						<legend class="field-label">強調色</legend>
-						<VRadioGroup v-model="appearanceForm.themeAccent" hide-details inline>
-							<VRadio v-for="accent in accents" :key="accent" :value="accent">
-								<template #label><span class="swatch" :class="`swatch-${accent}`" aria-hidden="true" />{{ themeAccentLabels[accent] }}</template>
-							</VRadio>
-						</VRadioGroup>
+						<legend class="field-label">背景圖</legend>
+						<div class="logo-row">
+							<div
+								v-if="appearanceForm.backdrop"
+								class="backdrop-thumb"
+								:style="{ backgroundImage: `url(&quot;${appearanceForm.backdrop.imageUrl}&quot;)` }"
+								role="img"
+								aria-label="背景圖預覽"
+							/>
+							<div class="logo-meta">
+								<p class="text-body-2">{{ appearanceForm.backdrop?.fileName ?? '未設定（使用預設配色）' }}</p>
+								<p class="note">JPG、PNG 或 WebP，10 MB 以內。系統會從圖片取出主色，並自動確保文字清楚可讀。</p>
+								<ul v-if="appearanceForm.backdrop" class="backdrop-swatches" aria-label="從圖片取出的顏色">
+									<li
+										v-for="(color, index) in appearanceForm.backdrop.palette.swatches"
+										:key="color"
+										:class="{ 'is-seed': index === 0 }"
+										:style="{ background: color }"
+										:title="index === 0 ? `主色來源 ${color}` : color"
+									/>
+								</ul>
+							</div>
+							<div class="logo-actions">
+								<VBtn variant="outlined" size="small" prepend-icon="mdi-upload" :loading="isBackdropLoading" @click="backdropInput?.click()">{{ appearanceForm.backdrop ? '更換圖片' : '選擇圖片' }}</VBtn>
+								<VBtn v-if="appearanceForm.backdrop" variant="text" size="small" @click="removeBackdrop">移除</VBtn>
+							</div>
+							<input ref="backdropInput" type="file" accept="image/jpeg,image/png,image/webp" class="d-none" aria-label="選擇背景圖" @change="onBackdropSelected" />
+						</div>
+						<p v-if="backdropError" class="error-text" role="alert">{{ backdropError }}</p>
 					</fieldset>
 					<div class="form-actions">
-						<VBtn variant="text" :disabled="!appearanceDirty" @click="Object.assign(appearanceForm, settingsState.appearance)">還原</VBtn>
+						<VBtn variant="text" :disabled="!appearanceDirty" @click="revertAppearance">還原</VBtn>
 						<VBtn type="submit" color="primary" :disabled="!appearanceDirty">儲存預設外觀</VBtn>
 					</div>
 				</form>
@@ -530,6 +589,10 @@ const tabDirty = computed<Record<SettingsTab, boolean>>(() => ({ brand: brandDir
 .logo-thumb { width: 48px; height: 48px; object-fit: contain; border-radius: 8px; border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); padding: 4px; background: rgb(var(--v-theme-surface)); }
 .logo-meta { flex: 1; min-width: 160px; }
 .logo-actions { display: flex; gap: 4px; }
+.backdrop-thumb { width: 120px; max-width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); background-position: center; background-size: cover; }
+.backdrop-swatches { display: flex; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.backdrop-swatches li { width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); }
+.backdrop-swatches li.is-seed { outline: 2px solid rgb(var(--v-theme-on-surface)); outline-offset: 1px; }
 .preview-sidebar { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 10px; background: rgb(var(--v-theme-surface)); border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); }
 .preview-logo { width: 36px; height: 36px; object-fit: contain; }
 .preview-list { display: grid; gap: 12px; }
@@ -552,9 +615,6 @@ const tabDirty = computed<Record<SettingsTab, boolean>>(() => ({ brand: brandDir
 .diff-legend { display: inline-block; padding: 0 6px; margin-inline: 4px; border-radius: 4px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .choice-group { border: 0; padding: 0; margin: 0 0 20px; }
-.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-inline-end: 6px; vertical-align: -2px; }
-.swatch-indigo { background: #315C91; }
-.swatch-red { background: #B42318; }
 .version-field { max-width: 220px; }
 .privacy-status { display: flex; flex-direction: column; gap: 2px; }
 @media (max-width: 860px) {

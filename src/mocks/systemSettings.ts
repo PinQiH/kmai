@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 
-import type { ThemeAccent, ThemePreference } from '@/theme'
+import type { ThemePreference } from '@/theme'
+import type { ImagePalette } from '@/utils/imagePalette'
 import type { DocumentVersionEntry } from '@/types'
 
 // > 系統設定：品牌外觀、全公司預設外觀、系統版本公告、隱私權政策
@@ -23,9 +24,17 @@ export interface BrandSettings {
 	logoFileName: string | null
 }
 
+export interface SystemBackdrop {
+	// @ readBackdropImage 重新編碼的 JPEG data URL，不是原始檔
+	imageUrl: string
+	fileName: string
+	palette: ImagePalette
+}
+
 export interface AppearanceDefaults {
 	themePreference: ThemePreference
-	themeAccent: ThemeAccent
+	// @ 全系統共用、只能由後台設定；null 表示使用預設配色
+	backdrop: SystemBackdrop | null
 }
 
 export interface SystemRelease {
@@ -80,7 +89,7 @@ Syscom Cubi 僅在授權範圍內處理公司知識與使用紀錄，用於提�
 function createInitialState() {
 	return {
 		brand: { systemName: 'Syscom Cubi', portalName: '凌群知識庫', adminName: '管理後台', logoDataUrl: null, logoFileName: null } as BrandSettings,
-		appearance: { themePreference: 'system', themeAccent: 'indigo' } as AppearanceDefaults,
+		appearance: { themePreference: 'system', backdrop: null } as AppearanceDefaults,
 		releases: [
 			{ id: 'rel-030', version: '0.3.0', date: '', author: '系統管理團隊', summary: '新增自動回信與使用者存取管理。', notes: '- 新增**自動回信**管理頁\n- 使用者、角色與群組可直接在後台維護', status: 'draft' },
 			{ id: 'rel-020', version: '0.2.0', date: '2026-08-18', author: '系統管理團隊', summary: '新增個人筆記本與文件範圍控制，並改善導覽體驗。', notes: '- 新增個人筆記本與文件上傳介面\n- 加入筆記本分享與成員權限設定\n- 問答頁可限定知識來源與指定文件', status: 'published' },
@@ -173,9 +182,69 @@ export function saveBrand(input: BrandSettings): Result {
 
 // > 預設外觀
 
-export function saveAppearanceDefaults(input: AppearanceDefaults): void {
-	settingsState.appearance = { ...input }
+/*
+ * > 預設外觀的本機暫存
+ * @ 後台「切換到前台」是開新頁面，整個應用重新載入，只放記憶體的設定會遺失；
+ *   先存在 localStorage，前後台分頁與重新整理後都讀得到。
+ * TODO(api-integration): 接後端後改由設定 API 讀寫，移除這段暫存
+ * !! 讀回的資料視為不可信：imageUrl 會放進 CSS url()，只接受 base64 JPEG data URL，
+ *    否則被竄改的暫存值可以注入任意 CSS。
+ */
+export const APPEARANCE_STORAGE_KEY = 'km.appearance-defaults'
+
+const HEX_COLOR = /^#[0-9A-F]{6}$/i
+const JPEG_DATA_URL = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/
+
+function isStoredBackdrop(value: unknown): value is SystemBackdrop {
+	if (!value || typeof value !== 'object') return false
+	const backdrop = value as Partial<SystemBackdrop>
+	const palette = backdrop.palette
+	return typeof backdrop.imageUrl === 'string'
+		&& JPEG_DATA_URL.test(backdrop.imageUrl)
+		&& typeof backdrop.fileName === 'string'
+		&& !!palette
+		&& typeof palette.seed === 'string' && HEX_COLOR.test(palette.seed)
+		&& Array.isArray(palette.swatches) && palette.swatches.every((color) => typeof color === 'string' && HEX_COLOR.test(color))
+		&& typeof palette.averageLuminance === 'number' && Number.isFinite(palette.averageLuminance)
 }
+
+/** 讀取本機暫存的預設外觀；沒有資料、格式不符或無法存取時回傳 null。 */
+export function readStoredAppearance(): AppearanceDefaults | null {
+	try {
+		const raw = localStorage.getItem(APPEARANCE_STORAGE_KEY)
+		if (!raw) return null
+		const value = JSON.parse(raw) as Partial<AppearanceDefaults>
+		if (!['system', 'light', 'dark'].includes(value.themePreference as string)) return null
+		if (value.backdrop !== null && !isStoredBackdrop(value.backdrop)) return null
+		return { themePreference: value.themePreference as ThemePreference, backdrop: value.backdrop }
+	} catch {
+		return null
+	}
+}
+
+// - 以本機暫存覆蓋目前的預設外觀；沒有暫存時維持原值
+export function syncAppearanceFromStorage(): void {
+	const stored = readStoredAppearance()
+	if (stored) settingsState.appearance = stored
+}
+
+/**
+ * 儲存預設外觀。
+ * @returns 失敗時的錯誤訊息；成功回傳 null。
+ */
+export function saveAppearanceDefaults(input: AppearanceDefaults): string | null {
+	const next: AppearanceDefaults = { themePreference: input.themePreference, backdrop: input.backdrop }
+	try {
+		localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(next))
+	} catch {
+		// @ 多半是背景圖超過瀏覽器的儲存上限（約 5 MB）
+		return '瀏覽器儲存空間不足，無法保存這張背景圖，請改用較小的圖片。'
+	}
+	settingsState.appearance = next
+	return null
+}
+
+syncAppearanceFromStorage()
 
 // > 版本
 

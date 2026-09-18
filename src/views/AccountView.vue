@@ -294,7 +294,7 @@ onMounted(syncTabFromRoute)
         <VCard class="surface-border pa-6">
           <h2 class="section-heading mb-1">外觀</h2>
           <p class="text-body-2 text-medium-emphasis mb-5">
-            可固定使用淺色或深色，也可以跟隨瀏覽器設定；系統配色由管理員統一設定。
+            可固定使用淺色或深色，也可以跟隨瀏覽器設定；背景圖與配色由管理員在後台統一設定。
           </p>
           <VRadioGroup
             :model-value="appStore.themePreference"

@@ -74,57 +74,38 @@ const darkColors = {
 export const lightTheme: ThemeDefinition = { dark: false, colors: lightColors }
 export const darkTheme: ThemeDefinition = { dark: true, colors: darkColors }
 
-/*
- * > Syscom 紅：品牌 Logo 的兩支紅（#C7000A 亮紅、#930000 深紅）
- * @ 只換強調色與必要的語意色，中性表面沿用同一套，維持 DESIGN.md 的紙感底色。
- * !! error 不能沿用原本的 #B42318：它與品牌紅 #C7000A 的 ΔE 只有 14，
- *    「刪除」與「儲存」會變成同一種紅，破壞性操作看不出來。
- *    改用深酒紅 #8E1B3D（ΔE 47.1），仍讀得出是警示紅但與品牌紅分得開。
- *    深色版同理：primary 亮化成 #F5A79E 後，error 必須往橘紅移到 #F79A5C（ΔE 30.5）。
- * @ info 兩個主題都保留靛藍：資訊態維持藍色，與紅色主色天然區隔。
- *    門檻由 tests/theme-palette.test.ts 釘死，調色後請跑測試，不要只憑肉眼。
- */
-export const redLightTheme: ThemeDefinition = {
-	dark: false,
-	colors: {
-		...lightColors,
-		primary: '#C7000A',
-		'primary-darken-1': '#930000',
-		error: '#8E1B3D',
-	},
-}
-
-export const redDarkTheme: ThemeDefinition = {
-	dark: true,
-	colors: {
-		...darkColors,
-		primary: '#F5A79E',
-		'primary-darken-1': '#E08C82',
-		error: '#F79A5C',
-	},
-}
+// @ 背景圖配色以預設色為底，只覆寫由圖片算出的顏色（見 utils/imagePalette.ts）
+export const baseThemeColors = { light: lightColors, dark: darkColors } as const
 
 export type ThemeMode = 'light' | 'dark'
 export type ThemePreference = ThemeMode | 'system'
-export type ThemeAccent = 'indigo' | 'red'
-
-export const themeAccentLabels: Record<ThemeAccent, string> = {
-	indigo: 'Cubi 藍',
-	red: 'Syscom 紅',
-}
 
 // @ 主題鍵沿用 kmai 前綴（內部識別碼未隨產品改名而更動）
-const themeNames: Record<ThemeAccent, Record<ThemeMode, string>> = {
-	indigo: { light: 'kmaiLight', dark: 'kmaiDark' },
-	red: { light: 'kmaiRedLight', dark: 'kmaiRedDark' },
+const themeNames = {
+	default: { light: 'kmaiLight', dark: 'kmaiDark' },
+	backdrop: { light: 'kmaiBackdropLight', dark: 'kmaiBackdropDark' },
+} as const satisfies Record<string, Record<ThemeMode, string>>
+
+/*
+ * > 所有要註冊到 Vuetify 的主題
+ * @ 背景圖主題先以預設色佔位，使用者設定背景圖後才在 runtime 改寫顏色。
+ *   先註冊的原因：Vuetify 對已存在的主題物件改色才會重新產生 CSS 變數。
+ */
+export function createThemeDefinitions(): Record<string, ThemeDefinition> {
+	return {
+		[themeNames.default.light]: lightTheme,
+		[themeNames.default.dark]: darkTheme,
+		[themeNames.backdrop.light]: { dark: false, colors: { ...lightColors } },
+		[themeNames.backdrop.dark]: { dark: true, colors: { ...darkColors } },
+	}
 }
 
 /**
- * 由強調色與明暗模式解析出 Vuetify 主題名稱。
- * @param accent 強調色。
+ * 由明暗模式與是否使用背景圖解析出 Vuetify 主題名稱。
  * @param mode 明暗模式。
+ * @param hasBackdrop 是否已設定背景圖。
  * @returns 已註冊於 Vuetify 的主題名稱。
  */
-export function resolveThemeName(accent: ThemeAccent, mode: ThemeMode): string {
-	return themeNames[accent][mode]
+export function resolveThemeName(mode: ThemeMode, hasBackdrop = false): string {
+	return themeNames[hasBackdrop ? 'backdrop' : 'default'][mode]
 }
