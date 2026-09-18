@@ -94,6 +94,10 @@ async function handleLogin(): Promise<void> {
         <p class="text-caption text-medium-emphasis mt-4">
           展示帳號已預先填入，可直接登入。
         </p>
+        <!-- TODO(product): 是否提供自助重設密碼流程尚未決定，目前只說明重設管道 -->
+        <p class="text-caption text-medium-emphasis mt-2" data-testid="login-forgot-password">
+          忘記密碼？公司帳號請到公司身分系統重設；外部顧問等本機帳號請聯絡系統管理員重設臨時密碼。
+        </p>
       </VCard>
     </section>
   </main>

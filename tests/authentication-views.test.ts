@@ -71,6 +71,18 @@ describe('authentication views', () => {
 		expect(router.currentRoute.value.name).toBe('target')
 	})
 
+	it('should tell users where to reset a forgotten password', async () => {
+		const router = createTestRouter()
+		await router.push('/login')
+		await router.isReady()
+		const loginView = mountView(LoginView, router)
+
+		const hint = loginView.get('[data-testid="login-forgot-password"]').text()
+
+		expect(hint).toContain('公司身分系統')
+		expect(hint).toContain('系統管理員')
+	})
+
 	it('should ignore an external login redirect target', async () => {
 		const router = createTestRouter()
 		await router.push('/login?redirect=https://untrusted.example')
