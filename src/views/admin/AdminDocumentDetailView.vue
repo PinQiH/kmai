@@ -4,12 +4,15 @@ import { useRoute, useRouter } from "vue-router"
 import DocumentLifecycleTrail from "@/components/DocumentLifecycleTrail.vue"
 import DocumentPreviewDrawer from "@/components/DocumentPreviewDrawer.vue"
 import DocumentFileActions from "@/components/DocumentFileActions.vue"
+import DocumentGraphSummary from "@/components/DocumentGraphSummary.vue"
+import DocumentVersionList from "@/components/DocumentVersionList.vue"
 import DocumentChunkEditor from "@/components/DocumentChunkEditor.vue"
 import DocumentReprocessDialog from "@/components/DocumentReprocessDialog.vue"
 import DocumentStrategyEditor from "@/components/DocumentStrategyEditor.vue"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import PageHeader from "@/components/PageHeader.vue"
 import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard"
+import { useToastStore } from "@/stores/toast"
 import StatePanel from "@/components/StatePanel.vue"
 import {
   workspaceDocuments,
@@ -23,7 +26,6 @@ import {
   versionFiles,
 } from "@/mocks/documentFiles"
 import { getDocumentVersionDetail } from "@/mocks/documentDetails"
-import { getDocumentGraphSummary } from "@/mocks/graphAdmin"
 import {
   getDocumentProcessingRecord,
   enqueueDocumentProcessing,
@@ -43,11 +45,6 @@ import {
 import { COMPANY_KNOWLEDGE_SOURCES } from "@/utils/knowledgeSources"
 
 const route = useRoute()
-// @ 詳細頁只放圖譜摘要，完整的實體檢視與編輯留在圖譜管理頁
-const GRAPH_ENTITY_PREVIEW = 8
-const graphSummary = computed(() =>
-  getDocumentGraphSummary(String(route.params.id)),
-)
 const document = computed(() =>
   workspaceDocuments.find((item) => item.id === String(route.params.id)),
 )
@@ -354,7 +351,10 @@ function getAttachmentState(name: string): string {
 // > 處理進度分頁：重新處理與切塊入口
 const isReprocessOpen = ref(false)
 const reprocessScope = ref("all")
-const processingMessage = ref("")
+const toastStore = useToastStore()
+function notify(text: string): void {
+  toastStore.show(text)
+}
 // @ 主文件用 undefined，附件用檔案代號；可由 ?file= 直接帶入
 const chunkFileId = ref<string | undefined>()
 watch(
@@ -381,7 +381,7 @@ function createVersionJob(): void {
   const version = selectedVersion.value?.version
   if (!target || !version) return
   enqueueDocumentProcessing(target.id, version, target.owner)
-  processingMessage.value = `已為第 ${version} 版建立處理工作，尚未執行後端處理。`
+  notify(`已為第 ${version} 版建立處理工作，尚未執行後端處理。`)
 }
 
 function viewChunks(fileId: string | undefined): void {
@@ -769,92 +769,14 @@ const leaveGuard = useUnsavedChangesGuard(
           <p v-else class="empty-line mt-4">這一版沒有附件。</p>
         </VCard></VWindowItem
       >
-      <VWindowItem value="versions"
-        ><VCard class="surface-border pa-6">
-          <div class="section-head">
-            <div>
-              <h2 class="section-heading">版本紀錄</h2>
-              <p class="tab-note">
-                最新的版本在最上面。處理與審核期間，前台仍顯示目前有效版本。
-              </p>
-            </div>
-            <VSpacer />
-            <VBtn
-              color="primary"
-              prepend-icon="mdi-upload"
-              @click="isVersionDialogOpen = true"
-              >上傳新版本</VBtn
-            >
-          </div>
-          <ol class="version-rows">
-            <li
-              v-for="entry in documentVersions"
-              :key="entry.version"
-              class="version-row"
-              :class="{
-                'is-current': entry.isCurrent,
-                'is-viewing': entry.version === selectedVersionNumber,
-              }"
-            >
-              <div class="version-mark">
-                <span class="version-number">{{ entry.version }}</span>
-                <span class="version-date">{{ entry.date }}</span>
-              </div>
-              <div class="version-main">
-                <div class="version-line">
-                  <VChip
-                    size="x-small"
-                    variant="flat"
-                    :color="
-                      entry.isCurrent
-                        ? 'success'
-                        : entry.status === '等待處理'
-                          ? 'warning'
-                          : 'surface-variant'
-                    "
-                  >
-                    {{
-                      entry.isCurrent
-                        ? "目前有效版本"
-                        : (entry.status ?? "歷史版本")
-                    }}
-                  </VChip>
-                  <span
-                    v-if="entry.version === selectedVersionNumber"
-                    class="viewing-tag"
-                    >檢視中</span
-                  >
-                  <span class="tab-note">{{ entry.author }}</span>
-                </div>
-                <p class="version-summary">
-                  {{ entry.summary || "（沒有版本說明）" }}
-                </p>
-                <ul v-if="entry.changes.length" class="version-changes">
-                  <li v-for="change in entry.changes" :key="change">
-                    {{ change }}
-                  </li>
-                </ul>
-              </div>
-              <div class="version-actions">
-                <VBtn
-                  :variant="
-                    entry.version === selectedVersionNumber ? 'tonal' : 'text'
-                  "
-                  size="small"
-                  prepend-icon="mdi-text-box-search-outline"
-                  @click="selectedVersionNumber = entry.version"
-                >
-                  檢視這一版
-                </VBtn>
-                <DocumentFileActions
-                  v-if="versionFiles[document.id]?.[entry.version]?.file"
-                  :file="versionFiles[document.id][entry.version].file!"
-                  :label="`第 ${entry.version} 版`"
-                />
-              </div>
-            </li>
-          </ol> </VCard
-      ></VWindowItem>
+      <VWindowItem value="versions">
+        <DocumentVersionList
+          v-model="selectedVersionNumber"
+          :document-id="document.id"
+          :versions="documentVersions"
+          @upload="isVersionDialogOpen = true"
+        />
+      </VWindowItem>
       <VWindowItem value="processing"
         ><VCard class="surface-border pa-6">
           <p class="tab-note mb-3" data-testid="processing-version-context">
@@ -870,16 +792,6 @@ const leaveGuard = useUnsavedChangesGuard(
             @view-chunks="viewChunks"
             @reprocess-file="openReprocess"
           />
-          <VAlert
-            v-if="processingMessage"
-            type="success"
-            variant="tonal"
-            closable
-            class="mt-4"
-            role="status"
-            @click:close="processingMessage = ''"
-            >{{ processingMessage }}</VAlert
-          >
           <div class="d-flex flex-wrap ga-3 mt-4">
             <VBtn
               v-if="processingRecord"
@@ -913,51 +825,10 @@ const leaveGuard = useUnsavedChangesGuard(
             :record="processingRecord"
             :title="document.title"
             :initial-scope="reprocessScope"
-            @done="processingMessage = $event"
+            @done="notify"
           />
         </VCard>
-        <VCard class="surface-border pa-6 mt-4" data-testid="detail-graph-summary">
-          <p class="text-subtitle-1 font-weight-medium mb-2">知識圖譜</p>
-          <template v-if="graphSummary.entities.length">
-            <p class="tab-note mb-3">
-              這份文件抽出 {{ graphSummary.entities.length }} 個實體、{{
-                graphSummary.relationCount
-              }}
-              條相關關係。
-              <template v-if="graphSummary.pendingReviewCount">
-                其中 {{ graphSummary.pendingReviewCount }}
-                個實體有待覆核的合併建議。</template
-              >
-            </p>
-            <div class="d-flex flex-wrap ga-2 mb-4">
-              <VChip
-                v-for="entity in graphSummary.entities.slice(0, GRAPH_ENTITY_PREVIEW)"
-                :key="entity.id"
-                size="small"
-                variant="tonal"
-                >{{ entity.label }}</VChip
-              >
-              <VChip
-                v-if="graphSummary.entities.length > GRAPH_ENTITY_PREVIEW"
-                size="small"
-                variant="text"
-                >還有 {{ graphSummary.entities.length - GRAPH_ENTITY_PREVIEW }} 個</VChip
-              >
-            </div>
-          </template>
-          <p v-else class="tab-note mb-3">
-            尚未納入知識圖譜。文件處理完成後，下一次圖譜重建才會出現。
-          </p>
-          <VBtn
-            variant="text"
-            prepend-icon="mdi-graph-outline"
-            :to="{
-              path: '/admin/graph',
-              query: { tab: 'entities', documentId: document.id },
-            }"
-            >在圖譜管理查看</VBtn
-          >
-        </VCard></VWindowItem
+        <DocumentGraphSummary class="mt-4" :document-id="document.id" /></VWindowItem
       >
       <VWindowItem value="chunks">
         <DocumentChunkEditor
@@ -1181,78 +1052,6 @@ const leaveGuard = useUnsavedChangesGuard(
   text-align: center;
 }
 
-/* > 版本紀錄 */
-.version-rows {
-  display: grid;
-  gap: var(--space-sm);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.version-row {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md);
-  border: 1px solid rgb(var(--v-theme-outline));
-  border-radius: var(--radius-sm);
-}
-.version-row.is-viewing {
-  border-color: rgb(var(--v-theme-primary));
-  background: rgb(var(--v-theme-primary) / 5%);
-}
-.version-mark {
-  display: grid;
-  gap: 2px;
-  text-align: center;
-}
-.version-number {
-  font-size: 1.05rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.version-date {
-  color: var(--ink-muted);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-}
-.version-main {
-  min-width: 0;
-}
-.version-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-sm);
-}
-.viewing-tag {
-  color: rgb(var(--v-theme-primary));
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-.version-summary {
-  margin-top: 4px;
-  font-size: 0.88rem;
-  overflow-wrap: anywhere;
-}
-.version-changes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px var(--space-md);
-  margin: 6px 0 0;
-  padding-left: 1.1rem;
-  color: var(--ink-muted);
-  font-size: 0.78rem;
-}
-.version-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-}
-
 .dialog-field {
   margin-bottom: 20px;
 }
@@ -1279,18 +1078,6 @@ const leaveGuard = useUnsavedChangesGuard(
 }
 
 @media (max-width: 700px) {
-  .version-row {
-    grid-template-columns: 1fr;
-  }
-  .version-mark {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-sm);
-    text-align: left;
-  }
-  .version-actions {
-    justify-content: flex-start;
-  }
   .context-divider {
     display: none;
   }
