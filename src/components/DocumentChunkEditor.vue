@@ -114,6 +114,9 @@ function save(): void {
 		toastStore.show(`${isAttachment.value ? '附件' : ''}切塊已儲存；向量化、索引、圖譜、摘要與品質診斷需要重新處理。原文保持不變。`)
 	} catch (cause) { error.value = cause instanceof Error ? cause.message : '無法儲存切塊。' }
 }
+
+// @ 供父層離開保護判斷
+defineExpose({ isDirty: dirty })
 </script>
 
 <template>

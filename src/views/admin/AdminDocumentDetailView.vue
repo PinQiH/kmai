@@ -9,6 +9,7 @@ import DocumentReprocessDialog from "@/components/DocumentReprocessDialog.vue"
 import DocumentStrategyEditor from "@/components/DocumentStrategyEditor.vue"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import PageHeader from "@/components/PageHeader.vue"
+import { useUnsavedChangesGuard } from "@/composables/useUnsavedChangesGuard"
 import StatePanel from "@/components/StatePanel.vue"
 import {
   workspaceDocuments,
@@ -388,6 +389,13 @@ function viewChunks(fileId: string | undefined): void {
   chunkFileId.value = file?.role === "附件" ? file.id : undefined
   activeTab.value = "chunks"
 }
+
+// > 離開保護：切塊或處理策略尚未儲存
+const chunkEditor = ref<InstanceType<typeof DocumentChunkEditor> | null>(null)
+const strategyEditor = ref<InstanceType<typeof DocumentStrategyEditor> | null>(null)
+const leaveGuard = useUnsavedChangesGuard(
+  () => Boolean(chunkEditor.value?.isDirty || strategyEditor.value?.isDirty),
+)
 </script>
 
 <template>
@@ -954,6 +962,7 @@ function viewChunks(fileId: string | undefined): void {
       <VWindowItem value="chunks">
         <DocumentChunkEditor
           v-if="selectedVersion"
+          ref="chunkEditor"
           v-model:file-id="chunkFileId"
           :document="document"
           :version="selectedVersion"
@@ -961,7 +970,7 @@ function viewChunks(fileId: string | undefined): void {
       </VWindowItem>
       <VWindowItem value="strategy"
         ><VCard class="surface-border pa-6"
-          ><DocumentStrategyEditor :document-id="document.id" /></VCard
+          ><DocumentStrategyEditor ref="strategyEditor" :document-id="document.id" /></VCard
       ></VWindowItem>
     </VWindow>
     <DocumentPreviewDrawer v-model="isPreviewOpen" :document-id="document.id" />
@@ -1042,6 +1051,15 @@ function viewChunks(fileId: string | undefined): void {
     :description="`確定要刪除「${deleteAttachmentTarget?.name ?? ''}」嗎？`"
     @update:model-value="deleteAttachmentTarget = null"
     @confirm="confirmDeleteAttachment"
+  />
+  <ConfirmDialog
+    :model-value="leaveGuard.isLeaveDialogOpen.value"
+    title="有未儲存的修改"
+    description="切塊或處理策略還沒有儲存，離開後會遺失。"
+    cancel-label="留在這頁"
+    confirm-label="放棄修改並離開"
+    @update:model-value="leaveGuard.stay"
+    @confirm="leaveGuard.confirmLeave"
   />
 </template>
 <style scoped>

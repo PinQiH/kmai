@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import FilterSearchField from '@/components/FilterSearchField.vue'
 import AccessGroupsPanel from '@/components/AccessGroupsPanel.vue'
 import AccessRolesPanel from '@/components/AccessRolesPanel.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import {
 	CAPABILITIES,
 	CURRENT_USER_ID,
@@ -51,20 +53,7 @@ watch(activeTab, (tab) => {
 
 const rolesPanel = ref<InstanceType<typeof AccessRolesPanel> | null>(null)
 const groupsPanel = ref<InstanceType<typeof AccessGroupsPanel> | null>(null)
-const leaveTarget = ref<string | null>(null)
-let allowLeave = false
-onBeforeRouteLeave((to) => {
-	if (allowLeave || !(rolesPanel.value?.isDirty || groupsPanel.value?.isDirty)) return true
-	leaveTarget.value = to.fullPath
-	return false
-})
-function confirmLeave(): void {
-	const target = leaveTarget.value
-	leaveTarget.value = null
-	if (!target) return
-	allowLeave = true
-	router.push(target)
-}
+const leaveGuard = useUnsavedChangesGuard(() => Boolean(rolesPanel.value?.isDirty || groupsPanel.value?.isDirty))
 
 const toastStore = useToastStore()
 function notify(text: string, tone: 'success' | 'error' | 'warning' = 'success'): void {
@@ -356,11 +345,15 @@ function directRoleNames(user: AccessUser): string[] {
 			</VCard>
 		</VDialog>
 
-		<VDialog :model-value="Boolean(leaveTarget)" max-width="440" @update:model-value="leaveTarget = null">
-			<VCard title="離開此頁？" text="有尚未儲存的角色或群組設定，離開後會遺失。">
-				<VCardActions><VSpacer /><VBtn @click="leaveTarget = null">繼續編輯</VBtn><VBtn color="error" @click="confirmLeave">捨棄並離開</VBtn></VCardActions>
-			</VCard>
-		</VDialog>
+		<ConfirmDialog
+			:model-value="leaveGuard.isLeaveDialogOpen.value"
+			title="離開此頁？"
+			description="有尚未儲存的角色或群組設定，離開後會遺失。"
+			cancel-label="留在這頁"
+			confirm-label="放棄修改並離開"
+			@update:model-value="leaveGuard.stay"
+			@confirm="leaveGuard.confirmLeave"
+		/>
 
 		<VDialog v-model="confirmReset" max-width="440">
 			<VCard title="重設密碼" :text="`確定為「${editingUser?.displayName ?? ''}」產生新的臨時密碼？原本的密碼會立即失效。`">

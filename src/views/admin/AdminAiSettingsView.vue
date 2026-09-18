@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import { useToastStore } from '@/stores/toast'
 import {
 	AGENT_TOOLS,
@@ -40,7 +42,6 @@ const TABS: Array<{ id: AiSettingsTab; label: string; sections: AiSettingsSectio
 const L = AI_SETTINGS_LIMITS
 
 const route = useRoute()
-const router = useRouter()
 
 const draft = ref<AiSettings>(cloneAiSettings(aiSettingsState.current))
 const activeTab = ref<AiSettingsTab>('retrieval')
@@ -53,9 +54,7 @@ const confirmOpen = ref(false)
 const saveNote = ref('')
 const saveError = ref('')
 const newTerm = ref('')
-const pendingLeave = ref<string | null>(null)
 const restoreTargetId = ref<string | null>(null)
-let allowLeave = false
 
 const baseline = computed(() => aiSettingsState.current)
 const changes = computed(() => diffAiSettings(baseline.value, draft.value))
@@ -206,28 +205,7 @@ function confirmRestore(): void {
 
 // > 離開保護
 
-onBeforeRouteLeave((to) => {
-	if (allowLeave || !isDirty.value) return true
-	pendingLeave.value = to.fullPath
-	return false
-})
-
-function leaveWithoutSaving(): void {
-	const target = pendingLeave.value
-	pendingLeave.value = null
-	if (!target) return
-	allowLeave = true
-	void router.push(target).finally(() => { allowLeave = false })
-}
-
-function handleBeforeUnload(event: BeforeUnloadEvent): void {
-	if (!isDirty.value) return
-	event.preventDefault()
-	event.returnValue = ''
-}
-
-onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
-onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload))
+const leaveGuard = useUnsavedChangesGuard(() => isDirty.value)
 </script>
 
 <template>
@@ -509,17 +487,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnl
 			</VCard>
 		</VDialog>
 
-		<VDialog :model-value="Boolean(pendingLeave)" max-width="440" @update:model-value="pendingLeave = null">
-			<VCard>
-				<VCardTitle class="pa-6 pb-2">離開前要放棄變更嗎？</VCardTitle>
-				<VCardText class="pa-6 pt-2">還有 {{ changes.length }} 項設定沒有儲存，離開後會遺失。</VCardText>
-				<VCardActions class="pa-5">
-					<VSpacer />
-					<VBtn @click="pendingLeave = null">留在此頁</VBtn>
-					<VBtn color="error" @click="leaveWithoutSaving">放棄並離開</VBtn>
-				</VCardActions>
-			</VCard>
-		</VDialog>
+		<ConfirmDialog
+			:model-value="leaveGuard.isLeaveDialogOpen.value"
+			title="離開前要放棄變更嗎？"
+			:description="`還有 ${changes.length} 項設定沒有儲存，離開後會遺失。`"
+			cancel-label="留在這頁"
+			confirm-label="放棄修改並離開"
+			@update:model-value="leaveGuard.stay"
+			@confirm="leaveGuard.confirmLeave"
+		/>
 	</div>
 </template>
 

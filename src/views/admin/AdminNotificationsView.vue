@@ -6,6 +6,7 @@ import { useDisplay } from 'vuetify'
 import FilterSearchField from '@/components/FilterSearchField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import StatePanel from '@/components/StatePanel.vue'
 import { ALERT_EVENT_TYPES, ALERT_SEVERITY_LABELS, useNotificationsStore } from '@/stores/notifications'
 import type {
@@ -549,6 +550,9 @@ function saveEmailSettings(): void {
 function sendTestEmail(): void {
 	notify(`測試信已模擬寄送至 ${emailSettings.value.senderAddress}；不會真的寄出。`, 'info')
 }
+
+// > 離開保護：發送中的通知已填內容，或正在編輯自動通知規則
+const leaveGuard = useUnsavedChangesGuard(() => (isSendDialogOpen.value && Boolean(sendDraft.value.title.trim() || sendDraft.value.body.trim())) || Boolean(ruleDraft.value))
 </script>
 
 <template>
@@ -841,6 +845,15 @@ function sendTestEmail(): void {
 			:description="`刪除「${deleteRuleTarget?.name ?? ''}」後不再產生新通知；已發送的通知與成效紀錄會保留。`"
 			@update:model-value="deleteRuleTarget = null"
 			@confirm="confirmDeleteRule"
+		/>
+		<ConfirmDialog
+			:model-value="leaveGuard.isLeaveDialogOpen.value"
+			title="有未儲存的修改"
+			description="通知內容或規則還沒有儲存，離開後會遺失。"
+			cancel-label="留在這頁"
+			confirm-label="放棄修改並離開"
+			@update:model-value="leaveGuard.stay"
+			@confirm="leaveGuard.confirmLeave"
 		/>
 	</div>
 </template>

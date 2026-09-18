@@ -5,7 +5,9 @@ import { useRoute, useRouter } from 'vue-router'
 import FilterSearchField from '@/components/FilterSearchField.vue'
 import GraphEntityDrawer from '@/components/GraphEntityDrawer.vue'
 import GraphRebuildDialog from '@/components/GraphRebuildDialog.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import { useToastStore } from '@/stores/toast'
 import StatusChip from '@/components/StatusChip.vue'
 import { GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE, GRAPH_NODE_TYPES, type GraphNodeType } from '@/mocks/graph'
@@ -288,6 +290,10 @@ onBeforeUnmount(() => {
 function scopeName(value: GraphScope): string {
 	return scopeOptions.find((option) => option.value === value)?.title ?? value
 }
+
+// > 離開保護：實體抽屜內的名稱、類型或別名尚未儲存
+const entityDrawer = ref<InstanceType<typeof GraphEntityDrawer> | null>(null)
+const leaveGuard = useUnsavedChangesGuard(() => Boolean(entityDrawer.value?.isDirty))
 </script>
 
 <template>
@@ -504,8 +510,17 @@ function scopeName(value: GraphScope): string {
 			</VWindowItem>
 		</VWindow>
 
-		<GraphEntityDrawer :entity-id="drawerEntityId" @close="drawerEntityId = null" @select="openEntity" @saved="notify" />
+		<GraphEntityDrawer ref="entityDrawer" :entity-id="drawerEntityId" @close="drawerEntityId = null" @select="openEntity" @saved="notify" />
 		<GraphRebuildDialog v-model="rebuildOpen" :scope="scope" :scope-options="scopeOptions" :initial-mode="rebuildInitialMode" @confirm="confirmRebuild" />
+		<ConfirmDialog
+			:model-value="leaveGuard.isLeaveDialogOpen.value"
+			title="有未儲存的修改"
+			description="實體的名稱、類型或別名還沒有儲存，離開後會遺失。"
+			cancel-label="留在這頁"
+			confirm-label="放棄修改並離開"
+			@update:model-value="leaveGuard.stay"
+			@confirm="leaveGuard.confirmLeave"
+		/>
 	</div>
 </template>
 

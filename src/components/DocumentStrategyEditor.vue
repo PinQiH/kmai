@@ -280,6 +280,10 @@ function reprocessNow(): void {
 	feedback.value = `已將 ${queued} 個版本排入重新處理，從「${startName}」開始${skipped ? `；${skipped} 個版本仍在處理中而略過，完成後需再重新處理` : ''}。`
 	emit('reprocessed', fromStage)
 }
+
+// @ 供父層離開保護判斷
+const isDirty = computed(() => dirtyCount.value > 0 || (scope.value !== 'global' && overrideEnabled.value !== storedOverrideEnabled.value))
+defineExpose({ isDirty })
 </script>
 
 <template>

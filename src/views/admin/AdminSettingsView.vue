@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from 'vuetify'
 
 import brandLogoUrl from '@/assets/brand/kmai-logo.png'
 import MarkdownContent from '@/components/MarkdownContent.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import {
 	LOGO_MAX_BYTES,
 	NOTES_MAX,
@@ -306,20 +308,7 @@ function submitDiscardPrivacy(): void {
 // > 離開保護
 
 const anyDirty = computed(() => brandDirty.value || appearanceDirty.value || releaseDirty.value || privacyDirty.value)
-const leaveTarget = ref<string | null>(null)
-let allowLeave = false
-onBeforeRouteLeave((to) => {
-	if (allowLeave || !anyDirty.value) return true
-	leaveTarget.value = to.fullPath
-	return false
-})
-function confirmLeave(): void {
-	const target = leaveTarget.value
-	leaveTarget.value = null
-	if (!target) return
-	allowLeave = true
-	router.push(target)
-}
+const leaveGuard = useUnsavedChangesGuard(() => anyDirty.value)
 
 const tabDirty = computed<Record<SettingsTab, boolean>>(() => ({ brand: brandDirty.value, appearance: appearanceDirty.value, releases: releaseDirty.value, privacy: privacyDirty.value }))
 </script>
@@ -564,13 +553,15 @@ const tabDirty = computed<Record<SettingsTab, boolean>>(() => ({ brand: brandDir
 				<VCardActions class="pa-5"><VSpacer /><VBtn @click="pendingReleaseId = null">繼續編輯</VBtn><VBtn color="error" variant="flat" @click="confirmSwitchRelease">放棄並切換</VBtn></VCardActions>
 			</VCard>
 		</VDialog>
-		<VDialog :model-value="Boolean(leaveTarget)" max-width="440" @update:model-value="leaveTarget = null">
-			<VCard>
-				<VCardTitle class="pa-6 pb-2">有未儲存的設定</VCardTitle>
-				<VCardText class="pa-6 pt-2">離開後這些修改會遺失。</VCardText>
-				<VCardActions class="pa-5"><VSpacer /><VBtn @click="leaveTarget = null">留在這頁</VBtn><VBtn color="error" variant="flat" @click="confirmLeave">放棄修改並離開</VBtn></VCardActions>
-			</VCard>
-		</VDialog>
+		<ConfirmDialog
+			:model-value="leaveGuard.isLeaveDialogOpen.value"
+			title="有未儲存的設定"
+			description="離開後這些修改會遺失。"
+			cancel-label="留在這頁"
+			confirm-label="放棄修改並離開"
+			@update:model-value="leaveGuard.stay"
+			@confirm="leaveGuard.confirmLeave"
+		/>
 	</div>
 </template>
 

@@ -62,6 +62,9 @@ function toggleHidden(): void {
 	setEntityHidden(entity.value.id, hide)
 	emit('saved', hide ? `已隱藏「${entity.value.label}」，前台圖譜與問答擴充不再使用它。` : `已恢復「${entity.value.label}」。`)
 }
+
+// @ 供父層離開保護判斷
+defineExpose({ isDirty })
 </script>
 
 <template>

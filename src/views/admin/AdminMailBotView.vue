@@ -3,7 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import FilterSearchField from '@/components/FilterSearchField.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import { aiSettingsState } from '@/mocks/aiSettings'
 import {
 	CONNECTION_STATE_LABELS,
@@ -247,6 +249,9 @@ function handleSubmitMfaCode(): void {
 	mfaCode.value = ''
 	notify(result.message, result.ok ? 'success' : 'error')
 }
+
+// > 離開保護：自動回信設定或修改中的回覆尚未儲存
+const leaveGuard = useUnsavedChangesGuard(() => isDirty.value || (isEditingReply.value && Boolean(replyDraft.value.trim())))
 </script>
 
 <template>
@@ -539,6 +544,15 @@ function handleSubmitMfaCode(): void {
 				</VCardActions>
 			</VCard>
 		</VDialog>
+		<ConfirmDialog
+			:model-value="leaveGuard.isLeaveDialogOpen.value"
+			title="有未儲存的修改"
+			description="自動回信設定或修改中的回覆還沒有儲存，離開後會遺失。"
+			cancel-label="留在這頁"
+			confirm-label="放棄修改並離開"
+			@update:model-value="leaveGuard.stay"
+			@confirm="leaveGuard.confirmLeave"
+		/>
 	</div>
 </template>
 
