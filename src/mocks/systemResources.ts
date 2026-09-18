@@ -86,7 +86,7 @@ export const aiConnections = reactive<AiConnection[]>([
 ])
 
 export const aiProfiles = reactive<AiProfile[]>([
-	{ id: 'llm-standard', kind: 'llm', name: 'GPT-4.1 mini', description: '品質與速度平衡，用於直接面對員工的回答。', connectionId: 'conn-openai', model: 'gpt-4.1-mini', params: { temperature: 0.2, contextWindow: 128000, maxOutputTokens: 2000 }, updatedAt: '9 月 2 日', testStatus: 'ok', testedAt: '今天 09:15' },
+	{ id: 'llm-standard', kind: 'llm', name: 'GPT-4.1 mini', description: '品質與速度平衡，用於直接面對使用者的回答。', connectionId: 'conn-openai', model: 'gpt-4.1-mini', params: { temperature: 0.2, contextWindow: 128000, maxOutputTokens: 2000 }, updatedAt: '9 月 2 日', testStatus: 'ok', testedAt: '今天 09:15' },
 	{ id: 'llm-gpt41', kind: 'llm', name: 'GPT-4.1', description: '較高品質，用於複雜比較題。', connectionId: 'conn-openai', model: 'gpt-4.1', params: { temperature: 0.2, contextWindow: 128000, maxOutputTokens: 4000 }, updatedAt: '9 月 2 日', testStatus: 'ok', testedAt: '今天 09:15' },
 	{ id: 'llm-o4mini', kind: 'llm', name: 'o4-mini 推理', description: '多步驟推理，回應較慢。', connectionId: 'conn-openai', model: 'o4-mini', params: { temperature: 1, contextWindow: 128000, maxOutputTokens: 8000 }, updatedAt: '9 月 3 日', testStatus: 'untested', testedAt: '尚未測試' },
 	{ id: 'llm-azure', kind: 'llm', name: 'Azure GPT-4.1', description: '資料留在 Azure 租戶內。', connectionId: 'conn-azure', model: 'gpt-4.1', params: { temperature: 0.2, contextWindow: 128000, maxOutputTokens: 2000 }, updatedAt: '8 月 30 日', testStatus: 'untested', testedAt: '尚未測試' },

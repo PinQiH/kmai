@@ -208,7 +208,13 @@ function semanticCandidates(role: SemanticRole, mode: ThemeMode, backgrounds: st
  *   warning 就沒有位置了。候選依偏好排序，第一組全部合格的就採用（預設色優先）；
  *   全都不合格時取「最近距離最大」的一組，盡量拉開。
  */
-function pickSemantics(primary: string, mode: ThemeMode, backgrounds: string[]): Record<SemanticRole['key'], string> {
+interface SemanticPick {
+	colors: Record<SemanticRole['key'], string>
+	// @ 主色與三個語意色兩兩之間的最近 ΔE
+	distance: number
+}
+
+function pickSemantics(primary: string, mode: ThemeMode, backgrounds: string[]): SemanticPick {
 	const [errors, warnings, successes] = SEMANTIC_ROLES.map((role) => semanticCandidates(role, mode, backgrounds))
 	let best = { error: errors[0], warning: warnings[0], success: successes[0] }
 	let bestDistance = -1
@@ -221,7 +227,7 @@ function pickSemantics(primary: string, mode: ThemeMode, backgrounds: string[]):
 				for (let i = 0; i < colors.length; i += 1) {
 					for (let j = i + 1; j < colors.length; j += 1) distance = Math.min(distance, deltaE(colors[i], colors[j]))
 				}
-				if (distance > MIN_DELTA_E) return { error, warning, success }
+				if (distance > MIN_DELTA_E) return { colors: { error, warning, success }, distance }
 				if (distance > bestDistance) {
 					best = { error, warning, success }
 					bestDistance = distance
@@ -229,7 +235,26 @@ function pickSemantics(primary: string, mode: ThemeMode, backgrounds: string[]):
 			}
 		}
 	}
-	return best
+	return { colors: best, distance: bestDistance }
+}
+
+// @ 主色色相的偏移順序：先試原色相，找不到合格語意色時才逐步遠離
+const PRIMARY_HUE_SHIFTS = [0, -12, 12, -24, 24, -36, 36]
+
+/*
+ * - 挑出主色與語意色
+ * @ 黃、橘色相的主色會和 warning 撞在一起，語意色怎麼換都拉不開（ΔE 只有 18 左右），
+ *   這時讓主色色相逐步偏移，取第一組合格的；全都不合格時取最近距離最大的一組。
+ */
+function pickPrimaryAndSemantics(hue: number, saturation: number, mode: ThemeMode, backgrounds: string[]): { primary: string; pick: SemanticPick } {
+	let best: { primary: string; pick: SemanticPick } | null = null
+	for (const shift of PRIMARY_HUE_SHIFTS) {
+		const primary = readableColor((hue + shift + 360) % 360, saturation, mode === 'dark' ? 70 : 45, mode, backgrounds)
+		const pick = pickSemantics(primary, mode, backgrounds)
+		if (pick.distance > MIN_DELTA_E) return { primary, pick }
+		if (!best || pick.distance > best.pick.distance) best = { primary, pick }
+	}
+	return best as { primary: string; pick: SemanticPick }
 }
 
 function buildColors(seed: string, mode: ThemeMode): Record<string, string> {
@@ -245,10 +270,9 @@ function buildColors(seed: string, mode: ThemeMode): Record<string, string> {
 		: { background: hslToHex(hue, 18, 95), surface: hslToHex(hue, 25, 99), 'surface-variant': hslToHex(hue, 16, 91), ink: hslToHex(hue, 14, 13), outline: hslToHex(hue, 12, 83) }
 	const backgrounds = [neutrals.background, neutrals.surface, neutrals['surface-variant']]
 
-	const primary = readableColor(hue, saturation, isDark ? 70 : 45, mode, backgrounds)
-	const [, , primaryLightness] = rgbToHsl(hexToRgb(primary))
-
-	const semantics = pickSemantics(primary, mode, backgrounds)
+	const { primary, pick } = pickPrimaryAndSemantics(hue, saturation, mode, backgrounds)
+	const [primaryHue, , primaryLightness] = rgbToHsl(hexToRgb(primary))
+	const semantics = pick.colors
 
 	return {
 		...baseThemeColors[mode],
@@ -256,7 +280,7 @@ function buildColors(seed: string, mode: ThemeMode): Record<string, string> {
 		surface: neutrals.surface,
 		'surface-variant': neutrals['surface-variant'],
 		primary,
-		'primary-darken-1': hslToHex(hue, saturation, clamp(primaryLightness - 10, 5, 95)),
+		'primary-darken-1': hslToHex(primaryHue, saturation, clamp(primaryLightness - 10, 5, 95)),
 		...semantics,
 		'on-background': neutrals.ink,
 		'on-surface': neutrals.ink,

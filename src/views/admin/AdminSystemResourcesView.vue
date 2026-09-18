@@ -347,7 +347,7 @@ function runConnectionTest(connectionId: string): void {
 								<VTextField v-model="draft.name" label="設定檔名稱" maxlength="30" placeholder="其他頁面會以這個名稱顯示" />
 								<VSelect v-model="draft.connectionId" :items="connectionOptions" :item-props="(item) => ({ subtitle: item.subtitle })" label="服務連線" />
 							</div>
-							<VTextField v-model="draft.description" label="用途說明" maxlength="60" placeholder="例如：品質優先，用於直接面對員工的回答" />
+							<VTextField v-model="draft.description" label="用途說明" maxlength="60" placeholder="例如：品質優先，用於直接面對使用者的回答" />
 							<VAlert v-if="draftConnection?.status === 'error'" type="error" variant="tonal" density="compact" class="mb-2">
 								「{{ draftConnection.name }}」目前連線異常：{{ draftConnection.statusNote }}
 								<template #append><VBtn variant="text" size="small" @click="activeTab = 'connections'">查看連線</VBtn></template>
