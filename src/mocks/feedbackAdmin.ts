@@ -130,6 +130,13 @@ export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
 	dismissed: '不處理',
 }
 
+export const FEEDBACK_STATUS_COLORS: Record<FeedbackStatus, string> = {
+	new: 'warning',
+	investigating: 'info',
+	resolved: 'success',
+	dismissed: 'secondary',
+}
+
 export const FEEDBACK_CAUSE_LABELS: Record<FeedbackCause, string> = {
 	'outdated-document': '文件內容過時',
 	'missing-content': '知識庫缺少內容',

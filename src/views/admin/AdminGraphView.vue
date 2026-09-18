@@ -5,10 +5,13 @@ import { useRoute, useRouter } from 'vue-router'
 import GraphEntityDrawer from '@/components/GraphEntityDrawer.vue'
 import GraphRebuildDialog from '@/components/GraphRebuildDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import StatusChip from '@/components/StatusChip.vue'
 import { GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE, GRAPH_NODE_TYPES, type GraphNodeType } from '@/mocks/graph'
 import {
 	BUILD_MODE_LABELS,
+	BUILD_STATUS_COLORS,
 	BUILD_STATUS_LABELS,
+	SUMMARY_STATUS_COLORS,
 	SUMMARY_STATUS_LABELS,
 	advanceRebuild,
 	cancelRebuild,
@@ -53,8 +56,6 @@ const scopeOptions: Array<{ title: string; value: GraphScope }> = [
 	{ title: '全部知識主題', value: 'all' },
 	...scopeIds.map((id) => ({ title: getCompanyKnowledgeSourceById(id)?.name ?? id, value: id })),
 ]
-const buildStatusColor: Record<BuildStatus, string> = { running: 'info', succeeded: 'success', failed: 'error', canceled: 'secondary' }
-const summaryStatusColor: Record<SummaryStatus, string> = { ready: 'success', processing: 'info', failed: 'error', stale: 'warning' }
 const entityHeaders = [
 	{ title: '實體', key: 'label' },
 	{ title: '類型', key: 'type', width: 100 },
@@ -452,7 +453,7 @@ function scopeName(value: GraphScope): string {
 					<article v-for="community in visibleCommunities":key="community.id" class="community-card" :data-testid="`community-${community.id}`">
 						<header class="community-head">
 							<h3>{{ community.cluster }}</h3>
-							<VChip :color="summaryStatusColor[community.summaryStatus]" size="small" variant="tonal">{{ SUMMARY_STATUS_LABELS[community.summaryStatus] }}</VChip>
+							<StatusChip :status="community.summaryStatus" :color="SUMMARY_STATUS_COLORS[community.summaryStatus]" :label="SUMMARY_STATUS_LABELS[community.summaryStatus]" />
 						</header>
 						<p class="cell-sub">{{ communityMembers(community.cluster).length }} 個實體 · {{ communityDocumentCount(community.cluster) }} 份文件 · 更新於 {{ community.updatedAt }}</p>
 						<p v-if="community.summaryStatus === 'failed'" class="community-summary text-error">{{ community.summaryError }}</p>
@@ -484,7 +485,7 @@ function scopeName(value: GraphScope): string {
 							</template>
 							<template #item.status="{ item }">
 								<div class="py-2">
-									<VChip :color="buildStatusColor[item.status]" size="small" variant="tonal">{{ BUILD_STATUS_LABELS[item.status] }}</VChip>
+									<StatusChip :status="item.status" :color="BUILD_STATUS_COLORS[item.status]" :label="BUILD_STATUS_LABELS[item.status]" />
 									<VProgressLinear v-if="item.status === 'running'" :model-value="item.progress" color="primary" rounded height="4" class="mt-2" />
 									<p class="cell-sub">{{ item.status === 'succeeded' ? `完成於 ${item.finishedAt}` : item.stage }}</p>
 								</div>

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import FeedbackCaseDrawer from '@/components/FeedbackCaseDrawer.vue'
 import MetricSparkline from '@/components/MetricSparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import StatusChip from '@/components/StatusChip.vue'
 import {
 	breakdownRate,
 	getIssueMetrics,
@@ -18,6 +19,7 @@ import {
 	FEEDBACK_CAUSE_LABELS,
 	FEEDBACK_HANDLERS,
 	FEEDBACK_KIND_LABELS,
+	FEEDBACK_STATUS_COLORS,
 	FEEDBACK_STATUS_LABELS,
 	OVERDUE_DAYS,
 	feedbackAdminState,
@@ -43,7 +45,6 @@ type KindFilter = FeedbackKind | 'all'
 // TODO(api-integration): 分頁改由後端處理（page / pageSize / total），前端只保留目前頁
 const PAGE_SIZE = 10
 const tabs: FeedbackTab[] = ['overview', 'queue', 'documents', 'closed']
-const statusColor = { new: 'warning', investigating: 'info', resolved: 'success', dismissed: 'secondary' } as const
 const signalColor = { error: 'error', warning: 'warning', info: 'info' } as const
 const ownerOptions = [
 	{ title: '全部處理人', value: 'all' },
@@ -426,7 +427,7 @@ function retest(caseId: string): void {
 									</span>
 								</span>
 								<span class="case-side">
-									<VChip :color="statusColor[item.status]" size="small" variant="tonal">{{ FEEDBACK_STATUS_LABELS[item.status] }}</VChip>
+									<StatusChip :status="item.status" :color="FEEDBACK_STATUS_COLORS[item.status]" :label="FEEDBACK_STATUS_LABELS[item.status]" />
 									<span class="case-meta">{{ item.assignee ?? '未指派' }}</span>
 									<span class="case-meta" :class="{ 'text-error font-weight-bold': overdue }">
 										<time :datetime="item.submittedAt" :title="formatDateTime(item.submittedAt)">{{ formatAge(item.submittedAt, now) }}</time><template v-if="overdue"> · 逾期</template>
@@ -482,7 +483,7 @@ function retest(caseId: string): void {
 									<span class="case-detail">{{ item.resolution }}</span>
 								</span>
 								<span class="case-side">
-									<VChip :color="statusColor[item.status]" size="small" variant="tonal">{{ FEEDBACK_STATUS_LABELS[item.status] }}</VChip>
+									<StatusChip :status="item.status" :color="FEEDBACK_STATUS_COLORS[item.status]" :label="FEEDBACK_STATUS_LABELS[item.status]" />
 									<span class="case-meta">{{ item.assignee }}</span>
 									<span v-if="item.closedAt" class="case-meta">{{ formatDateTime(item.closedAt) }}</span>
 								</span>

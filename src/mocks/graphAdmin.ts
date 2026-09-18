@@ -76,12 +76,16 @@ export const SUMMARY_STATUS_LABELS: Record<SummaryStatus, string> = {
 	stale: '摘要待更新',
 }
 
+export const SUMMARY_STATUS_COLORS: Record<SummaryStatus, string> = { ready: 'success', processing: 'info', failed: 'error', stale: 'warning' }
+
 export const BUILD_STATUS_LABELS: Record<BuildStatus, string> = {
 	running: '執行中',
 	succeeded: '完成',
 	failed: '失敗',
 	canceled: '已取消',
 }
+
+export const BUILD_STATUS_COLORS: Record<BuildStatus, string> = { running: 'info', succeeded: 'success', failed: 'error', canceled: 'secondary' }
 
 export const BUILD_MODE_LABELS: Record<BuildMode, string> = { quick: '快速重建', full: '完整重建' }
 

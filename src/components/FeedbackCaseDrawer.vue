@@ -5,6 +5,7 @@ import {
 	FEEDBACK_CAUSE_LABELS,
 	FEEDBACK_HANDLERS,
 	FEEDBACK_KIND_LABELS,
+	FEEDBACK_STATUS_COLORS,
 	FEEDBACK_STATUS_LABELS,
 	RESOLUTION_MAX_LENGTH,
 	addCaseNote,
@@ -22,6 +23,7 @@ import {
 	type FeedbackCause,
 } from '@/mocks/feedbackAdmin'
 import { workspaceDocuments } from '@/mocks/documentWorkspace'
+import StatusChip from '@/components/StatusChip.vue'
 import { getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
 
 interface ComponentProps {
@@ -32,7 +34,6 @@ interface ComponentProps {
 const props = defineProps<ComponentProps>()
 const emit = defineEmits<{ close: []; saved: [message: string, tone?: 'success' | 'error']; filterDocument: [documentId: string]; retest: [caseId: string] }>()
 
-const statusColor = { new: 'warning', investigating: 'info', resolved: 'success', dismissed: 'secondary' } as const
 const signalIcon = { error: 'mdi-alert-circle-outline', warning: 'mdi-alert-outline', info: 'mdi-information-outline' } as const
 const causeOptions = (Object.keys(FEEDBACK_CAUSE_LABELS) as FeedbackCause[]).map((value) => ({ title: FEEDBACK_CAUSE_LABELS[value], value }))
 const assigneeOptions = [{ title: '未指派', value: null }, ...FEEDBACK_HANDLERS.map((handler) => ({ title: handler.name, value: handler.name }))]
@@ -125,7 +126,7 @@ function percent(value: number): string {
 					<p class="drawer-meta">{{ FEEDBACK_KIND_LABELS[item.kind] }}<template v-if="item.category"> · {{ item.category }}</template></p>
 					<h2 class="section-heading">{{ item.title }}</h2>
 					<p class="drawer-meta">
-						<VChip :color="statusColor[item.status]" size="x-small" variant="tonal" class="me-1">{{ FEEDBACK_STATUS_LABELS[item.status] }}</VChip>
+						<StatusChip :status="item.status" :color="FEEDBACK_STATUS_COLORS[item.status]" :label="FEEDBACK_STATUS_LABELS[item.status]" size="x-small" class="me-1" />
 						{{ item.reporter.name }}<template v-if="item.reporter.department"> · {{ item.reporter.department }}</template> · <time :datetime="item.submittedAt" :title="formatDateTime(item.submittedAt)">{{ formatAge(item.submittedAt) }}</time>
 					</p>
 				</div>
