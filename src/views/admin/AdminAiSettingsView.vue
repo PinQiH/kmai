@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
+import { useToastStore } from '@/stores/toast'
 import {
 	AGENT_TOOLS,
 	AI_SETTINGS_LIMITS,
@@ -44,7 +45,10 @@ const router = useRouter()
 const draft = ref<AiSettings>(cloneAiSettings(aiSettingsState.current))
 const activeTab = ref<AiSettingsTab>('retrieval')
 const showErrors = ref(false)
-const feedback = ref('')
+const toastStore = useToastStore()
+function notify(text: string, tone: 'success' | 'error' | 'warning' | 'info' = 'success'): void {
+	toastStore.show(text, tone)
+}
 const confirmOpen = ref(false)
 const saveNote = ref('')
 const saveError = ref('')
@@ -176,7 +180,7 @@ function confirmSave(): void {
 	draft.value = cloneAiSettings(aiSettingsState.current)
 	confirmOpen.value = false
 	showErrors.value = false
-	feedback.value = `已儲存 ${result.revision.changes.length} 項變更，之後的新提問會套用；已產生的回答不受影響。`
+	notify(`已儲存 ${result.revision.changes.length} 項變更，之後的新提問會套用；已產生的回答不受影響。`)
 }
 
 function discard(): void {
@@ -193,11 +197,11 @@ function confirmRestore(): void {
 	if (!target) return
 	const result = restoreAiSettingsRevision(target, CURRENT_HANDLER)
 	if (!result.ok) {
-		feedback.value = result.message
+		notify(result.message, 'error')
 		return
 	}
 	draft.value = cloneAiSettings(aiSettingsState.current)
-	feedback.value = `已還原 ${result.revision.changes.length} 項設定，並記錄為一筆新的變更。`
+	notify(`已還原 ${result.revision.changes.length} 項設定，並記錄為一筆新的變更。`)
 }
 
 // > 離開保護
@@ -230,7 +234,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnl
 	<div class="page-shell ai-settings">
 		<PageHeader eyebrow="回答與檢索品質" title="AI 與檢索設定" description="決定收到提問後，系統怎麼找文件、採用哪些段落當引用，以及用什麼口吻回答。儲存後只影響之後的新提問。" />
 
-		<VAlert v-if="feedback" type="success" variant="tonal" density="compact" closable class="mb-5" role="status" @click:close="feedback = ''">{{ feedback }}</VAlert>
 
 		<nav class="flow-map" aria-label="回答流程總覽" data-testid="ai-flow-map">
 			<ol>

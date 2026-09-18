@@ -98,7 +98,8 @@ describe('AdminFeedbackView', () => {
 		await wrapper.get('[data-testid="feedback-start"]').trigger('click')
 
 		expect(feedback.getCase('fb-1049')!.status).toBe('investigating')
-		expect(wrapper.text()).toContain('已開始處理。')
+		const { useToastStore } = await import('@/stores/toast')
+		expect(useToastStore().items[0]?.title).toContain('已開始處理。')
 	})
 
 	it('should require a cause before closing a case', async () => {

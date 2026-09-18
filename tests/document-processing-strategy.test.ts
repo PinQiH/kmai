@@ -142,7 +142,7 @@ describe('附件切塊', () => {
 		const document = workspaceDocuments.find((item) => item.id === 'doc-003')!
 		const wrapper = mount(DocumentChunkEditor, {
 			props: { document, version: getWorkspaceVersions(document)[0]! },
-			global: { plugins: [createVuetify({ components, directives })] },
+			global: { plugins: [createPinia(), createVuetify({ components, directives })] },
 		})
 
 		expect(wrapper.get('[data-testid="chunk-file-doc-003-att-1"]').text()).toContain('3 個切塊')

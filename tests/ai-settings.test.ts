@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
@@ -99,7 +100,7 @@ describe('AdminAiSettingsView', () => {
 		})
 		await router.push(path)
 		await router.isReady()
-		const wrapper = mount({ template: '<VApp><RouterView /></VApp>' }, { global: { plugins: [router, createVuetify({ components, directives })] }, attachTo: document.body })
+		const wrapper = mount({ template: '<VApp><RouterView /></VApp>' }, { global: { plugins: [createPinia(), router, createVuetify({ components, directives })] }, attachTo: document.body })
 		await flushPromises()
 		return { wrapper, router }
 	}

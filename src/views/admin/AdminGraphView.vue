@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import GraphEntityDrawer from '@/components/GraphEntityDrawer.vue'
 import GraphRebuildDialog from '@/components/GraphRebuildDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useToastStore } from '@/stores/toast'
 import StatusChip from '@/components/StatusChip.vue'
 import { GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE, GRAPH_NODE_TYPES, type GraphNodeType } from '@/mocks/graph'
 import {
@@ -92,7 +93,10 @@ watch([scope, activeTab], ([nextScope, nextTab]) => {
 	if (query.scope !== route.query.scope || query.tab !== route.query.tab) router.replace({ query })
 })
 
-const feedback = ref('')
+const toastStore = useToastStore()
+function notify(text: string, tone: 'success' | 'error' | 'warning' | 'info' = 'success'): void {
+	toastStore.show(text, tone)
+}
 const errorMessage = ref('')
 const scopeLabel = computed(() => scopeOptions.find((option) => option.value === scope.value)?.title ?? '')
 
@@ -193,11 +197,11 @@ function decide(candidate: MergeCandidate, decision: MergeCandidate['decision'])
 	decideCandidate(candidate.id, decision, CURRENT_ACTOR)
 	const primary = entityOf(candidate.primaryId).label
 	const duplicate = entityOf(candidate.duplicateId).label
-	feedback.value = decision === 'merge'
+	notify(decision === 'merge'
 		? `已記錄：「${duplicate}」將合併到「${primary}」，完整重建後生效。`
 		: decision === 'reject'
 			? `已記錄：「${duplicate}」與「${primary}」保持獨立，之後不再建議合併。`
-			: `已撤回「${duplicate}」的決定。`
+			: `已撤回「${duplicate}」的決定。`)
 }
 
 function confidenceTone(value: number): string {
@@ -225,7 +229,7 @@ function communityDocumentCount(cluster: string): number {
 
 function resummarize(id: string, cluster: string): void {
 	requestResummarize(id)
-	feedback.value = `已排入「${cluster}」的摘要重新產生，只會影響這個主題。`
+	notify(`已排入「${cluster}」的摘要重新產生，只會影響這個主題。`)
 	// @ 假資料：模擬背景工作延遲
 	const timer = window.setTimeout(() => { completeResummarize(id); timers.delete(timer) }, 2400)
 	timers.add(timer)
@@ -250,7 +254,7 @@ function runBuildTimer(): void {
 		advanceRebuild(job.id, job.mode === 'full' ? 4 : 10)
 		if (job.status === 'running') return
 		window.clearInterval(buildTimer)
-		if (job.status === 'succeeded') feedback.value = `${BUILD_MODE_LABELS[job.mode]}完成：${job.result!.nodes} 個實體、${job.result!.edges} 條關係${job.result!.merged ? `，合併 ${job.result!.merged} 組名稱` : ''}。`
+		if (job.status === 'succeeded') notify(`${BUILD_MODE_LABELS[job.mode]}完成：${job.result!.nodes} 個實體、${job.result!.edges} 條關係${job.result!.merged ? `，合併 ${job.result!.merged} 組名稱` : ''}。`)
 	}, 700)
 }
 
@@ -262,7 +266,6 @@ function confirmRebuild(targetScope: GraphScope, mode: BuildMode): void {
 	}
 	rebuildOpen.value = false
 	errorMessage.value = ''
-	feedback.value = ''
 	runBuildTimer()
 }
 
@@ -270,7 +273,7 @@ function stopRebuild(): void {
 	if (!runningJob.value) return
 	cancelRebuild(runningJob.value.id)
 	window.clearInterval(buildTimer)
-	feedback.value = '已取消重建，圖譜維持上一次成功的版本。'
+	notify('已取消重建，圖譜維持上一次成功的版本。', 'info')
 }
 
 // 離開頁面再回來時，未完成的模擬工作要接著跑
@@ -307,7 +310,6 @@ function scopeName(value: GraphScope): string {
 			{{ unappliedDecisions.length }} 項合併覆核決定尚未套用，完整重建後才會生效。
 			<template #append><VBtn variant="text" size="small" @click="openRebuild('full')">排入完整重建</VBtn></template>
 		</VAlert>
-		<VAlert v-if="feedback" type="success" variant="tonal" density="compact" closable class="mb-5" role="status" @click:close="feedback = ''">{{ feedback }}</VAlert>
 		<VAlert v-if="errorMessage" type="error" variant="tonal" density="compact" closable class="mb-5" @click:close="errorMessage = ''">{{ errorMessage }}</VAlert>
 
 		<dl class="metric-row" :aria-label="`${scopeLabel}圖譜規模`">
@@ -501,7 +503,7 @@ function scopeName(value: GraphScope): string {
 			</VWindowItem>
 		</VWindow>
 
-		<GraphEntityDrawer :entity-id="drawerEntityId" @close="drawerEntityId = null" @select="openEntity" @saved="feedback = $event" />
+		<GraphEntityDrawer :entity-id="drawerEntityId" @close="drawerEntityId = null" @select="openEntity" @saved="notify" />
 		<GraphRebuildDialog v-model="rebuildOpen" :scope="scope" :scope-options="scopeOptions" :initial-mode="rebuildInitialMode" @confirm="confirmRebuild" />
 	</div>
 </template>

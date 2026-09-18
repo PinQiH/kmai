@@ -4,6 +4,7 @@ import DocumentVersionContent from '@/components/DocumentVersionContent.vue'
 import { getDocumentVersionDetail } from '@/mocks/documentDetails'
 import { documentChunks, getAttachmentSections, getChunkKey, saveDocumentChunks } from '@/mocks/documentChunks'
 import { getDocumentProcessingRecord } from '@/mocks/documentProcessing'
+import { useToastStore } from '@/stores/toast'
 import type { DocumentContentSection, DocumentProcessingFile, DocumentVersionEntry, KnowledgeDocument } from '@/types'
 
 const props = defineProps<{ document: KnowledgeDocument; version: DocumentVersionEntry }>()
@@ -12,7 +13,7 @@ const fileId = defineModel<string | undefined>('fileId', { default: undefined })
 
 const chunks = ref<DocumentContentSection[]>([])
 const dirty = ref(false)
-const message = ref('')
+const toastStore = useToastStore()
 const error = ref('')
 
 // > 檔案清單：主文件＋附件，各自有切塊狀態
@@ -71,7 +72,6 @@ function reset(): void {
 	const sections = saved?.chunks ?? sourceSections.value
 	chunks.value = sections.map((section, index) => ({ ...section, heading: `切塊 ${index + 1}` }))
 	dirty.value = false
-	message.value = ''
 	error.value = ''
 }
 watch(key, reset, { immediate: true })
@@ -111,7 +111,7 @@ function save(): void {
 		saveDocumentChunks(props.document.id, props.version.version, chunks.value, storageFileId.value)
 		dirty.value = false
 		error.value = ''
-		message.value = `${isAttachment.value ? '附件' : ''}切塊已儲存；向量化、索引、圖譜、摘要與品質診斷需要重新處理。原文保持不變。`
+		toastStore.show(`${isAttachment.value ? '附件' : ''}切塊已儲存；向量化、索引、圖譜、摘要與品質診斷需要重新處理。原文保持不變。`)
 	} catch (cause) { error.value = cause instanceof Error ? cause.message : '無法儲存切塊。' }
 }
 </script>
@@ -143,7 +143,7 @@ function save(): void {
 			<p class="text-body-2 mt-1">可到「處理進度」分頁查看詳細步驟，或重新處理這個檔案。</p>
 		</VAlert>
 		<template v-else>
-			<VAlert v-if="documentChunks[key]?.needsReprocessing && !message" type="warning" variant="tonal" class="mb-4">切塊已修改，下游五個階段待重新處理。</VAlert>
+			<VAlert v-if="documentChunks[key]?.needsReprocessing" type="warning" variant="tonal" class="mb-4">切塊已修改，下游五個階段待重新處理。</VAlert>
 			<div class="chunk-compare">
 				<div class="compare-pane">
 					<h2 class="text-h6 mb-4">{{ isAttachment ? `附件原文：${selectedFile?.name}` : '原文件' }}</h2>
@@ -162,7 +162,6 @@ function save(): void {
 				</div>
 			</div>
 			<VAlert v-if="error" type="error" variant="tonal" class="mt-4">{{ error }}</VAlert>
-			<VAlert v-if="message" type="success" variant="tonal" class="mt-4" role="status">{{ message }}</VAlert>
 			<div class="d-flex ga-3 mt-4"><VBtn color="primary" :disabled="!dirty" @click="save">儲存切塊</VBtn><VBtn variant="text" :disabled="!dirty" @click="reset">放棄變更</VBtn><span v-if="dirty" role="status">有尚未儲存的切塊變更</span></div>
 		</template>
 

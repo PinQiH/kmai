@@ -36,6 +36,7 @@ import {
 } from '@/mocks/feedbackAdmin'
 import { useAdminAssistantStore } from '@/stores/adminAssistant'
 import { useNotebooksStore } from '@/stores/notebooks'
+import { useToastStore } from '@/stores/toast'
 import { getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
 import { buildKnowledgeSourceOptions } from '@/utils/knowledgeSources'
 
@@ -85,8 +86,7 @@ watch(activeTab, (tab) => {
 	if (next !== route.query.tab) router.replace({ query: { ...route.query, tab: next, case: undefined, documentId: undefined } })
 })
 
-const message = ref('')
-const messageTone = ref<'success' | 'error'>('success')
+const toastStore = useToastStore()
 const now = ref(Date.now())
 
 // > 概況
@@ -203,8 +203,7 @@ function showDocumentFeedback(documentId: string): void {
 }
 
 function onSaved(text: string, tone: 'success' | 'error' = 'success'): void {
-	message.value = text
-	messageTone.value = tone
+	toastStore.show(text, tone)
 	now.value = Date.now()
 }
 
@@ -242,7 +241,6 @@ function retest(caseId: string): void {
 	<div class="page-shell">
 		<PageHeader eyebrow="使用者回饋" title="回饋與問題" description="同仁對 AI 回答按倒讚、或從帳號頁回報問題，都會進到這裡。先看診斷線索與檢索過程判斷原因，修正後結案，系統會以站內通知告訴回報者。" />
 
-		<VAlert v-if="message" :type="messageTone" variant="tonal" density="compact" closable class="mb-5" role="status" @click:close="message = ''">{{ message }}</VAlert>
 
 		<dl class="metric-row" aria-label="回饋處理概況">
 			<div><dt>待處理</dt><dd>{{ openCases.length }}</dd><span>{{ unassignedCount ? `其中 ${unassignedCount} 筆尚未指派` : '全部已有處理人' }}</span></div>

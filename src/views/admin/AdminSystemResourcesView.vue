@@ -22,6 +22,7 @@ import {
 	type ResourceKind,
 } from '@/mocks/systemResources'
 import { countProfileStrategyReferences } from '@/mocks/documentStrategies'
+import { useToastStore } from '@/stores/toast'
 
 type ResourceTab = 'profiles' | 'connections'
 
@@ -64,7 +65,10 @@ const selectedId = ref<string>(aiProfiles[0]?.id ?? '')
 const draft = ref<AiProfile | null>(null)
 const isNew = ref(false)
 const formError = ref('')
-const feedback = ref('')
+const toastStore = useToastStore()
+function notify(text: string, tone: 'success' | 'error' | 'warning' | 'info' = 'success'): void {
+	toastStore.show(text, tone)
+}
 const deleteTarget = ref<AiProfile | null>(null)
 
 const selected = computed(() => getProfile(selectedId.value))
@@ -155,7 +159,8 @@ function runProfileTest(): void {
 		const status = testProfile(profile.id)
 		draft.value = cloneProfile(getProfile(profile.id))
 		isTesting.value = false
-		feedback.value = status === 'ok' ? `「${profile.name}」測試通過。` : `「${profile.name}」測試失敗：${profile.testNote ?? '請確認設定。'}`
+		if (status === 'ok') notify(`「${profile.name}」測試通過。`)
+		else notify(`「${profile.name}」測試失敗：${profile.testNote ?? '請確認設定。'}`, 'error')
 	}, 600)
 }
 
@@ -164,7 +169,6 @@ function startCreate(kind: ResourceKind): void {
 	isNew.value = true
 	draft.value = createProfileDraft(kind)
 	formError.value = ''
-	feedback.value = ''
 }
 
 function resetDraft(): void {
@@ -206,11 +210,11 @@ function save(): void {
 	const wasNew = isNew.value
 	isNew.value = false
 	selectedId.value = profile.id
-	feedback.value = wasNew
+	notify(wasNew
 		? `已建立「${profile.name.trim()}」。到「AI 與檢索設定」或文件處理策略選用後才會生效。`
 		: affected.length
 			? `已儲存「${profile.name.trim()}」，${affected.join('、')}會一起套用；只影響之後的處理。`
-			: `已儲存「${profile.name.trim()}」。`
+			: `已儲存「${profile.name.trim()}」。`)
 }
 
 function confirmDelete(): void {
@@ -218,14 +222,15 @@ function confirmDelete(): void {
 	if (!target || deleteBlockers.value.usages.length || deleteBlockers.value.references) return
 	deleteProfile(target.id)
 	deleteTarget.value = null
-	feedback.value = `已刪除「${target.name}」。`
+	notify(`已刪除「${target.name}」。`)
 	selectProfile(aiProfiles[0]?.id ?? '')
 }
 
 function runConnectionTest(connectionId: string): void {
 	const connection = getConnection(connectionId)
 	const status = testConnection(connectionId)
-	feedback.value = status === 'ok' ? `「${connection?.name}」連線正常。` : `「${connection?.name}」連線失敗：${connection?.statusNote ?? '請確認服務是否啟動。'}`
+	if (status === 'ok') notify(`「${connection?.name}」連線正常。`)
+	else notify(`「${connection?.name}」連線失敗：${connection?.statusNote ?? '請確認服務是否啟動。'}`, 'error')
 }
 </script>
 
@@ -243,8 +248,6 @@ function runConnectionTest(connectionId: string): void {
 				</VMenu>
 			</template>
 		</PageHeader>
-
-		<VAlert v-if="feedback" type="success" variant="tonal" density="compact" closable class="mb-5" role="status" @click:close="feedback = ''">{{ feedback }}</VAlert>
 
 		<VTabs v-model="activeTab" color="primary" class="mb-5">
 			<VTab value="profiles">設定檔</VTab>

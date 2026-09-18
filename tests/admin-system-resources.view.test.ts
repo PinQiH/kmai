@@ -19,7 +19,7 @@ Object.defineProperty(globalThis, 'visualViewport', {
 })
 
 // NOTE: 假資料是模組層級的 reactive 狀態，每個測試重新載入模組避免互相污染
-async function mountView(query = ''): Promise<{ wrapper: VueWrapper; resources: typeof import('@/mocks/systemResources') }> {
+async function mountView(query = ''): Promise<{ wrapper: VueWrapper; resources: typeof import('@/mocks/systemResources'); toasts: () => string[] }> {
 	vi.resetModules()
 	const resources = await import('@/mocks/systemResources')
 	const { default: AdminSystemResourcesView } = await import('@/views/admin/AdminSystemResourcesView.vue')
@@ -39,7 +39,9 @@ async function mountView(query = ''): Promise<{ wrapper: VueWrapper; resources: 
 		global: { plugins: [pinia, createVuetify({ components, directives }), router] },
 	})
 	await flushPromises()
-	return { wrapper, resources }
+	const { useToastStore } = await import('@/stores/toast')
+	const toastStore = useToastStore()
+	return { wrapper, resources, toasts: () => toastStore.items.map((item) => item.title) }
 }
 
 function findButton(wrapper: VueWrapper, text: string) {
@@ -105,7 +107,7 @@ describe('AdminSystemResourcesView', () => {
 	})
 
 	it('should save an edited profile and warn which usages are affected', async () => {
-		const { wrapper, resources } = await mountView('?profile=llm-standard')
+		const { wrapper, resources, toasts } = await mountView('?profile=llm-standard')
 
 		await wrapper.get('.profile-editor input[maxlength="30"]').setValue('GPT-4.1 mini（主要）')
 		expect(wrapper.text()).toContain('儲存後會影響：生成回答、問題規劃')
@@ -113,11 +115,11 @@ describe('AdminSystemResourcesView', () => {
 		await wrapper.get('[data-testid="profile-save"]').trigger('click')
 
 		expect(resources.getProfile('llm-standard')?.name).toBe('GPT-4.1 mini（主要）')
-		expect(wrapper.text()).toContain('已儲存「GPT-4.1 mini（主要）」，生成回答、問題規劃會一起套用')
+		expect(toasts()[0]).toContain('已儲存「GPT-4.1 mini（主要）」，生成回答、問題規劃會一起套用')
 	})
 
 	it('should create a new profile from the add menu', async () => {
-		const { wrapper, resources } = await mountView()
+		const { wrapper, resources, toasts } = await mountView()
 		const before = resources.aiProfiles.length
 
 		await findButton(wrapper, '新增設定檔').trigger('click')
@@ -133,7 +135,7 @@ describe('AdminSystemResourcesView', () => {
 		await wrapper.get('[data-testid="profile-save"]').trigger('click')
 
 		expect(resources.aiProfiles).toHaveLength(before + 1)
-		expect(wrapper.text()).toContain('已建立「測試重新排序」')
+		expect(toasts()[0]).toContain('已建立「測試重新排序」')
 	})
 
 	it('should refuse to delete a profile that is still in use', async () => {
@@ -148,7 +150,7 @@ describe('AdminSystemResourcesView', () => {
 	})
 
 	it('should delete an unused profile after confirmation', async () => {
-		const { wrapper, resources } = await mountView('?profile=llm-deepseek')
+		const { wrapper, resources, toasts } = await mountView('?profile=llm-deepseek')
 		expect(resources.getProfileUsages('llm-deepseek')).toHaveLength(0)
 
 		await findButton(wrapper, '刪除').trigger('click')
@@ -159,16 +161,16 @@ describe('AdminSystemResourcesView', () => {
 		await flushPromises()
 
 		expect(resources.getProfile('llm-deepseek')).toBeUndefined()
-		expect(wrapper.text()).toContain('已刪除「DeepSeek V3」。')
+		expect(toasts()).toContain('已刪除「DeepSeek V3」。')
 	})
 
 	it('should report the result of a connection test', async () => {
-		const { wrapper } = await mountView()
+		const { wrapper, toasts } = await mountView()
 
 		await findButton(wrapper, '服務連線').trigger('click')
 		await flushPromises()
 		await findButton(wrapper, '測試連線').trigger('click')
 
-		expect(wrapper.text()).toMatch(/「OpenAI」連線(正常|失敗)/)
+		expect(toasts()[0]).toMatch(/「OpenAI」連線(正常|失敗)/)
 	})
 })

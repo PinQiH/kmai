@@ -1,5 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+
+import { useToastStore } from '@/stores/toast'
 import { nextTick } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
@@ -149,7 +151,7 @@ describe('AskView answer actions', () => {
 			},
 		})
 		expect(savedAnswer?.source.type === 'ai-answer' ? savedAnswer.source.citations : []).toHaveLength(1)
-		expect(document.body.textContent).toContain('已將回答存入「產品研究筆記」。')
+		expect(useToastStore().items.map((item) => item.title)).toContain('已將回答存入「產品研究筆記」。')
 
 		viewerNotebook.members.find((member) => member.id === 'user-current')!.role = 'editor'
 		await wrapper!.get('[aria-label="已存入 1 本筆記本，可繼續新增"]').trigger('click')

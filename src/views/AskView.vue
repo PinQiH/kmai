@@ -13,6 +13,7 @@ import { getEmployeeDocumentsBySourceId } from '@/repositories/knowledge.reposit
 import { ANSWER_FEEDBACK_REASON_MAX_LENGTH, useConversationStore } from '@/stores/conversation'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useNotebooksStore } from '@/stores/notebooks'
+import { useToastStore } from '@/stores/toast'
 import type { Citation, ConversationMessage, OutlineItem } from '@/types'
 import { buildAskKnowledgeSourceGroups, buildKnowledgeSourceOptions } from '@/utils/knowledgeSources'
 
@@ -42,7 +43,7 @@ const question = ref('')
 const selectedCitation = ref<Citation | null>(null)
 const isCitationOpen = ref(false)
 const isScopeOpen = ref(false)
-const feedbackMessage = ref('')
+const toastStore = useToastStore()
 const messageEnd = ref<HTMLElement>()
 const scrollArea = ref<HTMLElement>()
 const composerField = ref<HTMLTextAreaElement>()
@@ -288,10 +289,8 @@ watch(question, async () => {
 })
 
 // @ 側邊欄的「開新對話」在同一頁清空訊息，不會觸發 mounted，需要另外把焦點帶回輸入框
-// @ 回饋訊息屬於上一輪對話，不清掉會殘留在新對話的空狀態下
 watch(isEmptyState, (isEmpty) => {
 	if (!isEmpty) return
-	feedbackMessage.value = ''
 	if (isFeedbackDialogOpen.value) setFeedbackDialogOpen(false)
 	if (isSaveDialogOpen.value) setSaveDialogOpen(false)
 	focusComposer()
@@ -342,7 +341,7 @@ function recordFeedback(messageId: string, isHelpful: boolean): void {
 	const value = isHelpful ? 'helpful' : 'unhelpful'
 	if (message.feedback?.value === value) {
 		conversationStore.setAnswerFeedback({ messageId, value: null })
-		feedbackMessage.value = '已取消這筆回答評價。'
+		toastStore.show('已取消這筆回答評價。', 'info')
 		return
 	}
 	if (!isHelpful) {
@@ -353,7 +352,7 @@ function recordFeedback(messageId: string, isHelpful: boolean): void {
 		return
 	}
 	if (conversationStore.setAnswerFeedback({ messageId, value: 'helpful' })) {
-		feedbackMessage.value = '已記錄為有幫助，謝謝你的回饋。'
+		toastStore.show('已記錄為有幫助，謝謝你的回饋。')
 	}
 }
 
@@ -417,7 +416,7 @@ function submitNegativeFeedback(): void {
 		return
 	}
 	queueFeedbackForAdmin(feedbackTargetId.value, reason)
-	feedbackMessage.value = '已記錄倒讚與改善原因，謝謝你的回饋。'
+	toastStore.show('已記錄倒讚與改善原因，謝謝你的回饋。')
 	setFeedbackDialogOpen(false)
 }
 
@@ -459,7 +458,7 @@ function saveAnswerToNotebook(): void {
 		citations: answer.citations ?? [],
 	})
 	if (result === 'saved') {
-		feedbackMessage.value = `已將回答存入「${targetNotebook?.name ?? '指定筆記本'}」。`
+		toastStore.show(`已將回答存入「${targetNotebook?.name ?? '指定筆記本'}」。`)
 		setSaveDialogOpen(false)
 		return
 	}
@@ -477,7 +476,8 @@ function toggleFavorite(messageId: string, answer: string): void {
 	const conversationId = conversationStore.activeConversationId
 	if (!questionMessage || !conversationId) return
 	favoritesStore.toggle({ id: messageId, conversationId, question: questionMessage.content, answer, date: new Date().toISOString().slice(0, 10) })
-	feedbackMessage.value = favoritesStore.isFavorite(messageId) ? '已加入我的收藏。' : '已取消收藏。'
+	const isFavorite = favoritesStore.isFavorite(messageId)
+	toastStore.show(isFavorite ? '已加入我的收藏。' : '已取消收藏。', isFavorite ? 'success' : 'info')
 }
 
 function jumpToQuestion(messageId: string): void {
@@ -627,7 +627,6 @@ watch(
 									<div ref="messageEnd" />
 								</div>
 
-								<VAlert v-if="feedbackMessage" type="success" variant="tonal" density="compact" closable class="mt-4" @click:close="feedbackMessage = ''">{{ feedbackMessage }}</VAlert>
 							</div>
 
 							<ConversationOutline v-if="showOutline" :items="outlineItems" :active-id="activeQuestionId" @select="jumpToQuestion" />
