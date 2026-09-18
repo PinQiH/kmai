@@ -95,10 +95,6 @@ const routes: RouteRecordRaw[] = [
 		meta: { title: "知識圖譜" },
 	},
 	{
-		path: "/favorites",
-		redirect: "/",
-	},
-	{
 		path: "/notifications",
 		name: "notifications",
 		component: () => import("@/views/NotificationsView.vue"),
@@ -206,7 +202,12 @@ const routes: RouteRecordRaw[] = [
 		component: () => import("@/views/ForbiddenView.vue"),
 		meta: { public: true, title: "禁止存取" },
 	},
-	{ path: "/:pathMatch(.*)*", redirect: "/" },
+	{
+		path: "/:pathMatch(.*)*",
+		name: "not-found",
+		component: () => import("@/views/NotFoundView.vue"),
+		meta: { title: "找不到頁面" },
+	},
 ]
 
 export const router = createRouter({

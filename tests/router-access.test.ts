@@ -53,6 +53,29 @@ describe('router guard integration', () => {
 	})
 })
 
+describe('unknown routes', () => {
+	it('should show the not-found page instead of silently going home', async () => {
+		const appStore = useAppStore(pinia)
+		appStore.isAuthenticated = true
+		appStore.isAdmin = false
+
+		await router.push('/does-not-exist?from=bookmark')
+
+		expect(router.currentRoute.value.name).toBe('not-found')
+		expect(router.currentRoute.value.fullPath).toBe('/does-not-exist?from=bookmark')
+	})
+
+	it('should ask signed-out users to log in before showing the not-found page', async () => {
+		const appStore = useAppStore(pinia)
+		appStore.logout()
+
+		await router.push('/does-not-exist')
+
+		expect(router.currentRoute.value.name).toBe('login')
+		expect(router.currentRoute.value.query.redirect).toBe('/does-not-exist')
+	})
+})
+
 describe('route components', () => {
 	// @ 路由都是 lazy import，路徑打錯只有在點到那頁時才會壞；這裡一次載入全部確認
 	it('should resolve every lazily loaded route component', async () => {
