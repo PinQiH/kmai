@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import type { ThemeInstance } from 'vuetify'
 
+import { settingsState } from '@/mocks/systemSettings'
 import { resolveThemeName, type ThemeAccent, type ThemeMode, type ThemePreference } from '@/theme'
 import type { AdminRole } from '@/types'
 
@@ -40,9 +41,10 @@ export const useAppStore = defineStore('app', {
 		isNavigationOpen: false,
 		isNavigationRail: false,
 		mustChangePassword: false,
-		themePreference: 'system',
+		// @ 新工作階段的預設外觀由管理端「系統設定」決定
+		themePreference: settingsState.appearance.themePreference,
 		themeMode: 'light',
-		themeAccent: 'indigo',
+		themeAccent: settingsState.appearance.themeAccent,
 	}),
 	getters: {
 		// @ 單一來源：任何要套用主題的地方都經過這裡，避免各處自己拼主題名稱

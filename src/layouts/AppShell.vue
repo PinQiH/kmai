@@ -9,6 +9,7 @@ import ConversationHistoryPanel from "@/components/ConversationHistoryPanel.vue"
 import ConversationSearchDialog from "@/components/ConversationSearchDialog.vue"
 import NotificationMenu from "@/components/NotificationMenu.vue"
 import UserAccountMenu from "@/components/UserAccountMenu.vue"
+import { settingsState } from "@/mocks/systemSettings"
 import { useConversationStore } from "@/stores/conversation"
 import { useAppStore } from "@/stores/app"
 import { useAdminAssistantStore } from "@/stores/adminAssistant"
@@ -204,11 +205,11 @@ async function handleLogout(): Promise<void> {
       border="0"
     >
       <div class="brand-lockup py-5" :class="isRailMode ? 'px-3' : 'px-5'">
-        <img :src="brandLogoUrl" alt="" class="brand-logo" aria-hidden="true" />
+        <img :src="settingsState.brand.logoDataUrl ?? brandLogoUrl" alt="" class="brand-logo" aria-hidden="true" />
         <div v-if="!isRailMode">
-          <p class="font-weight-bold">Syscom Cubi</p>
+          <p class="font-weight-bold">{{ settingsState.brand.systemName }}</p>
           <p class="text-caption text-medium-emphasis">
-            {{ isAdminWorkspace ? "管理後台" : "凌群知識庫" }}
+            {{ isAdminWorkspace ? settingsState.brand.adminName : settingsState.brand.portalName }}
           </p>
         </div>
       </div>

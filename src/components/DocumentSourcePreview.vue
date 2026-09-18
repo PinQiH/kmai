@@ -2,6 +2,7 @@
 import { computed, useId } from 'vue'
 
 import type { DocumentContentSection, DocumentSource } from '@/types'
+import { parseMarkdownBlocks, type MarkdownBlock } from '@/utils/markdown'
 
 interface Props {
 	source: DocumentSource
@@ -10,13 +11,6 @@ interface Props {
 	showHeader?: boolean
 	showSourceContent?: boolean
 }
-
-type MarkdownBlock =
-	| { type: 'code'; language: string; text: string }
-	| { type: 'heading'; level: 1 | 2 | 3; text: string }
-	| { type: 'list'; ordered: boolean; items: string[] }
-	| { type: 'paragraph'; text: string }
-	| { type: 'quote'; text: string }
 
 const props = withDefaults(defineProps<Props>(), {
 	sections: () => [],
@@ -68,93 +62,6 @@ const markdownBlocks = computed<MarkdownBlock[]>(() => {
 	if (props.source.type !== 'text' || props.source.format !== 'markdown') return []
 	return parseMarkdownBlocks(props.source.content)
 })
-
-function parseMarkdownBlocks(content: string): MarkdownBlock[] {
-	const lines = content.replace(/\r\n?/g, '\n').split('\n')
-	const blocks: MarkdownBlock[] = []
-	let index = 0
-
-	while (index < lines.length) {
-		const line = lines[index]
-		if (!line.trim()) {
-			index += 1
-			continue
-		}
-
-		const fenceMatch = line.match(/^```\s*([^`]*)$/)
-		if (fenceMatch) {
-			const codeLines: string[] = []
-			index += 1
-			while (index < lines.length && !/^```\s*$/.test(lines[index])) {
-				codeLines.push(lines[index])
-				index += 1
-			}
-			if (index < lines.length) index += 1
-			blocks.push({
-				type: 'code',
-				language: fenceMatch[1].trim(),
-				text: codeLines.join('\n'),
-			})
-			continue
-		}
-
-		const headingMatch = line.match(/^(#{1,3})\s+(.+)$/)
-		if (headingMatch) {
-			blocks.push({
-				type: 'heading',
-				level: headingMatch[1].length as 1 | 2 | 3,
-				text: headingMatch[2].trim(),
-			})
-			index += 1
-			continue
-		}
-
-		const quoteMatch = line.match(/^>\s?(.*)$/)
-		if (quoteMatch) {
-			const quoteLines = [quoteMatch[1]]
-			index += 1
-			while (index < lines.length) {
-				const nextQuote = lines[index].match(/^>\s?(.*)$/)
-				if (!nextQuote) break
-				quoteLines.push(nextQuote[1])
-				index += 1
-			}
-			blocks.push({ type: 'quote', text: quoteLines.join('\n') })
-			continue
-		}
-
-		const unorderedMatch = line.match(/^[-*+]\s+(.+)$/)
-		const orderedMatch = line.match(/^\d+[.)]\s+(.+)$/)
-		if (unorderedMatch || orderedMatch) {
-			const isOrdered = Boolean(orderedMatch)
-			const items: string[] = []
-			while (index < lines.length) {
-				const itemMatch = isOrdered
-					? lines[index].match(/^\d+[.)]\s+(.+)$/)
-					: lines[index].match(/^[-*+]\s+(.+)$/)
-				if (!itemMatch) break
-				items.push(itemMatch[1].trim())
-				index += 1
-			}
-			blocks.push({ type: 'list', ordered: isOrdered, items })
-			continue
-		}
-
-		const paragraphLines = [line.trim()]
-		index += 1
-		while (index < lines.length && lines[index].trim() && !isMarkdownBlockStart(lines[index])) {
-			paragraphLines.push(lines[index].trim())
-			index += 1
-		}
-		blocks.push({ type: 'paragraph', text: paragraphLines.join(' ') })
-	}
-
-	return blocks
-}
-
-function isMarkdownBlockStart(line: string): boolean {
-	return /^(?:```|#{1,3}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/.test(line)
-}
 </script>
 
 <template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MarkdownContent from '@/components/MarkdownContent.vue'
 import type { DocumentVersionEntry } from '@/types'
 
 interface ComponentProps {
@@ -38,7 +39,8 @@ withDefaults(defineProps<ComponentProps>(), {
 					</div>
 				</div>
 				<p class="version-summary">{{ version.summary }}</p>
-				<ul v-if="version.changes.length" class="version-changes" aria-label="本版更新內容">
+				<MarkdownContent v-if="version.notes" :content="version.notes" :heading-offset="3" class="version-notes" />
+				<ul v-else-if="version.changes.length" class="version-changes" aria-label="本版更新內容">
 					<li v-for="change in version.changes" :key="change">{{ change }}</li>
 				</ul>
 			</article>
@@ -136,6 +138,11 @@ withDefaults(defineProps<ComponentProps>(), {
 	color: var(--ink-strong);
 	font-size: 0.9rem;
 	line-height: 1.6;
+}
+
+.version-notes {
+	margin-top: var(--space-sm);
+	font-size: 0.9rem;
 }
 
 .version-empty {

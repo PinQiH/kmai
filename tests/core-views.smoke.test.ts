@@ -12,7 +12,7 @@ import AdminDocumentDetailView from '@/views/admin/AdminDocumentDetailView.vue'
 import AdminDocumentsView from '@/views/admin/AdminDocumentsView.vue'
 import AdminOverviewView from '@/views/admin/AdminOverviewView.vue'
 import AdminUploadView from '@/views/admin/AdminUploadView.vue'
-import AdminWorkspaceView from '@/views/admin/AdminWorkspaceView.vue'
+import AdminSettingsView from '@/views/admin/AdminSettingsView.vue'
 import SearchView from '@/views/SearchView.vue'
 
 globalThis.ResizeObserver = class ResizeObserverStub {
@@ -33,7 +33,7 @@ function createTestRouter(routes: RouteRecordRaw[]): Router {
 	})
 }
 
-function mountView(component: typeof SearchView | typeof AdminOverviewView | typeof AdminDocumentsView | typeof AdminDocumentDetailView | typeof AdminUploadView | typeof AdminWorkspaceView, router: Router): VueWrapper {
+function mountView(component: typeof SearchView | typeof AdminOverviewView | typeof AdminDocumentsView | typeof AdminDocumentDetailView | typeof AdminUploadView | typeof AdminSettingsView, router: Router): VueWrapper {
 	wrapper = mount(component, {
 		global: {
 			plugins: [createVuetify({ components, directives }), router],
@@ -136,18 +136,18 @@ describe('core views', () => {
 		expect(documentDetailView.text()).toContain('文件欄位')
 	})
 
-	it('should render system settings and apply the selected accent', async () => {
+	it('should render system settings brand form', async () => {
 		const router = createTestRouter([{
 			path: '/admin/settings',
-			component: AdminWorkspaceView,
-			meta: { workspace: 'settings', title: '系統設定' },
+			component: AdminSettingsView,
+			meta: { title: '系統設定' },
 		}])
 		await router.push('/admin/settings')
 		await router.isReady()
-		const workspaceView = mountView(AdminWorkspaceView, router)
+		const workspaceView = mountView(AdminSettingsView, router)
 		await nextTick()
 
 		expect(workspaceView.text()).toContain('系統設定')
-		expect(workspaceView.text()).toContain('品牌與預設外觀')
+		expect(workspaceView.text()).toContain('名稱與 Logo')
 	})
 })

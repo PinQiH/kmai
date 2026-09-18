@@ -12,6 +12,8 @@ import {
   rateResolution,
   reportIssue,
 } from "@/mocks/feedbackAdmin"
+import MarkdownContent from "@/components/MarkdownContent.vue"
+import { formatSettingsTime, getPublishedReleaseHistory, settingsState } from "@/mocks/systemSettings"
 import { useAppStore } from "@/stores/app"
 import type { ThemePreference } from "@/theme"
 import type { DocumentVersionEntry } from "@/types"
@@ -82,42 +84,8 @@ function isValidNewPassword(password: string): boolean {
   )
 }
 
-const systemReleaseHistory: DocumentVersionEntry[] = [
-  {
-    version: "0.2.0",
-    date: "2026-08-18",
-    author: "系統管理團隊",
-    isCurrent: true,
-    summary: "新增個人筆記本與文件範圍控制，並改善導覽體驗。",
-    changes: [
-      "新增個人筆記本與文件上傳介面",
-      "加入筆記本分享與成員權限設定",
-      "問答頁可限定知識來源與指定文件",
-    ],
-  },
-  {
-    version: "0.1.0",
-    date: "2026-08-14",
-    author: "系統管理團隊",
-    summary: "Syscom Cubi 知識管理平台第一個展示版本。",
-    changes: [
-      "提供企業知識搜尋與 AI 問答",
-      "支援文件版本與引用追溯",
-      "建立管理端健康度與處理監控",
-    ],
-  },
-  {
-    version: "0.0.5",
-    date: "2026-08-01",
-    author: "產品開發團隊",
-    summary: "完成內部測試版本，確認主要知識查詢流程。",
-    changes: [
-      "完成側邊導覽與權限路由",
-      "加入文件列表與搜尋結果頁",
-      "建立淺色及深色主題",
-    ],
-  },
-]
+// @ 版本紀錄與隱私權政策由管理端「系統設定」維護，這裡只顯示已發布內容
+const systemReleaseHistory = computed<DocumentVersionEntry[]>(() => getPublishedReleaseHistory())
 
 const allowedTabs = new Set([
   "profile",
@@ -498,12 +466,9 @@ onMounted(syncTabFromRoute)
       ><VCard
         ><VCardTitle class="pa-6 pb-2">隱私權暨個人資料保護政策</VCardTitle
         ><VCardText class="pa-6 pt-2"
-          ><p class="mb-3">
-            Syscom Cubi
-            僅在授權範圍內處理公司知識與使用紀錄，用於提供搜尋、問答、系統安全及服務改善。
-          </p>
-          <p>
-            使用者的提問、回饋與操作紀錄會依公司治理規範保存；如需查詢或更正個人資料，請聯絡系統管理員。
+          ><MarkdownContent :content="settingsState.privacy.content" class="mb-4" />
+          <p class="text-caption text-medium-emphasis">
+            第 {{ settingsState.privacy.revision }} 版 · 發布於 {{ formatSettingsTime(settingsState.privacy.publishedAt) }}
           </p></VCardText
         ><VCardActions class="pa-5"
           ><VSpacer /><VBtn color="primary" @click="isPrivacyOpen = false"

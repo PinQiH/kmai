@@ -77,6 +77,8 @@ export interface DocumentVersionEntry {
 	author: string
 	summary: string
 	changes: string[]
+	/** Markdown 格式的更新說明；有值時取代 changes 清單顯示。 */
+	notes?: string
 	isCurrent?: boolean
 	status?: string
 }

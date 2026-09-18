@@ -1,5 +1,6 @@
 ﻿import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-router"
 
+import { settingsState } from "@/mocks/systemSettings"
 import { useAppStore } from "@/stores/app"
 import { pinia } from "@/stores"
 
@@ -196,8 +197,8 @@ const routes: RouteRecordRaw[] = [
 	{
 		path: "/admin/settings",
 		name: "admin-settings",
-		component: () => import("@/views/admin/AdminWorkspaceView.vue"),
-		meta: { admin: true, workspace: "settings", title: "系統設定" },
+		component: () => import("@/views/admin/AdminSettingsView.vue"),
+		meta: { admin: true, title: "系統設定" },
 	},
 	{
 		path: "/forbidden",
@@ -242,7 +243,7 @@ router.beforeEach((to) => {
 router.afterEach((to, _from, failure) => {
 	// NOTE: 被取消的導覽（例如 Vuetify 對話框開啟時攔下）也會觸發 afterEach，此時不可更新標題與焦點
 	if (failure) return
-	document.title = `${String(to.meta.title ?? "凌群知識庫")}｜Syscom Cubi`
+	document.title = `${String(to.meta.title ?? settingsState.brand.portalName)}｜${settingsState.brand.systemName}`
 	window.requestAnimationFrame(() => {
 		document
 			.querySelector<HTMLElement>("#main-content")
