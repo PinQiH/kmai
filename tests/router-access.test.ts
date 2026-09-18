@@ -52,3 +52,18 @@ describe('router guard integration', () => {
 		expect(router.currentRoute.value.name).toBe('forbidden')
 	})
 })
+
+describe('route components', () => {
+	// @ 路由都是 lazy import，路徑打錯只有在點到那頁時才會壞；這裡一次載入全部確認
+	it('should resolve every lazily loaded route component', async () => {
+		const loaders = router.getRoutes()
+			.map((route) => ({ path: route.path, loader: route.components?.default }))
+			.filter((entry): entry is { path: string; loader: () => Promise<{ default: unknown }> } => typeof entry.loader === 'function')
+
+		expect(loaders.length).toBeGreaterThan(20)
+		for (const { path, loader } of loaders) {
+			const module = await loader()
+			expect(module.default, `路由 ${path} 載入不到元件`).toBeTruthy()
+		}
+	}, 60_000)
+})

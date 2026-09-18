@@ -1,11 +1,11 @@
 import { setActivePinia, createPinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { alertEvents } from '@/mocks/monitoring'
 import { getAdminQuestionRecordsSnapshot } from '@/repositories/adminQuestions.repository'
 import { useAssistantAuditStore } from '@/stores/assistantAudit'
 import type { SystemRecordEntry } from '@/types'
-import { buildCsvFileName, escapeCsvField, toCsvContent, type CsvColumn } from '@/utils/csv'
+import { buildCsvFileName, downloadCsvFile, escapeCsvField, toCsvContent, type CsvColumn } from '@/utils/csv'
 import { ALL_FILTER, describeAlertDeliverySnapshot, filterAlertEvents, isUnresolvedAlert } from '@/utils/monitoring'
 import { filterAuditRecords } from '@/utils/systemRecords'
 
@@ -114,6 +114,40 @@ describe('csv export helpers', () => {
 
 	it('should stamp the export file name with the current time', () => {
 		expect(buildCsvFileName('system-audit', new Date(2026, 8, 17, 14, 5))).toBe('system-audit-20260917-1405.csv')
+	})
+
+	it('should keep commas and line breaks inside a quoted field', () => {
+		expect(escapeCsvField('台北,高雄\r\n第二行')).toBe('"台北,高雄\r\n第二行"')
+		expect(escapeCsvField('-5')).toBe('"\'-5"')
+	})
+
+	it('should download the CSV with a UTF-8 BOM and release the object url', async () => {
+		vi.useFakeTimers()
+		const createObjectURL = vi.fn((_blob: Blob) => 'blob:csv')
+		const revokeObjectURL = vi.fn()
+		Object.assign(URL, { createObjectURL, revokeObjectURL })
+		const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+		downloadCsvFile('audit.csv', '"欄位"')
+
+		expect(click).toHaveBeenCalledOnce()
+		const blob = createObjectURL.mock.calls[0]![0]
+		expect(blob.type).toBe('text/csv;charset=utf-8;')
+		expect(revokeObjectURL).not.toHaveBeenCalled()
+
+		vi.advanceTimersByTime(1000)
+		expect(revokeObjectURL).toHaveBeenCalledWith('blob:csv')
+
+		click.mockRestore()
+		// NOTE: FileReader 內部依賴計時器，要先切回真實計時器才讀得到內容
+		vi.useRealTimers()
+		// @ 用位元組比對：文字解碼會把開頭的 BOM 吃掉；jsdom 的 Blob 沒有 arrayBuffer()，改用 FileReader
+		const buffer = await new Promise<ArrayBuffer>((resolve) => {
+			const reader = new FileReader()
+			reader.onload = () => resolve(reader.result as ArrayBuffer)
+			reader.readAsArrayBuffer(blob)
+		})
+		expect([...new Uint8Array(buffer).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
 	})
 })
 
