@@ -213,12 +213,6 @@ function closeCredential(): void {
 	credential.value = null
 }
 
-function startCreate(): void {
-	if (activeTab.value === 'roles') rolesPanel.value?.startCreate()
-	else if (activeTab.value === 'groups') groupsPanel.value?.startCreate()
-	else openEditor(null)
-}
-const createLabel = computed(() => ({ users: '新增使用者', roles: '新增角色', groups: '新增群組' })[activeTab.value])
 
 function directRoleNames(user: AccessUser): string[] {
 	return getEffectiveRoles(user).map((entry) => (entry.sources.includes('直接指派') ? entry.role.name : `${entry.role.name}*`))
@@ -227,9 +221,7 @@ function directRoleNames(user: AccessUser): string[] {
 
 <template>
 	<div class="page-shell">
-		<PageHeader eyebrow="身分與權限" title="使用者與存取" description="管理誰能登入、能做什麼。權限來自角色，角色可以直接指派給使用者，或指派給群組讓成員與子群組一起繼承。">
-			<template #actions><VBtn color="primary" prepend-icon="mdi-plus" data-testid="access-create" @click="startCreate">{{ createLabel }}</VBtn></template>
-		</PageHeader>
+		<PageHeader eyebrow="身分與權限" title="使用者與存取" description="管理誰能登入、能做什麼。權限來自角色，角色可以直接指派給使用者，或指派給群組讓成員與子群組一起繼承。" />
 
 
 		<VTabs v-model="activeTab" color="primary" show-arrows class="mb-5">
@@ -246,6 +238,7 @@ function directRoleNames(user: AccessUser): string[] {
 				</dl>
 
 				<div class="filters">
+					<VBtn color="primary" prepend-icon="mdi-account-plus-outline" height="40" data-testid="access-create" @click="openEditor(null)">新增使用者</VBtn>
 					<VTextField v-model="keyword" label="搜尋名稱、帳號或 Email" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable />
 					<VSelect v-model="statusFilter" label="狀態" :items="statuses.map((value) => ({ value, title: USER_STATUS_LABELS[value] }))" density="compact" hide-details clearable />
 					<VSelect v-model="roleFilter" label="角色（含繼承）" :items="roleOptions" density="compact" hide-details clearable />
@@ -403,7 +396,7 @@ function directRoleNames(user: AccessUser): string[] {
 .health-row dd { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .metric-button { color: inherit; border-bottom: 2px solid transparent; }
 .metric-button[aria-pressed='true'] { border-bottom-color: rgb(var(--v-theme-primary)); }
-.filters { display: grid; grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.filters { display: grid; grid-template-columns: auto minmax(220px, 1.4fr) repeat(3, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
 .bulk-bar { display: flex; align-items: center; gap: 4px; padding: 6px 12px; margin-bottom: 8px; border-radius: 8px; background: rgba(var(--v-theme-primary), 0.08); }
 .user-table :deep(tbody tr) { cursor: pointer; }
 .identity { display: flex; flex-direction: column; padding: 8px 0; }

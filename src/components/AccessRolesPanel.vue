@@ -114,14 +114,16 @@ function remove(): void {
 	emit('notify', `已刪除角色「${role.name}」。`)
 }
 
-defineExpose({ startCreate: () => requestSelect(null), isDirty })
+defineExpose({ isDirty })
 </script>
 
 <template>
 	<div class="split">
 		<section class="list-pane" aria-label="角色清單">
+			<VBtn color="primary" variant="tonal" block prepend-icon="mdi-shield-plus-outline" class="mb-3" data-testid="roles-create" :active="isCreating" @click="requestSelect(null)">新增角色</VBtn>
 			<VTextField v-model="search" label="搜尋角色" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable class="mb-3" />
 			<ul class="item-list">
+				<li v-if="isCreating"><span class="item-row is-active"><span class="item-top"><strong>新角色</strong></span><span class="item-sub">尚未儲存</span></span></li>
 				<li v-for="role in filteredRoles" :key="role.id">
 					<button type="button" class="item-row" :class="{ 'is-active': role.id === selectedId }" :aria-current="role.id === selectedId ? 'true' : undefined" @click="requestSelect(role.id)">
 						<span class="item-top">

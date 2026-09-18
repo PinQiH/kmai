@@ -122,14 +122,16 @@ function removeMember(userId: string): void {
 	else emit('notify', '已將成員移出群組。')
 }
 
-defineExpose({ startCreate: () => requestSelect(null), isDirty })
+defineExpose({ isDirty })
 </script>
 
 <template>
 	<div class="split">
 		<section class="list-pane" aria-label="群組階層">
+			<VBtn color="primary" variant="tonal" block prepend-icon="mdi-account-multiple-plus-outline" class="mb-3" data-testid="groups-create" :active="isCreating" @click="requestSelect(null)">新增群組</VBtn>
 			<VTextField v-model="search" label="搜尋群組" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable class="mb-3" />
 			<ul class="item-list">
+				<li v-if="isCreating"><span class="item-row is-active"><span class="item-top"><strong>新群組</strong></span><span class="item-sub">尚未儲存</span></span></li>
 				<li v-for="{ group, depth } in tree" :key="group.id">
 					<button type="button" class="item-row" :class="{ 'is-active': group.id === selectedId }" :style="{ paddingInlineStart: `${12 + (search ? 0 : depth * 16)}px` }" :aria-current="group.id === selectedId ? 'true' : undefined" @click="requestSelect(group.id)">
 						<span class="item-top">
