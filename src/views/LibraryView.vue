@@ -6,7 +6,9 @@ import FilterSearchField from '@/components/FilterSearchField.vue'
 import DocumentCard from '@/components/DocumentCard.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
-import { getEmployeeDocumentsSnapshot } from '@/repositories/knowledge.repository'
+import type { KnowledgeDocument } from '@/types'
+import { useAsyncData } from '@/composables/useAsyncData'
+import { fetchEmployeeDocuments } from '@/repositories/knowledge.repository'
 import { useConversationStore } from '@/stores/conversation'
 import { COMPANY_KNOWLEDGE_SOURCES } from '@/utils/knowledgeSources'
 import GraphView from '@/views/GraphView.vue'
@@ -33,9 +35,12 @@ const selectedKnowledgeSourceId = ref(resolveRequestedKnowledgeSourceId())
 const activeView = ref<LibraryViewMode>(resolveRequestedView(selectedKnowledgeSourceId.value))
 const search = ref('')
 
-const documents = getEmployeeDocumentsSnapshot()
+const { data: documents, isLoading, errorMessage, reload } = useAsyncData(fetchEmployeeDocuments, {
+	initialValue: [] as KnowledgeDocument[],
+	errorMessage: () => '目前無法載入知識庫文件，請稍後再試。',
+})
 const selectedKnowledgeSource = computed(() => knowledgeSources.find((source) => source.id === selectedKnowledgeSourceId.value) ?? null)
-const visibleDocuments = computed(() => documents.filter((document) => {
+const visibleDocuments = computed(() => documents.value.filter((document) => {
 	const matchesKnowledgeSource = selectedKnowledgeSourceId.value === 'all' || document.knowledgeSourceId === selectedKnowledgeSourceId.value
 	const matchesSearch = !search.value || `${document.title} ${document.summary}`.includes(search.value)
 	return matchesKnowledgeSource && matchesSearch
@@ -85,7 +90,20 @@ watch(
 		</VTabs>
 
 		<template v-if="activeView === 'documents'">
-			<StatePanel v-if="visibleDocuments.length === 0" icon="mdi-bookshelf" title="找不到符合的文件" description="請修改搜尋文字或選擇其他知識庫。" action-label="清除條件" @action="search = ''; selectKnowledgeSource('all')" />
+			<StatePanel
+				v-if="errorMessage"
+				icon="mdi-cloud-alert-outline"
+				title="無法載入文件"
+				:description="errorMessage"
+				action-label="重新載入"
+				@action="reload"
+			/>
+			<VRow v-else-if="isLoading">
+				<VCol v-for="placeholder in 6" :key="placeholder" cols="12" md="6" lg="4">
+					<VSkeletonLoader type="article" class="surface-border rounded-lg" />
+				</VCol>
+			</VRow>
+			<StatePanel v-else-if="visibleDocuments.length === 0" icon="mdi-bookshelf" title="找不到符合的文件" description="請修改搜尋文字或選擇其他知識庫。" action-label="清除條件" @action="search = ''; selectKnowledgeSource('all')" />
 			<VRow v-else>
 				<VCol v-for="document in visibleDocuments" :key="document.id" cols="12" md="6" lg="4">
 					<DocumentCard :document="document" />

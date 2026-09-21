@@ -26,14 +26,25 @@ function cloneKnowledgeDocument(document: KnowledgeDocument): KnowledgeDocument 
 	}
 }
 
-/** 取得前台目前可見的文件快照，避免 View 直接依賴 Mock 資料來源。 */
-export function getEmployeeDocumentsSnapshot(): KnowledgeDocument[] {
+/** 前台目前可見的文件；供本檔其他函式與尚未改為非同步的呼叫端使用。 */
+function readVisibleDocuments(): KnowledgeDocument[] {
 	return documents.filter(canEmployeeReadDocument).map(cloneKnowledgeDocument)
 }
 
+/**
+ * 取得前台目前可見的文件。
+ * @returns 已發布且開放全公司的文件。
+ */
+export async function fetchEmployeeDocuments(): Promise<KnowledgeDocument[]> {
+	// TODO(api-integration): 改為呼叫後端文件清單 API。
+	await new Promise((resolve) => window.setTimeout(resolve, MOCK_DELAY_MS))
+	return readVisibleDocuments()
+}
+
+// TODO(api-integration): 呼叫端以 computed 取用，改為非同步時要一併補上各自的載入狀態
 /** 取得前台在指定公司知識庫中目前可用的文件。 */
 export function getEmployeeDocumentsBySourceId(sourceId: string): KnowledgeDocument[] {
-	return getEmployeeDocumentsSnapshot().filter((document) => document.knowledgeSourceId === sourceId)
+	return readVisibleDocuments().filter((document) => document.knowledgeSourceId === sourceId)
 }
 
 /**

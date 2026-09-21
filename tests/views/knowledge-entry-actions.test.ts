@@ -45,6 +45,8 @@ async function mountView(component: typeof HomeView | typeof LibraryView | typeo
 			},
 		},
 	)
+	// @ 首頁與知識庫的文件改為非同步載入，等骨架消失代表第一次載入完成
+	await vi.waitFor(() => expect(wrapper!.find('.v-skeleton-loader').exists()).toBe(false))
 	return router
 }
 

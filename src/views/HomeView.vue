@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import AnimatedNumber from '@/components/AnimatedNumber.vue'
 import DocumentCard from '@/components/DocumentCard.vue'
+import StatePanel from '@/components/StatePanel.vue'
 import KnowledgeConstellation from '@/components/KnowledgeConstellation.vue'
 import SearchInput from '@/components/SearchInput.vue'
 import { getKnowledgeSourceIdByGraphLabel } from '@/mocks/graph'
-import { getEmployeeDocumentsSnapshot } from '@/repositories/knowledge.repository'
+import { useAsyncData } from '@/composables/useAsyncData'
+import { fetchEmployeeDocuments } from '@/repositories/knowledge.repository'
+import type { KnowledgeDocument } from '@/types'
 import { COMPANY_KNOWLEDGE_SOURCES } from '@/utils/knowledgeSources'
 
 const suggestedQuestions = ['國內出差住宿費用上限是多少？', '新進同仁第一週要完成哪些事情？', '如何申請客戶資料存取權限？']
@@ -20,15 +23,18 @@ const knowledgeBaseIcons: Record<string, string> = {
 
 const router = useRouter()
 const query = ref('')
-const employeeDocuments = getEmployeeDocumentsSnapshot()
-const recentDocuments = employeeDocuments.slice(0, 3)
-const knowledgeBases = COMPANY_KNOWLEDGE_SOURCES
+const { data: employeeDocuments, isLoading, errorMessage, reload } = useAsyncData(fetchEmployeeDocuments, {
+	initialValue: [] as KnowledgeDocument[],
+	errorMessage: () => '目前無法載入知識庫內容，請稍後再試。',
+})
+const recentDocuments = computed(() => employeeDocuments.value.slice(0, 3))
+const knowledgeBases = computed(() => COMPANY_KNOWLEDGE_SOURCES
 	.filter((source) => source.id !== 'company')
 	.map((source) => ({
 		...source,
 		icon: knowledgeBaseIcons[source.id] ?? 'mdi-bookshelf',
-		count: employeeDocuments.filter((document) => document.knowledgeSourceId === source.id).length,
-	}))
+		count: employeeDocuments.value.filter((document) => document.knowledgeSourceId === source.id).length,
+	})))
 
 // - 首頁的提問入口一律進 AI 問答；純關鍵字檢索由側邊欄的搜尋頁負責
 async function handleSearch(value = query.value): Promise<void> {
@@ -76,7 +82,20 @@ async function handleTopicSelect(label: string): Promise<void> {
 				<VSpacer />
 				<VBtn to="/library" variant="text" append-icon="mdi-arrow-right" data-testid="all-knowledge-documents">瀏覽全部文件</VBtn>
 			</div>
-			<VRow>
+			<StatePanel
+				v-if="errorMessage"
+				icon="mdi-cloud-alert-outline"
+				title="無法載入知識庫"
+				:description="errorMessage"
+				action-label="重新載入"
+				@action="reload"
+			/>
+			<VRow v-else-if="isLoading">
+				<VCol v-for="placeholder in 4" :key="placeholder" cols="12" sm="6" lg="3">
+					<VSkeletonLoader type="list-item-avatar" class="surface-border rounded-lg" />
+				</VCol>
+			</VRow>
+			<VRow v-else>
 				<VCol v-for="(knowledgeBase, index) in knowledgeBases" :key="knowledgeBase.id" cols="12" sm="6" lg="3">
 					<VCard class="knowledge-base-row surface-border pa-4 rise-in" :style="{ '--rise-index': index }" :to="{ path: '/library', query: { source: knowledgeBase.id } }" :data-testid="`home-knowledge-base-${knowledgeBase.id}`">
 						<VIcon :icon="knowledgeBase.icon" color="primary" aria-hidden="true" />
@@ -93,7 +112,12 @@ async function handleTopicSelect(label: string): Promise<void> {
 			<div class="d-flex align-center mb-4">
 				<h2 id="recent-title" class="section-heading">最近更新</h2>
 			</div>
-			<VRow>
+			<VRow v-if="isLoading && !errorMessage">
+				<VCol v-for="placeholder in 3" :key="placeholder" cols="12" md="4">
+					<VSkeletonLoader type="article" class="surface-border rounded-lg" />
+				</VCol>
+			</VRow>
+			<VRow v-else-if="!errorMessage">
 				<VCol v-for="(document, index) in recentDocuments" :key="document.id" cols="12" md="4">
 					<DocumentCard :document="document" class="rise-in" :style="{ '--rise-index': index }" />
 				</VCol>

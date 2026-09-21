@@ -12,7 +12,7 @@ import { prepareVersionFiles, versionFiles } from '@/mocks/documentFiles'
 import { getDocumentProcessingRecord, processingStages } from '@/mocks/documentProcessing'
 import { chunkOptionsError, DEFAULT_STRATEGY_OPTIONS, documentOverrideEnabled, resolveStrategy, saveStrategy } from '@/mocks/documentStrategies'
 import { addWorkspaceVersion, getWorkspaceVersions, suggestVersion, workspaceDocuments } from '@/mocks/documentWorkspace'
-import { getEmployeeDocumentsSnapshot } from '@/repositories/knowledge.repository'
+import { fetchEmployeeDocuments } from '@/repositories/knowledge.repository'
 import type { KnowledgeDocument } from '@/types'
 import AdminUploadView from '@/views/admin/AdminUploadView.vue'
 
@@ -212,6 +212,6 @@ describe('AdminUploadView 三種文件來源', () => {
 		expect(getWorkspaceVersions(created)[0]?.status).toBe('等待處理')
 		expect(getDocumentProcessingRecord(created.id)?.steps).toHaveLength(processingStages.length)
 		// @ 還在處理中的文件不該出現在前台知識庫。
-		expect(getEmployeeDocumentsSnapshot().some((item) => item.id === created.id)).toBe(false)
+		expect((await fetchEmployeeDocuments()).some((item) => item.id === created.id)).toBe(false)
 	})
 })
