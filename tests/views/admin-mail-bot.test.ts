@@ -22,7 +22,7 @@ import {
 	testSubjectPattern,
 } from '@/mocks/mailBot'
 import { useToastStore } from '@/stores/toast'
-import { getAdminQuestionRecordsSnapshot } from '@/repositories/adminQuestions.repository'
+import { fetchAdminQuestionRecords } from '@/repositories/adminQuestions.repository'
 import { filterAdminQuestionRecords } from '@/utils/systemRecords'
 import AdminMailBotView from '@/views/admin/AdminMailBotView.vue'
 
@@ -91,8 +91,8 @@ describe('mail bot state', () => {
 		expect(formatSeconds(3900)).toBe('1 小時 5 分')
 	})
 
-	it('09. AI 問答紀錄可依來源篩出自動回信，舊紀錄視為前台提問', () => {
-		const records = getAdminQuestionRecordsSnapshot()
+	it('09. AI 問答紀錄可依來源篩出自動回信，舊紀錄視為前台提問', async () => {
+		const records = await fetchAdminQuestionRecords()
 		const base = { keyword: '', userId: 'all', department: 'all', status: 'all' as const, timeRange: 'all' as const, now: Date.now() }
 		const mail = filterAdminQuestionRecords(records, { ...base, source: 'mail' })
 		expect(mail.length).toBeGreaterThan(0)

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { getAdminQuestionRecordsSnapshot } from '@/repositories/adminQuestions.repository'
+import { fetchAdminQuestionRecords } from '@/repositories/adminQuestions.repository'
 import { filterAdminQuestionRecords } from '@/utils/systemRecords'
 
 const NOW = Date.parse('2026-08-31T04:00:00.000Z')
 
 describe('admin question records', () => {
-	it('should keep each question-answer turn as an independent record', () => {
-		const records = getAdminQuestionRecordsSnapshot()
+	it('should keep each question-answer turn as an independent record', async () => {
+		const records = await fetchAdminQuestionRecords()
 		const travelConversation = records.filter((record) => record.conversationId === 'conversation-travel-001')
 
 		expect(travelConversation).toHaveLength(2)
@@ -15,8 +15,8 @@ describe('admin question records', () => {
 		expect(travelConversation.every((record) => record.question && record.answer)).toBe(true)
 	})
 
-	it('should combine keyword, user, department, status and time filters', () => {
-		const records = getAdminQuestionRecordsSnapshot()
+	it('should combine keyword, user, department, status and time filters', async () => {
+		const records = await fetchAdminQuestionRecords()
 		const result = filterAdminQuestionRecords(records, {
 			keyword: 'employee@company.com',
 			userId: 'user-current',
@@ -29,8 +29,8 @@ describe('admin question records', () => {
 		expect(result.map((record) => record.id)).toEqual(['question-002', 'question-001'])
 	})
 
-	it('should search full answers and request IDs without changing the source records', () => {
-		const records = getAdminQuestionRecordsSnapshot()
+	it('should search full answers and request IDs without changing the source records', async () => {
+		const records = await fetchAdminQuestionRecords()
 		const originalQuestion = records[0]?.question
 		const byAnswer = filterAdminQuestionRecords(records, {
 			keyword: '直屬主管核准',
@@ -54,9 +54,9 @@ describe('admin question records', () => {
 		expect(records[0]?.question).toBe(originalQuestion)
 	})
 
-	it('should return cloned citation and trace structures from the repository', () => {
-		const first = getAdminQuestionRecordsSnapshot()
-		const second = getAdminQuestionRecordsSnapshot()
+	it('should return cloned citation and trace structures from the repository', async () => {
+		const first = await fetchAdminQuestionRecords()
+		const second = await fetchAdminQuestionRecords()
 
 		first[0]!.citations[0]!.title = '已修改'
 		first[0]!.trace!.stages[0]!.label = '已修改'

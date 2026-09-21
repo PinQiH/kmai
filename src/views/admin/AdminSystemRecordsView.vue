@@ -6,8 +6,9 @@ import AuditRecordsPanel from '@/components/AuditRecordsPanel.vue'
 import FilterSearchField from '@/components/FilterSearchField.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
+import { useAsyncData } from '@/composables/useAsyncData'
 import SystemEventsPanel from '@/components/SystemEventsPanel.vue'
-import { getAdminQuestionRecordsSnapshot } from '@/repositories/adminQuestions.repository'
+import { fetchAdminQuestionRecords } from '@/repositories/adminQuestions.repository'
 import { useAppStore } from '@/stores/app'
 import { useAssistantAuditStore } from '@/stores/assistantAudit'
 import { useNotificationsStore } from '@/stores/notifications'
@@ -44,9 +45,15 @@ const notificationsStore = useNotificationsStore()
 
 const isSystemAdmin = computed(() => appStore.adminRole === 'system-admin')
 const activeTab = ref<SystemRecordTab>(isSystemAdmin.value ? 'questions' : 'events')
-const questionRecords = ref<AdminQuestionRecord[]>([])
-const questionLoading = ref(false)
-const questionLoadError = ref('')
+const {
+	data: questionRecords,
+	isLoading: questionLoading,
+	errorMessage: questionLoadError,
+	reload: loadQuestionRecords,
+} = useAsyncData(fetchAdminQuestionRecords, {
+	initialValue: [] as AdminQuestionRecord[],
+	errorMessage: () => '目前無法載入 AI 問答紀錄，請稍後重試。',
+})
 const selectedQuestion = ref<AdminQuestionRecord | null>(null)
 const questionDrawerOpen = ref(false)
 const routeMessage = ref('')
@@ -168,18 +175,6 @@ function normalizeTab(value: unknown): SystemRecordTab {
 	return isSystemAdmin.value ? 'questions' : 'events'
 }
 
-function loadQuestionRecords(): void {
-	questionLoading.value = true
-	questionLoadError.value = ''
-	try {
-		questionRecords.value = getAdminQuestionRecordsSnapshot()
-	} catch {
-		questionLoadError.value = '目前無法載入 AI 問答紀錄，請稍後重試。'
-	} finally {
-		questionLoading.value = false
-	}
-}
-
 function questionSummary(question: string): string {
 	return question.length > 80 ? `${question.slice(0, 80)}…` : question
 }
@@ -273,12 +268,11 @@ function handleAssistantDetailModel(value: boolean): void {
 	if (!value) void closeAssistantDetail()
 }
 
-loadQuestionRecords()
 onMounted(() => window.addEventListener('keydown', handleEscapeKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', handleEscapeKey))
 
 watch(
-	() => [route.query.tab, route.query.questionId, appStore.adminRole] as const,
+	() => [route.query.tab, route.query.questionId, appStore.adminRole, questionRecords.value] as const,
 	async ([tabQuery, questionIdQuery]) => {
 		const nextTab = normalizeTab(tabQuery)
 		const questionId = firstQueryValue(questionIdQuery).trim()
@@ -296,6 +290,9 @@ watch(
 			if (questionDrawerOpen.value) void closeQuestionDrawer(false)
 			return
 		}
+
+		// @ 紀錄尚在載入時先不判定找不到，等資料到齊後這個 watcher 會再跑一次
+		if (questionLoading.value) return
 
 		const record = questionRecords.value.find((item) => item.id === questionId)
 		if (!record) {
