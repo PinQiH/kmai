@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-import { citations, conversationHistory, conversationMessagesById } from '@/mocks/data'
+import { citations, conversationFolders, conversationHistory, conversationMessagesById } from '@/mocks/data'
 import type {
 	AnswerModelId,
 	AnswerFeedback,
@@ -9,6 +9,7 @@ import type {
 	AnswerSettings,
 	AnswerStyleId,
 	Citation,
+	ConversationFolder,
 	ConversationMessage,
 	ConversationSummary,
 	ThinkingStage,
@@ -32,7 +33,13 @@ interface ConversationState {
 	activeConversationId: string | null
 	historyKeyword: string
 	onlyArchived: boolean
+	folders: ConversationFolder[]
+	selectedFolderId: FolderFilterId
+	selectedConversationIds: string[]
 }
+
+/** 資料夾篩選值：兩個系統項目（全部／未分類）或實際的資料夾 id。 */
+export type FolderFilterId = typeof ALL_FOLDER_ID | typeof UNFILED_FOLDER_ID | string
 
 interface SelectedKnowledgeDocument {
 	id: string
@@ -54,6 +61,19 @@ const STREAM_CHUNK_SIZE = 2
 const SEARCH_RESULT_LIMIT = 20
 export const ANSWER_FEEDBACK_REASON_MAX_LENGTH = 500
 
+// @ 系統項目用保留字而非 null：v-for 的 key 與 aria-current 都需要一個可比對的字串
+export const ALL_FOLDER_ID = 'all'
+export const UNFILED_FOLDER_ID = 'unfiled'
+export const FOLDER_NAME_MAX_LENGTH = 30
+
+/** 資料夾操作的結果；UI 依此決定要顯示的訊息。 */
+export type FolderMutationResult = 'ok' | 'empty-name' | 'too-long' | 'duplicated' | 'not-found'
+
+// - 名稱比對統一去頭尾空白並忽略大小寫，避免出現肉眼看不出差異的兩個資料夾
+function normalizeFolderName(name: string): string {
+	return name.trim().toLocaleLowerCase()
+}
+
 // - 釘選優先，其次依更新時間新到舊
 function comparePinnedFirst(left: ConversationSummary, right: ConversationSummary): number {
 	if (left.isPinned !== right.isPinned) return left.isPinned ? -1 : 1
@@ -64,6 +84,13 @@ function comparePinnedFirst(left: ConversationSummary, right: ConversationSummar
 function matchesKeyword({ conversation, keyword }: { conversation: ConversationSummary; keyword: string }): boolean {
 	const normalized = keyword.toLowerCase()
 	return conversation.title.toLowerCase().includes(normalized) || conversation.previewAnswer.toLowerCase().includes(normalized)
+}
+
+// - 資料夾篩選：全部不限縮，未分類只看 folderId 為 null 者
+function matchesFolder({ conversation, folderId }: { conversation: ConversationSummary; folderId: string }): boolean {
+	if (folderId === ALL_FOLDER_ID) return true
+	if (folderId === UNFILED_FOLDER_ID) return conversation.folderId === null
+	return conversation.folderId === folderId
 }
 
 function cloneConversationMessages(messages: ConversationMessage[]): ConversationMessage[] {
@@ -206,6 +233,9 @@ export const useConversationStore = defineStore('conversation', {
 		activeConversationId: null,
 		historyKeyword: '',
 		onlyArchived: false,
+		folders: conversationFolders.map((folder) => ({ ...folder })),
+		selectedFolderId: ALL_FOLDER_ID,
+		selectedConversationIds: [],
 	}),
 	getters: {
 		answerStyleLabel(state): string {
@@ -225,16 +255,42 @@ export const useConversationStore = defineStore('conversation', {
 		completedStages(state): ThinkingStage[] {
 			return state.thinkingStages.filter((stage) => stage.status === 'done')
 		},
-		// - 套用關鍵字與封存篩選，並讓釘選的對話置頂
+		// - 套用資料夾、關鍵字與封存篩選，並讓釘選的對話置頂
 		filteredConversations(state): ConversationSummary[] {
 			const keyword = state.historyKeyword.trim()
 			return state.conversations
 				.filter((conversation) => {
 					if (state.onlyArchived !== conversation.isArchived) return false
+					if (!matchesFolder({ conversation, folderId: state.selectedFolderId })) return false
 					if (!keyword) return true
 					return matchesKeyword({ conversation, keyword })
 				})
 				.sort(comparePinnedFirst)
+		},
+		// - 目前選取的資料夾；系統項目（全部／未分類）沒有對應實體，回傳 null
+		selectedFolder(state): ConversationFolder | null {
+			return state.folders.find((folder) => folder.id === state.selectedFolderId) ?? null
+		},
+		/**
+		 * 各資料夾在目前封存狀態下的對話數。
+		 * @ 不套用關鍵字：側邊欄的數字代表資料夾規模，會隨搜尋跳動反而難判讀。
+		 */
+		folderCounts(state): Record<string, number> {
+			const counts: Record<string, number> = { [ALL_FOLDER_ID]: 0, [UNFILED_FOLDER_ID]: 0 }
+			for (const folder of state.folders) counts[folder.id] = 0
+
+			for (const conversation of state.conversations) {
+				if (state.onlyArchived !== conversation.isArchived) continue
+				counts[ALL_FOLDER_ID] += 1
+				const key = conversation.folderId ?? UNFILED_FOLDER_ID
+				if (key in counts) counts[key] += 1
+			}
+			return counts
+		},
+		// - 批次搬移時實際會被套用的對話：僅限目前清單可見者，避免搬到看不見的項目
+		selectedVisibleConversationIds(state): string[] {
+			const visibleIds = new Set((this.filteredConversations as ConversationSummary[]).map((conversation) => conversation.id))
+			return state.selectedConversationIds.filter((id) => visibleIds.has(id))
 		},
 		pinnedConversations(): ConversationSummary[] {
 			return (this.filteredConversations as ConversationSummary[]).filter((conversation) => conversation.isPinned)
@@ -397,6 +453,8 @@ export const useConversationStore = defineStore('conversation', {
 				return
 			}
 
+			// @ 在某個資料夾底下開始的對話直接歸入該資料夾；系統項目底下則維持未分類
+			const inheritedFolderId = this.folders.some((folder) => folder.id === this.selectedFolderId) ? this.selectedFolderId : null
 			const created: ConversationSummary = {
 				id: crypto.randomUUID(),
 				title: question,
@@ -405,6 +463,7 @@ export const useConversationStore = defineStore('conversation', {
 				previewAnswer: answer,
 				isPinned: false,
 				isArchived: false,
+				folderId: inheritedFolderId,
 			}
 			this.conversations.unshift(created)
 			this.conversationMessagesById[created.id] = cloneConversationMessages(this.messages)
@@ -472,6 +531,98 @@ export const useConversationStore = defineStore('conversation', {
 			this.messages = []
 			this.thinkingStages = []
 			this.retrievedCount = 0
+		},
+
+		/* > 專案資料夾 */
+
+		/**
+		 * 切換目前檢視的資料夾，並清掉上一個資料夾殘留的批次選取。
+		 * @param folderId 資料夾識別碼，或系統項目 all／unfiled。
+		 */
+		selectFolder(folderId: FolderFilterId): void {
+			if (this.selectedFolderId === folderId) return
+			this.selectedFolderId = folderId
+			this.selectedConversationIds = []
+		},
+		/**
+		 * 新增資料夾，名稱不可空白、重複或過長。
+		 * @param name 使用者輸入的名稱。
+		 * @returns 成功時回傳新資料夾 id，失敗時回傳失敗原因。
+		 */
+		createFolder(name: string): { result: FolderMutationResult; folderId?: string } {
+			const trimmedName = name.trim()
+			if (!trimmedName) return { result: 'empty-name' }
+			if (trimmedName.length > FOLDER_NAME_MAX_LENGTH) return { result: 'too-long' }
+			if (this.folders.some((folder) => normalizeFolderName(folder.name) === normalizeFolderName(trimmedName))) return { result: 'duplicated' }
+
+			// TODO(api-integration): 串接後改為呼叫建立資料夾 API，id 由後端產生。
+			const created: ConversationFolder = { id: crypto.randomUUID(), name: trimmedName, createdAt: new Date().toISOString() }
+			this.folders.push(created)
+			return { result: 'ok', folderId: created.id }
+		},
+		/**
+		 * 重新命名資料夾。
+		 * @param folderId 資料夾識別碼。
+		 * @param name 新名稱。
+		 * @returns 操作結果。
+		 */
+		renameFolder({ folderId, name }: { folderId: string; name: string }): FolderMutationResult {
+			const target = this.folders.find((folder) => folder.id === folderId)
+			if (!target) return 'not-found'
+
+			const trimmedName = name.trim()
+			if (!trimmedName) return 'empty-name'
+			if (trimmedName.length > FOLDER_NAME_MAX_LENGTH) return 'too-long'
+			if (this.folders.some((folder) => folder.id !== folderId && normalizeFolderName(folder.name) === normalizeFolderName(trimmedName))) return 'duplicated'
+
+			// TODO(api-integration): 串接後改為呼叫更新資料夾 API。
+			target.name = trimmedName
+			return 'ok'
+		},
+		/**
+		 * 刪除資料夾。
+		 * @ 只刪資料夾本身，裡面的對話退回未分類——刪錯資料夾不該連帶失去問答紀錄。
+		 * @param folderId 資料夾識別碼。
+		 * @returns 操作結果。
+		 */
+		deleteFolder(folderId: string): FolderMutationResult {
+			const targetIndex = this.folders.findIndex((folder) => folder.id === folderId)
+			if (targetIndex < 0) return 'not-found'
+
+			// TODO(api-integration): 串接後改為呼叫刪除資料夾 API。
+			this.folders.splice(targetIndex, 1)
+			for (const conversation of this.conversations) {
+				if (conversation.folderId === folderId) conversation.folderId = null
+			}
+			if (this.selectedFolderId === folderId) this.selectFolder(ALL_FOLDER_ID)
+			return 'ok'
+		},
+		/**
+		 * 把一批對話搬到指定資料夾。
+		 * @param conversationIds 要搬移的對話識別碼。
+		 * @param folderId 目標資料夾；null 代表移出資料夾（未分類）。
+		 * @returns 實際搬移的筆數。
+		 */
+		moveConversations({ conversationIds, folderId }: { conversationIds: string[]; folderId: string | null }): number {
+			if (folderId !== null && !this.folders.some((folder) => folder.id === folderId)) return 0
+
+			// TODO(api-integration): 串接後改為呼叫批次搬移 API。
+			const targetIds = new Set(conversationIds)
+			let movedCount = 0
+			for (const conversation of this.conversations) {
+				if (!targetIds.has(conversation.id) || conversation.folderId === folderId) continue
+				conversation.folderId = folderId
+				movedCount += 1
+			}
+			return movedCount
+		},
+		toggleConversationSelection(conversationId: string): void {
+			const existingIndex = this.selectedConversationIds.indexOf(conversationId)
+			if (existingIndex >= 0) this.selectedConversationIds.splice(existingIndex, 1)
+			else this.selectedConversationIds.push(conversationId)
+		},
+		clearConversationSelection(): void {
+			this.selectedConversationIds = []
 		},
 	},
 })

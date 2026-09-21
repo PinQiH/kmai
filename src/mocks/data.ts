@@ -1,4 +1,4 @@
-import type { ActivityItem, AnswerTrace, Citation, ConversationMessage, ConversationSummary, DirectoryGroup, DirectoryUser, DocumentCategoryGroup, DocumentVersionEntry, HealthMetric, KnowledgeDocument, OrganizationUnit } from '@/types'
+import type { ActivityItem, AnswerTrace, Citation, ConversationFolder, ConversationMessage, ConversationSummary, DirectoryGroup, DirectoryUser, DocumentCategoryGroup, DocumentVersionEntry, HealthMetric, KnowledgeDocument, OrganizationUnit } from '@/types'
 
 // TODO(api-integration): 串接文件查詢 API 後移除此 Mock 資料。
 export const documents: KnowledgeDocument[] = [
@@ -302,6 +302,13 @@ const performanceAppealCitation: Citation = {
 }
 
 // TODO(api-integration): 串接歷史對話 API 後移除此 Mock 資料。
+// TODO(api-integration): 串接資料夾 API 後改由後端提供。
+export const conversationFolders: ConversationFolder[] = [
+	{ id: 'folder-travel', name: '差旅與報支', createdAt: '2026-08-01T09:00:00' },
+	{ id: 'folder-onboarding', name: '新人到職', createdAt: '2026-08-02T09:00:00' },
+	{ id: 'folder-security', name: '資訊安全', createdAt: '2026-08-03T09:00:00' },
+]
+
 export const conversationHistory: ConversationSummary[] = [
 	{
 		id: 'conv-001',
@@ -310,6 +317,7 @@ export const conversationHistory: ConversationSummary[] = [
 		messageCount: 2,
 		previewAnswer: '依目前有效的差旅辦法，國內住宿每晚原則上限為新台幣 3,000 元。',
 		isPinned: true,
+		folderId: 'folder-travel',
 		isArchived: false,
 	},
 	{
@@ -319,6 +327,7 @@ export const conversationHistory: ConversationSummary[] = [
 		messageCount: 4,
 		previewAnswer: '新進同仁第一週應完成公司帳號啟用、設備點交、資訊安全訓練及主管安排的到職會談。',
 		isPinned: false,
+		folderId: 'folder-onboarding',
 		isArchived: false,
 	},
 	{
@@ -328,6 +337,7 @@ export const conversationHistory: ConversationSummary[] = [
 		messageCount: 2,
 		previewAnswer: '客戶資料需依分級申請存取權限，對外分享前必須確認接收者、用途與保存期限。',
 		isPinned: false,
+		folderId: 'folder-security',
 		isArchived: false,
 	},
 	{
@@ -337,6 +347,7 @@ export const conversationHistory: ConversationSummary[] = [
 		messageCount: 6,
 		previewAnswer: '3.2 版調整了國內住宿上限與核銷期限，並新增旺季例外的申請欄位。',
 		isPinned: true,
+		folderId: 'folder-travel',
 		isArchived: false,
 	},
 	{
@@ -346,6 +357,7 @@ export const conversationHistory: ConversationSummary[] = [
 		messageCount: 2,
 		previewAnswer: '請款需檢附驗收單、發票或收據，以及完成簽核的採購申請單。',
 		isPinned: false,
+		folderId: null,
 		isArchived: true,
 	},
 	{
@@ -355,6 +367,7 @@ export const conversationHistory: ConversationSummary[] = [
 		messageCount: 3,
 		previewAnswer: '評等公布後十個工作天內可提出申覆，逾期不再受理。',
 		isPinned: false,
+		folderId: null,
 		isArchived: true,
 	},
 ]

@@ -11,7 +11,6 @@ import KnowledgeSourceDialog from '@/components/KnowledgeSourceDialog.vue'
 import ThinkingTrace from '@/components/ThinkingTrace.vue'
 import { buildRunFromTrace, reportAnswerFeedback } from '@/mocks/feedbackAdmin'
 import { ANSWER_FEEDBACK_REASON_MAX_LENGTH, useConversationStore } from '@/stores/conversation'
-import { useFavoritesStore } from '@/stores/favorites'
 import { useNotebooksStore } from '@/stores/notebooks'
 import { useToastStore } from '@/stores/toast'
 import type { Citation, ConversationMessage, OutlineItem } from '@/types'
@@ -31,7 +30,6 @@ const SUMMARY_MAX_LENGTH = 140
 const route = useRoute()
 const display = useDisplay()
 const conversationStore = useConversationStore()
-const favoritesStore = useFavoritesStore()
 const notebooksStore = useNotebooksStore()
 const question = ref('')
 const selectedCitation = ref<Citation | null>(null)
@@ -142,18 +140,18 @@ async function openConversationMessage({ conversationId, messageId }: { conversa
 	navigationErrorMessage.value = ''
 	targetedMessageId.value = null
 	if (!conversationId || !messageId) {
-		navigationErrorMessage.value = '收藏連結不完整，無法開啟原始問答。'
+		navigationErrorMessage.value = '連結不完整，無法開啟原始問答。'
 		return
 	}
 	if (conversationStore.isResponding) {
-		navigationErrorMessage.value = '目前正在產生回答，請稍候完成後再開啟收藏。'
+		navigationErrorMessage.value = '目前正在產生回答，請稍候完成後再開啟這則問答。'
 		return
 	}
 
 	conversationStore.openConversation(conversationId)
 	const targetMessage = conversationStore.messages.find((message) => message.id === messageId)
 	if (conversationStore.activeConversationId !== conversationId || !targetMessage || targetMessage.role !== 'assistant') {
-		navigationErrorMessage.value = '原始對話或回答已不存在，無法開啟這筆收藏。'
+		navigationErrorMessage.value = '原始對話或回答已不存在，無法開啟這則問答。'
 		return
 	}
 
@@ -380,15 +378,6 @@ function saveAnswerToNotebook(): void {
 		: '目前無法存入這本筆記本，請重新選擇後再試。'
 }
 
-function toggleFavorite(messageId: string, answer: string): void {
-	const questionMessage = findQuestionForAnswer(messageId)
-	const conversationId = conversationStore.activeConversationId
-	if (!questionMessage || !conversationId) return
-	favoritesStore.toggle({ id: messageId, conversationId, question: questionMessage.content, answer, date: new Date().toISOString().slice(0, 10) })
-	const isFavorite = favoritesStore.isFavorite(messageId)
-	toastStore.show(isFavorite ? '已加入我的收藏。' : '已取消收藏。', isFavorite ? 'success' : 'info')
-}
-
 function jumpToQuestion(messageId: string): void {
 	const target = document.getElementById(`message-${messageId}`)
 	if (!target) return
@@ -519,13 +508,11 @@ watch(
 										<AnswerMessage
 											v-else
 											:message="message"
-											:is-favorite="favoritesStore.isFavorite(message.id)"
 											:is-targeted="targetedMessageId === message.id"
 											:saved-notebook-count="getSavedNotebookCount(message.id)"
 											@open-citation="openCitation"
 											@feedback="recordFeedback(message.id, $event)"
 											@save-to-notebook="openSaveToNotebook(message.id)"
-											@toggle-favorite="toggleFavorite(message.id, message.content)"
 										/>
 									</template>
 									<ThinkingTrace

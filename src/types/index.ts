@@ -256,6 +256,19 @@ export interface ConversationSummary {
 	// @ 釘選取代了原本的收藏：置頂顯示，語意單一
 	isPinned: boolean
 	isArchived: boolean
+	// @ 單一歸屬的專案資料夾；null 代表未分類
+	folderId: string | null
+}
+
+/**
+ * 專案資料夾：把問答紀錄分門別類地歸納。
+ * @ 刻意採單層、單一歸屬（非標籤）：問答紀錄天然屬於單一專案，
+ *   交叉檢索的需求由既有的關鍵字搜尋吸收。
+ */
+export interface ConversationFolder {
+	id: string
+	name: string
+	createdAt: string
 }
 
 export type NavigationAction = 'new-conversation' | 'search-conversation'

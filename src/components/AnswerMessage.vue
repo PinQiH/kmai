@@ -7,18 +7,16 @@ import type { Citation, ConversationMessage } from '@/types'
 
 interface ComponentProps {
 	message: ConversationMessage
-	isFavorite?: boolean
 	isTargeted?: boolean
 	savedNotebookCount?: number
 }
 
-const props = withDefaults(defineProps<ComponentProps>(), { isFavorite: false, isTargeted: false, savedNotebookCount: 0 })
+const props = withDefaults(defineProps<ComponentProps>(), { isTargeted: false, savedNotebookCount: 0 })
 
 const emit = defineEmits<{
 	openCitation: [citation: Citation, triggerId: string]
 	feedback: [isHelpful: boolean]
 	saveToNotebook: []
-	toggleFavorite: []
 }>()
 
 const isTraceOpen = ref(false)
@@ -166,14 +164,6 @@ function openCitationDetail(citation: Citation): void {
 					/>
 					<span v-if="savedNotebookCount > 0" class="save-notebook-count" aria-hidden="true">{{ savedNotebookCount }}</span>
 				</span>
-				<VBtn
-					:icon="isFavorite ? 'mdi-bookmark' : 'mdi-bookmark-outline'"
-					size="small"
-					variant="text"
-					:aria-label="isFavorite ? '取消收藏這個回答' : '收藏這個回答'"
-					:aria-pressed="isFavorite"
-					@click="emit('toggleFavorite')"
-				/>
 			</div>
 		</template>
 	</article>
