@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { hasEditedChunks, processingStages, reprocessJob, type ProcessingStageId, type ReprocessScope } from '@/mocks/documentProcessing'
+import { getProcessingStageIndex, getProcessingStageName, hasEditedChunks, processingStages, reprocessJob, type ProcessingStageId, type ReprocessScope } from '@/mocks/documentProcessing'
 import { clearStrategyChanged, getEarliestPendingStage, pendingStrategyStages } from '@/mocks/documentStrategies'
 import { getVersionCount } from '@/mocks/documentReprocess'
 import { workspaceDocuments } from '@/mocks/documentWorkspace'
@@ -48,14 +48,6 @@ const stageItems = computed(() => processingStages.map((stage, index) => ({
 	props: { subtitle: pendingStages.value.includes(stage.id) && !selectedAttachment.value ? '策略已變更' : undefined },
 })))
 
-function getStageIndex(stageId: string | undefined): number {
-	return processingStages.findIndex((stage) => stage.id === stageId)
-}
-
-function getStageName(stageId: string | undefined): string {
-	return processingStages.find((stage) => stage.id === stageId)?.name ?? ''
-}
-
 /**
  * 預設起跑點：附件從它第一個未完成的步驟；整份文件依序看失敗步驟、最早變更策略的步驟，
  * 只改過切塊的從向量化開始，避免蓋掉人工切塊。
@@ -82,13 +74,13 @@ watch(isOpen, (open) => {
 })
 watch(scope, () => { if (isOpen.value) fromStage.value = getDefaultStage() })
 
-const reusedNames = computed(() => processingStages.slice(0, getStageIndex(fromStage.value)).map((stage) => stage.name).join('、'))
+const reusedNames = computed(() => processingStages.slice(0, getProcessingStageIndex(fromStage.value)).map((stage) => stage.name).join('、'))
 // @ 策略變更屬於整份文件；只跑附件或起跑點晚於變更步驟時，變更都還不算生效
-const skipsPending = computed(() => pendingStages.value.length > 0 && scope.value === 'all' && getStageIndex(fromStage.value) > getStageIndex(pendingStages.value[0]))
+const skipsPending = computed(() => pendingStages.value.length > 0 && scope.value === 'all' && getProcessingStageIndex(fromStage.value) > getProcessingStageIndex(pendingStages.value[0]))
 const partialPending = computed(() => pendingStages.value.length > 0 && (scope.value !== 'all' || !canClearPending.value))
 const overwritesChunks = computed(() => {
 	const record = props.record
-	if (!record || getStageIndex(fromStage.value) > getStageIndex('chunk')) return false
+	if (!record || getProcessingStageIndex(fromStage.value) > getProcessingStageIndex('chunk')) return false
 	if (selectedAttachment.value) return hasEditedChunks(record.documentId, version.value, selectedAttachment.value.id)
 	return hasEditedChunks(record.documentId, version.value)
 		|| (scope.value === 'all' && attachments.value.some((file) => hasEditedChunks(record.documentId, version.value, file.id)))
@@ -100,7 +92,7 @@ function confirm(): void {
 	reprocessJob(record.jobId, fromStage.value, undefined, scope.value)
 	if (canClearPending.value && scope.value === 'all' && !skipsPending.value) clearStrategyChanged(record.documentId)
 	const target = selectedAttachment.value ? `附件「${selectedAttachment.value.name}」` : scope.value === 'main' ? `「${props.title}」主文件` : `「${props.title}」`
-	emit('done', `${target}第 ${version.value} 版已從「${getStageName(fromStage.value)}」重新排入示範佇列，尚未執行後端處理。`)
+	emit('done', `${target}第 ${version.value} 版已從「${getProcessingStageName(fromStage.value)}」重新排入示範佇列，尚未執行後端處理。`)
 	isOpen.value = false
 }
 </script>
@@ -133,7 +125,7 @@ function confirm(): void {
 					{{ reusedNames ? `沿用上次結果：${reusedNames}` : '所有步驟都會重跑。' }}
 				</p>
 				<VAlert v-if="skipsPending" type="warning" variant="tonal" density="compact" class="mt-3">
-					「{{ getStageName(pendingStages[0]) }}」的策略已變更但不在重跑範圍內，這項變更仍不會生效。
+					「{{ getProcessingStageName(pendingStages[0]) }}」的策略已變更但不在重跑範圍內，這項變更仍不會生效。
 				</VAlert>
 				<VAlert v-else-if="partialPending" type="info" variant="tonal" density="compact" class="mt-3">
 					<template v-if="!canClearPending">

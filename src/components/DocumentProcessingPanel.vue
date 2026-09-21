@@ -8,7 +8,7 @@ import StatePanel from '@/components/StatePanel.vue'
 import {
 	getDocumentProcessingRecords,
 	hasEditedChunks,
-	processingStages,
+	getProcessingStageName,
 	reprocessJob,
 	type ReprocessScope,
 	retryProcessingFile,
@@ -106,10 +106,6 @@ function openDetail(job: ProcessingJob): void {
 	isDetailOpen.value = true
 }
 
-function getStageName(stageId: string | undefined): string {
-	return processingStages.find((stage) => stage.id === stageId)?.name ?? ''
-}
-
 /** 一鍵重新執行失敗工作：從失敗步驟起跑；沒有失敗步驟時依策略變更或切塊修改決定。 */
 function getDefaultStartStage(job: ProcessingJob): ProcessingStageId {
 	if (job.failedStepId) return job.failedStepId
@@ -122,7 +118,7 @@ function getDefaultStartStage(job: ProcessingJob): ProcessingStageId {
 function retryJob(job: ProcessingJob): void {
 	const fromStage = getDefaultStartStage(job)
 	reprocessJob(job.id, fromStage)
-	notify(`「${job.title}」已從「${getStageName(fromStage)}」重新排入示範佇列，尚未執行後端處理。`)
+	notify(`「${job.title}」已從「${getProcessingStageName(fromStage)}」重新排入示範佇列，尚未執行後端處理。`)
 }
 
 /** 批次捷徑：失敗的附件各自從失敗步驟重跑，主文件不動。 */

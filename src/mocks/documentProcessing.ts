@@ -456,3 +456,22 @@ export function getDocumentProcessingRecord(documentId: string, version?: string
 export function getDocumentProcessingRecords(): DocumentProcessingRecord[] {
 	return processingRecords.map(cloneProcessingRecord)
 }
+
+/**
+ * 取得處理步驟的顯示名稱。
+ * @param stageId 步驟代號。
+ * @param fallback 找不到時的替代文字。
+ * @returns 步驟名稱。
+ */
+export function getProcessingStageName(stageId: string | undefined, fallback = ''): string {
+	return processingStages.find((stage) => stage.id === stageId)?.name ?? fallback
+}
+
+/**
+ * 取得處理步驟在流程中的順序。
+ * @param stageId 步驟代號。
+ * @returns 索引；找不到時為 -1。
+ */
+export function getProcessingStageIndex(stageId: string | undefined): number {
+	return processingStages.findIndex((stage) => stage.id === stageId)
+}

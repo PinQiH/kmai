@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { processingStages } from '@/mocks/documentProcessing'
+import { getProcessingStageName, processingStages } from '@/mocks/documentProcessing'
 import { planBatchReprocess, runBatchReprocess, type BatchStartStage, type BatchVersionScope } from '@/mocks/documentReprocess'
 
 interface ComponentProps {
@@ -44,10 +44,6 @@ const archivedDocumentCount = computed(() => new Set(plan.value.filter((item) =>
 const queuedDocumentCount = computed(() => new Set(queuedItems.value.map((item) => item.documentId)).size)
 const pendingCount = computed(() => new Set(queuedItems.value.filter((item) => item.hasPendingStrategy).map((item) => item.documentId)).size)
 const overwriteItems = computed(() => queuedItems.value.filter((item) => item.overwritesChunks))
-
-function getStageName(stageId: string): string {
-	return processingStages.find((stage) => stage.id === stageId)?.name ?? stageId
-}
 
 function confirm(): void {
 	const documentCount = queuedDocumentCount.value
@@ -100,7 +96,7 @@ function confirm(): void {
 						<li v-for="item in plan" :key="`${item.documentId}-${item.version}`" :class="`is-${item.status}`">
 							<span class="plan-title">{{ item.title }} · v{{ item.version }} <span class="plan-role">{{ item.versionRole }}</span></span>
 							<span class="plan-action">
-								<template v-if="item.status === 'ready'">從「{{ getStageName(item.fromStage) }}」開始</template>
+								<template v-if="item.status === 'ready'">從「{{ getProcessingStageName(item.fromStage) }}」開始</template>
 								<template v-else-if="item.status === 'create'">建立處理工作</template>
 								<template v-else-if="item.status === 'running'">略過：處理中</template>
 								<template v-else>略過：已下架</template>
