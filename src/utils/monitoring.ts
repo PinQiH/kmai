@@ -226,3 +226,16 @@ export function parseEmailList(text: string): string[] {
 
 	return emails
 }
+
+// > 告警嚴重度與事件狀態的顯示設定；系統概況與告警紀錄共用同一份對照
+export const ALERT_SEVERITY_META: Record<AlertSeverity, { color: string; icon: string; label: string }> = {
+	critical: { color: 'error', icon: 'mdi-alert-octagon-outline', label: '嚴重' },
+	warning: { color: 'warning', icon: 'mdi-alert-outline', label: '警告' },
+	info: { color: 'info', icon: 'mdi-information-outline', label: '資訊' },
+}
+
+export const ALERT_EVENT_STATUS_META: Record<AlertEventStatus, { color: string; icon: string; label: string }> = {
+	firing: { color: 'error', icon: 'mdi-bell-ring-outline', label: '觸發中' },
+	resolved: { color: 'success', icon: 'mdi-bell-check-outline', label: '已解除' },
+	silenced: { color: 'secondary', icon: 'mdi-bell-sleep-outline', label: '已靜音' },
+}
