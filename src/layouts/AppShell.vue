@@ -48,7 +48,6 @@ const adminNavigationGroups: Array<{ title: string; items: NavigationItem[] }> =
 		title: "內容與知識",
 		items: [
 			{ title: "文件管理", icon: "mdi-file-document-multiple-outline", to: "/admin/documents" },
-			{ title: "文件處理", icon: "mdi-progress-wrench", to: "/admin/processing" },
 			{ title: "圖譜管理", icon: "mdi-vector-polyline", to: "/admin/graph" },
 		],
 	},

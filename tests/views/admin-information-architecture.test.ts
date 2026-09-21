@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import AdminMonitoringView from '@/views/admin/AdminMonitoringView.vue'
 import AdminNotificationsView from '@/views/admin/AdminNotificationsView.vue'
-import AdminProcessingView from '@/views/admin/AdminProcessingView.vue'
+import AdminDocumentsView from '@/views/admin/AdminDocumentsView.vue'
 
 globalThis.ResizeObserver = class ResizeObserverStub {
 	observe(): void {}
@@ -50,44 +50,44 @@ async function mountAdminView(component: object, path: string, routes: Array<{ p
 }
 
 describe('admin information architecture', () => {
-	it('should position document processing around attention, all jobs and global strategy', async () => {
-		const { wrapper } = await mountAdminView(AdminProcessingView, '/admin/processing', [
-			{ path: '/admin/processing', component: AdminProcessingView },
+	it('should fold document processing into the document management tabs', async () => {
+		const { wrapper } = await mountAdminView(AdminDocumentsView, '/admin/documents', [
+			{ path: '/admin/documents', component: AdminDocumentsView },
 			{ path: '/admin/documents/:id/manage', component: { template: '<div />' } },
 		])
 		const tabLabels = wrapper.findAll('[role="tab"]').map((tab) => tab.text())
 
-		expect(wrapper.text()).toContain('文件處理')
+		expect(wrapper.text()).toContain('文件管理')
+		expect(tabLabels).toContain('全部文件')
 		expect(tabLabels.some((label) => label.includes('需要處理'))).toBe(true)
-		expect(tabLabels).toContain('全部工作')
 		expect(tabLabels).toContain('處理策略')
-		expect(wrapper.text()).toContain('這裡只顯示失敗、部分附件失敗、等待過久，或策略已變更待重新處理的工作')
-		expect(wrapper.text()).not.toContain('新增切塊')
+		// @ 預設停在文件清單，處理提示只出現在「需要處理」分頁
+		expect(wrapper.text()).not.toContain('這裡只顯示失敗、部分附件失敗、等待過久，或策略已變更待重新處理的工作')
 	})
 
-	it('should open the all-jobs tab when the upload flow links in with a tab query', async () => {
-		const { wrapper } = await mountAdminView(AdminProcessingView, '/admin/processing?tab=all', [
-			{ path: '/admin/processing', component: AdminProcessingView },
+	it('should open the attention tab when linked in with a tab query', async () => {
+		const { wrapper } = await mountAdminView(AdminDocumentsView, '/admin/documents?tab=attention', [
+			{ path: '/admin/documents', component: AdminDocumentsView },
 			{ path: '/admin/documents/:id/manage', component: { template: '<div />' } },
 		])
 
 		const selectedTab = wrapper.findAll('[role="tab"]').find((tab) => tab.classes().includes('v-tab--selected'))
 
-		expect(selectedTab?.text()).toBe('全部工作')
-		expect(wrapper.text()).not.toContain('這裡只顯示失敗、部分附件失敗、等待過久，或策略已變更待重新處理的工作')
+		expect(selectedTab?.text()).toContain('需要處理')
+		expect(wrapper.text()).toContain('這裡只顯示失敗、部分附件失敗、等待過久，或策略已變更待重新處理的工作')
 	})
 
 	it('should show and clear the document filter when linked from document details', async () => {
-		const { wrapper, router } = await mountAdminView(AdminProcessingView, '/admin/processing?tab=all&documentId=doc-003', [
-			{ path: '/admin/processing', component: AdminProcessingView },
+		const { wrapper, router } = await mountAdminView(AdminDocumentsView, '/admin/documents?tab=attention&documentId=doc-003', [
+			{ path: '/admin/documents', component: AdminDocumentsView },
 			{ path: '/admin/documents/:id/manage', component: { template: '<div />' } },
 		])
-		const filterChip = wrapper.get('[data-testid="processing-document-filter-doc-003"]')
+		const filterChip = wrapper.get('[data-testid="document-id-filter-doc-003"]')
 
 		expect(filterChip.text()).toContain('文件：客戶資料存取與分享規範')
 		await filterChip.get('.v-chip__close').trigger('click')
 		await vi.waitFor(() => expect(router.currentRoute.value.query.documentId).toBeUndefined())
-		expect(wrapper.find('[data-testid="processing-document-filter-doc-003"]').exists()).toBe(false)
+		expect(wrapper.find('[data-testid="document-id-filter-doc-003"]').exists()).toBe(false)
 	})
 
 	it('should keep operational monitoring focused on detection and leave delivery to notifications', async () => {

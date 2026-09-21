@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 
 import { workspaceDocuments } from "@/mocks/documentWorkspace"
 import FilterSearchField from "@/components/FilterSearchField.vue"
 import DocumentBatchReprocessDialog from "@/components/DocumentBatchReprocessDialog.vue"
 import DocumentPreviewDrawer from "@/components/DocumentPreviewDrawer.vue"
+import DocumentProcessingPanel from "@/components/DocumentProcessingPanel.vue"
+import DocumentStrategyPanel from "@/components/DocumentStrategyPanel.vue"
 import {
   fileTypeGroups,
   getFileTypeId,
   getFileTypeName,
 } from "@/mocks/documentStrategies"
 import { isDocumentProcessing } from "@/mocks/documentReprocess"
+import { useProcessingJobs } from "@/composables/useProcessingJobs"
 import PageHeader from "@/components/PageHeader.vue"
 import StatePanel from "@/components/StatePanel.vue"
 import {
@@ -28,6 +31,9 @@ import {
   COMPANY_KNOWLEDGE_SOURCES,
   getCompanyKnowledgeSourceById,
 } from "@/utils/knowledgeSources"
+
+/** 文件管理的三個視角：清單、需要處理的工作、處理策略。 */
+type DocumentTab = "documents" | "attention" | "strategy"
 
 type UploadedRangeKey =
   | "全部時間"
@@ -56,6 +62,8 @@ const headers = [
 ]
 
 const route = useRoute()
+const router = useRouter()
+const activeTab = ref<DocumentTab>("documents")
 const search = ref<string | null>("")
 const status = ref<DocumentStatus | typeof ALL_STATUS>(ALL_STATUS)
 const mainCategory = ref<string>(ALL_CATEGORY)
@@ -131,6 +139,60 @@ const subCategoryOptions = computed(() => {
   return [ALL_SUB_CATEGORY, ...Array.from(new Set(subCategories))]
 })
 
+// @ 舊的 /admin/processing?tab=all 轉導過來會是 tab=documents，tab=attention 則直接停在需要處理的工作上
+const documentTabs: DocumentTab[] = ["documents", "attention", "strategy"]
+watch(
+  () => route.query.tab,
+  (queryTab) => {
+    const nextTab = documentTabs.find((item) => item === queryTab)
+    if (nextTab) activeTab.value = nextTab
+  },
+  { immediate: true },
+)
+
+// @ 上傳完成頁與圖譜管理會帶 ?documentId=（可能多筆）過來，只看那幾份文件
+const documentIds = computed(() => {
+  const value = route.query.documentId
+  return (Array.isArray(value) ? value : [value]).filter(
+    (id): id is string => typeof id === "string" && Boolean(id),
+  )
+})
+const documentIdFilters = computed(() =>
+  documentIds.value.map((id) => ({
+    id,
+    title: managedDocuments.find((document) => document.id === id)?.title ?? id,
+  })),
+)
+
+// @ 分頁標籤的紅色計數在任何分頁都要正確，所以在頁面層算，不等子元件掛載後回報
+const { attentionJobs } = useProcessingJobs()
+const attentionCount = computed(
+  () =>
+    attentionJobs.value.filter(
+      (job) =>
+        !documentIds.value.length || documentIds.value.includes(job.documentId),
+    ).length,
+)
+
+// @ 讓網址反映目前分頁，重新整理或分享連結時才會停在同一個視角
+watch(activeTab, (tab) => {
+  if (route.query.tab !== tab) router.replace({ query: { ...route.query, tab } })
+})
+
+/** 從列表跳到「需要處理」分頁，並把範圍收斂到這份文件。 */
+function openProcessingForDocument(documentId: string): void {
+  activeTab.value = "attention"
+  router.replace({ query: { ...route.query, tab: "attention", documentId } })
+}
+
+function clearDocumentIdFilter(documentId?: string): void {
+  const remainingIds = documentId
+    ? documentIds.value.filter((id) => id !== documentId)
+    : []
+  const nextDocumentId = remainingIds.length ? remainingIds : undefined
+  router.replace({ query: { ...route.query, documentId: nextDocumentId } })
+}
+
 // @ 由管理總覽的「審核文件」帶入 ?status=待審核，讓列表預設就停在待處理的文件上
 watch(
   () => route.query.status,
@@ -196,6 +258,8 @@ function matchesUploadedRange(document: KnowledgeDocument): boolean {
 const visibleDocuments = computed(() =>
   managedDocuments
     .filter((document) => {
+      if (documentIds.value.length && !documentIds.value.includes(document.id))
+        return false
       const keyword = (search.value ?? "").trim()
       const searchableText = `${document.title} ${document.department} ${document.category} ${document.subCategory ?? ""} ${document.owner} ${document.tags.join(" ")}`
       const matchesSearch = !keyword || searchableText.includes(keyword)
@@ -351,6 +415,8 @@ function clearAllFilters(): void {
   knowledgeTopic.value = ALL_TOPIC
   fileType.value = ALL_FILE_TYPE
   uploadedRange.value = "全部時間"
+  // @ 文件篩選是靠網址帶進來的，不一起清掉的話「清除全部條件」後空清單仍然是空的
+  if (documentIds.value.length) clearDocumentIdFilter()
 }
 
 function openDeleteDialog(documentId: string): void {
@@ -391,7 +457,7 @@ function approveSelected(): void {
     <PageHeader
       eyebrow="內容生命週期"
       title="文件管理"
-      description="管理文件內容、版本與發布狀態。"
+      description="管理文件內容、版本與發布狀態，並處理失敗或停滯的處理工作。"
     >
       <template #actions
         ><VBtn
@@ -423,12 +489,58 @@ function approveSelected(): void {
         v-if="showProcessingLink"
         variant="text"
         size="small"
-        :to="{ path: '/admin/processing', query: { tab: 'all' } }"
-        >到文件處理查看進度</VBtn
+        @click="activeTab = 'attention'"
+        >查看需要處理的工作</VBtn
       ></VAlert
     >
 
-    <VCard class="surface-border">
+    <!-- @ 分頁不用 VWindow：VWindow 預設 overflow hidden，會把篩選器的浮動 label 與 chip 裁掉 -->
+    <VTabs v-model="activeTab" color="primary" class="mb-4">
+      <VTab value="documents">全部文件</VTab>
+      <VTab value="attention"
+        >需要處理
+        <VChip
+          v-if="attentionCount"
+          size="x-small"
+          color="error"
+          class="ml-2"
+          >{{ attentionCount }}</VChip
+        ></VTab
+      >
+      <VTab value="strategy">處理策略</VTab>
+    </VTabs>
+
+    <div
+      v-if="documentIdFilters.length && activeTab !== 'strategy'"
+      class="document-id-filters"
+      aria-label="目前套用的文件篩選"
+    >
+      <span class="filter-count">目前篩選</span>
+      <VChip
+        v-for="filter in documentIdFilters"
+        :key="filter.id"
+        closable
+        size="small"
+        prepend-icon="mdi-file-document-outline"
+        :data-testid="`document-id-filter-${filter.id}`"
+        @click:close="clearDocumentIdFilter(filter.id)"
+      >
+        文件：{{ filter.title }}
+      </VChip>
+      <VBtn variant="text" size="small" @click="clearDocumentIdFilter()"
+        >查看全部文件</VBtn
+      >
+    </div>
+
+    <DocumentProcessingPanel
+      v-if="activeTab === 'attention'"
+      :search="search ?? ''"
+      :document-ids="documentIds"
+    />
+
+    <DocumentStrategyPanel v-else-if="activeTab === 'strategy'" />
+
+    <VCard v-else class="surface-border">
       <div class="filter-bar">
         <div class="filter-primary">
           <FilterSearchField
@@ -689,15 +801,12 @@ function approveSelected(): void {
                     title="管理文件"
                     prepend-icon="mdi-pencil-outline"
                   />
-                  <!-- @ 只有卡在處理階段的文件才需要跳到佇列；其餘分頁捷徑一律不放進列表選單。 -->
+                  <!-- @ 只有卡在處理階段的文件才需要看處理工作；其餘分頁捷徑一律不放進列表選單。 -->
                   <VListItem
                     v-if="item.status === '處理中' || item.status === '失敗'"
-                    :to="{
-                      path: '/admin/processing',
-                      query: { tab: 'all', documentId: item.id },
-                    }"
-                    title="查看處理佇列"
+                    title="查看處理工作"
                     prepend-icon="mdi-progress-clock"
+                    @click="openProcessingForDocument(item.id)"
                   />
                   <VListItem
                     title="刪除文件"
@@ -768,6 +877,14 @@ function approveSelected(): void {
 </template>
 
 <style scoped>
+.document-id-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
 .filter-bar {
   display: grid;
   gap: var(--space-md);

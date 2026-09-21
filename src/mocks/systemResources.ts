@@ -125,10 +125,10 @@ export const aiUsages: AiUsage[] = [
 	{ id: 'answer', name: '生成回答', kind: 'llm', pageLabel: 'AI 與檢索設定', pagePath: '/admin/ai-settings' },
 	{ id: 'planner', name: '問題規劃', kind: 'llm', pageLabel: 'AI 與檢索設定', pagePath: '/admin/ai-settings' },
 	{ id: 'rerank', name: '重新排序', kind: 'reranker', pageLabel: 'AI 與檢索設定', pagePath: '/admin/ai-settings' },
-	{ id: 'summarize', name: 'AI 摘要', kind: 'llm', pageLabel: '文件處理策略', pagePath: '/admin/processing' },
-	{ id: 'graph', name: '知識圖譜抽取', kind: 'llm', pageLabel: '文件處理策略', pagePath: '/admin/processing' },
-	{ id: 'embed', name: '向量化', kind: 'embedding', pageLabel: '文件處理策略', pagePath: '/admin/processing' },
-	{ id: 'parse', name: '文件解析', kind: 'parser', pageLabel: '文件處理策略', pagePath: '/admin/processing' },
+	{ id: 'summarize', name: 'AI 摘要', kind: 'llm', pageLabel: '文件處理策略', pagePath: '/admin/documents?tab=strategy' },
+	{ id: 'graph', name: '知識圖譜抽取', kind: 'llm', pageLabel: '文件處理策略', pagePath: '/admin/documents?tab=strategy' },
+	{ id: 'embed', name: '向量化', kind: 'embedding', pageLabel: '文件處理策略', pagePath: '/admin/documents?tab=strategy' },
+	{ id: 'parse', name: '文件解析', kind: 'parser', pageLabel: '文件處理策略', pagePath: '/admin/documents?tab=strategy' },
 ]
 
 /**

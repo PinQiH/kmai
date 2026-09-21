@@ -294,7 +294,7 @@ async function nextStep(): Promise<void> {
 			</template>
 		</VStepper>
 		<VAlert v-if="submitError" type="error" class="mt-4">{{ submitError }}</VAlert>
-		<div class="d-flex justify-space-between mt-5"><VBtn variant="outlined" :disabled="currentStep === 1 || isComplete" @click="currentStep -= 1">上一步</VBtn><VBtn v-if="!isComplete" data-testid="upload-next" color="primary" :loading="isSubmitting" :disabled="!canContinue" @click="nextStep">{{ currentStep === 3 ? '確認並開始處理' : '下一步' }}</VBtn><VBtn v-else color="primary" :to="{ path: '/admin/processing', query: { tab: 'all', documentId: createdIds } }">查看處理進度</VBtn></div>
+		<div class="d-flex justify-space-between mt-5"><VBtn variant="outlined" :disabled="currentStep === 1 || isComplete" @click="currentStep -= 1">上一步</VBtn><VBtn v-if="!isComplete" data-testid="upload-next" color="primary" :loading="isSubmitting" :disabled="!canContinue" @click="nextStep">{{ currentStep === 3 ? '確認並開始處理' : '下一步' }}</VBtn><VBtn v-else color="primary" :to="{ path: '/admin/documents', query: { tab: 'documents', documentId: createdIds } }">查看處理進度</VBtn></div>
 	</div>
 </template>
 

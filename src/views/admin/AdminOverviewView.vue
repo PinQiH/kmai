@@ -45,7 +45,7 @@ const metricColor = {
     >
       目前有失敗與等待過久的文件工作，請先確認原因再重新執行或取消。
       <template #append
-        ><VBtn variant="text" to="/admin/processing"
+        ><VBtn variant="text" to="/admin/documents?tab=attention"
           >前往需要處理</VBtn
         ></template
       >
@@ -131,7 +131,7 @@ const metricColor = {
             <VBtn
               variant="tonal"
               prepend-icon="mdi-reload-alert"
-              to="/admin/processing"
+              to="/admin/documents?tab=attention"
               >重跑失敗工作 <VChip class="ml-2" size="x-small">3</VChip></VBtn
             >
             <VBtn

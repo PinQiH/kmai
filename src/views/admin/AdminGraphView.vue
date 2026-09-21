@@ -135,7 +135,7 @@ const healthItems = computed<HealthItem[]>(() => [
 	{ id: 'orphan', title: '孤立實體', description: '沒有任何關係的實體，通常是擷取雜訊，問答時也無法帶出相關知識。', count: orphans.value.length, tone: 'warning' as const, action: '檢視實體', run: () => { activeTab.value = 'entities'; entityFilter.value = 'orphan' } },
 	{ id: 'retired-source', title: '來源文件全部下架的實體', description: '這些實體的每一份來源文件都已下架，卻仍出現在前台圖譜與問答中；下一次重建（快速或完整）會移除。只有部分來源下架的實體仍有其他文件支撐，不會列在這裡。', count: retiredEntities.value.length, tone: 'warning' as const, action: '檢視實體', run: () => { activeTab.value = 'entities'; clearEntityFilters(); entityFilter.value = 'retired' } },
 	{ id: 'community', title: '主題摘要失敗或過期', description: '摘要會顯示在前台圖譜與問答的主題說明。', count: troubledCommunities.value.length, tone: 'warning' as const, action: '查看社群', run: () => { activeTab.value = 'communities'; communityFilter.value = 'all' } },
-	{ id: 'coverage', title: '尚未納入圖譜的文件', description: uncoveredDocuments.value.map((document) => `${document.title}（${document.status}）`).join('、'), count: uncoveredDocuments.value.length, tone: 'info' as const, action: '查看這些文件的處理', run: () => router.push({ path: '/admin/processing', query: { tab: 'all', documentId: uncoveredDocuments.value.map((document) => document.id) } }) },
+	{ id: 'coverage', title: '尚未納入圖譜的文件', description: uncoveredDocuments.value.map((document) => `${document.title}（${document.status}）`).join('、'), count: uncoveredDocuments.value.length, tone: 'info' as const, action: '查看這些文件的處理', run: () => router.push({ path: '/admin/documents', query: { tab: 'documents', documentId: uncoveredDocuments.value.map((document) => document.id) } }) },
 ].filter((item) => item.count > 0))
 
 // > 實體清單

@@ -814,10 +814,10 @@ const leaveGuard = useUnsavedChangesGuard(
             <VBtn
               variant="text"
               :to="{
-                path: '/admin/processing',
-                query: { tab: 'all', documentId: document.id },
+                path: '/admin/documents',
+                query: { tab: 'attention', documentId: document.id },
               }"
-              >在文件處理頁查看</VBtn
+              >在文件管理查看處理工作</VBtn
             >
           </div>
           <DocumentReprocessDialog

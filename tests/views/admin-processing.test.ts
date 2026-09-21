@@ -21,7 +21,7 @@ import DocumentChunkEditor from '@/components/DocumentChunkEditor.vue'
 import DocumentLifecycleTrail from '@/components/DocumentLifecycleTrail.vue'
 import { getWorkspaceVersions, workspaceDocuments } from '@/mocks/documentWorkspace'
 import { isDocumentProcessing, planBatchReprocess, reprocessAllVersions, runBatchReprocess } from '@/mocks/documentReprocess'
-import AdminProcessingView from '@/views/admin/AdminProcessingView.vue'
+import DocumentProcessingPanel from '@/components/DocumentProcessingPanel.vue'
 
 globalThis.ResizeObserver = class ResizeObserverStub {
 	observe(): void {}
@@ -29,20 +29,25 @@ globalThis.ResizeObserver = class ResizeObserverStub {
 	disconnect(): void {}
 } as typeof ResizeObserver
 
-async function mountProcessingView(path: string) {
+/** 處理面板現在掛在文件管理頁的「需要處理」分頁下，測試直接掛面板本身。 */
+async function mountProcessingPanel(props: { search?: string; documentIds?: string[] } = {}) {
 	const pinia = createPinia()
 	setActivePinia(pinia)
 	const router = createRouter({
 		history: createMemoryHistory(),
 		routes: [
-			{ path: '/admin/processing', component: AdminProcessingView },
+			{ path: '/admin/documents', component: { template: '<div />' } },
 			{ path: '/admin/documents/:id/manage', component: { template: '<div />' } },
 		],
 	})
-	await router.push(path)
+	await router.push('/admin/documents')
 	await router.isReady()
 	const wrapper = mount(
-		{ components: { AdminProcessingView }, template: '<VApp><AdminProcessingView /></VApp>' },
+		{
+			components: { DocumentProcessingPanel },
+			data: () => ({ panelProps: props }),
+			template: '<VApp><DocumentProcessingPanel v-bind="panelProps" /></VApp>',
+		},
 		{ global: { plugins: [pinia, createVuetify({ components, directives }), router] } },
 	)
 	await flushPromises()
@@ -157,27 +162,29 @@ describe('附件切塊', () => {
 	})
 })
 
-describe('AdminProcessingView 列表', () => {
+describe('需要處理的工作清單', () => {
 	it('should flag a document whose attachment failed as partially failed', async () => {
-		const wrapper = await mountProcessingView('/admin/processing')
+		const wrapper = await mountProcessingPanel()
 		const rows = wrapper.findAll('[data-testid="processing-job"]').map((row) => row.text())
 
 		expect(rows.some((text) => text.includes('客戶資料存取與分享規範') && text.includes('部分失敗') && text.includes('1 失敗'))).toBe(true)
 	})
 
 	it('should filter jobs by document or attachment name', async () => {
-		const wrapper = await mountProcessingView('/admin/processing?tab=all')
-		await wrapper.get('[data-testid="processing-search"] input').setValue('住宿費用')
-		await flushPromises()
+		const wrapper = await mountProcessingPanel({ search: '客戶資料' })
 		const rows = wrapper.findAll('[data-testid="processing-job"]')
 
 		expect(rows).toHaveLength(1)
-		expect(rows[0]!.text()).toContain('員工差旅與費用報支辦法')
+		expect(rows[0]!.text()).toContain('客戶資料存取與分享規範')
 	})
 
-	it('should paginate the all-jobs list', async () => {
-		for (let index = 0; index < 12; index += 1) enqueueDocumentProcessing(`doc-page-${index}`, '1.0', '測試')
-		const wrapper = await mountProcessingView('/admin/processing?tab=all')
+	it('should paginate the attention list', async () => {
+		// @ 新排入的工作預設是「等待中」，標記策略變更才會進入需要處理的清單
+		for (let index = 0; index < 12; index += 1) {
+			enqueueDocumentProcessing(`doc-page-${index}`, '1.0', '測試')
+			markStrategyChanged(`doc-page-${index}`, ['chunk'])
+		}
+		const wrapper = await mountProcessingPanel()
 
 		expect(wrapper.findAll('[data-testid="processing-job"]')).toHaveLength(10)
 		expect(wrapper.text()).toMatch(/共 \d+ 筆，顯示第 1–10 筆/)

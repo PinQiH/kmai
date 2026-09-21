@@ -130,11 +130,17 @@ const routes: RouteRecordRaw[] = [
 		component: () => import("@/views/admin/AdminUploadView.vue"),
 		meta: { admin: true, title: "新增文件" },
 	},
+	// @ 文件處理已併入文件管理；舊連結與書籤轉導過去，tab=all 對應「全部文件」分頁
 	{
 		path: "/admin/processing",
 		name: "admin-processing",
-		component: () => import("@/views/admin/AdminProcessingView.vue"),
-		meta: { admin: true, title: "文件處理" },
+		redirect: (to) => ({
+			path: "/admin/documents",
+			query: {
+				...to.query,
+				tab: to.query.tab === "attention" || to.query.tab === "strategy" ? to.query.tab : "documents",
+			},
+		}),
 	},
 	{
 		path: "/admin/monitoring",
