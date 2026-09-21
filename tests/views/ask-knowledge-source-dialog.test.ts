@@ -228,6 +228,69 @@ describe('AskView knowledge source dialog', () => {
 		expect(trigger.text()).toBe('產品研究筆記')
 	})
 
+	it('should create a notebook in place and select it as the knowledge source', async () => {
+		const { store, notebooksStore } = await mountAskView()
+		await wrapper!.get('#knowledge-source-trigger').trigger('click')
+		await flushPromises()
+
+		const dialog = getDialog()
+		dialog.querySelector<HTMLButtonElement>('[data-testid="open-create-notebook-form"]')?.click()
+		await flushPromises()
+
+		const nameInput = dialog.querySelector<HTMLInputElement>('[data-testid="new-notebook-name"] input')
+		if (!nameInput) throw new Error('找不到筆記本名稱欄位')
+		nameInput.value = '競品調查'
+		nameInput.dispatchEvent(new Event('input'))
+		await flushPromises()
+		dialog.querySelector<HTMLButtonElement>('[data-testid="submit-create-notebook"]')?.click()
+		await flushPromises()
+
+		const created = notebooksStore.notebooks.find((notebook) => notebook.name === '競品調查')
+		expect(created).toBeDefined()
+		expect(store.selectedKnowledgeSourceId).toBe(created!.id)
+		expect(dialog.querySelector('[data-testid="new-notebook-name"]')).toBeNull()
+		expect(dialog.querySelector('[data-testid="upload-notebook-source"]')).not.toBeNull()
+	})
+
+	it('should reject an empty notebook name instead of creating one', async () => {
+		const { notebooksStore } = await mountAskView()
+		const notebookCount = notebooksStore.notebooks.length
+		await wrapper!.get('#knowledge-source-trigger').trigger('click')
+		await flushPromises()
+
+		const dialog = getDialog()
+		dialog.querySelector<HTMLButtonElement>('[data-testid="open-create-notebook-form"]')?.click()
+		await flushPromises()
+		dialog.querySelector<HTMLButtonElement>('[data-testid="submit-create-notebook"]')?.click()
+		await flushPromises()
+
+		expect(notebooksStore.notebooks).toHaveLength(notebookCount)
+		expect(dialog.textContent).toContain('請輸入筆記本名稱')
+	})
+
+	it('should add an uploaded file to the selected notebook without leaving the dialog', async () => {
+		const { notebooksStore } = await mountAskView()
+		await wrapper!.get('#knowledge-source-trigger').trigger('click')
+		await flushPromises()
+
+		const dialog = getDialog()
+		dialog.querySelector<HTMLInputElement>('[data-testid="knowledge-source-notebook-onboarding"] input')?.click()
+		await flushPromises()
+
+		const fileInput = dialog.querySelector<HTMLInputElement>('[data-testid="notebook-source-file-input"]')
+		if (!fileInput) throw new Error('找不到檔案上傳欄位')
+		const file = new File(['新人報到流程'], '報到流程.md', { type: 'text/markdown' })
+		Object.defineProperty(fileInput, 'files', { configurable: true, value: [file] })
+		fileInput.dispatchEvent(new Event('change'))
+		await flushPromises()
+		await flushPromises()
+
+		const notebook = notebooksStore.notebooks.find((item) => item.id === 'notebook-onboarding')
+		expect(notebook!.documents.map((document) => document.name)).toContain('報到流程.md')
+		expect(getDialog().style.display).not.toBe('none')
+		await vi.waitFor(() => expect(getDialog().textContent).toContain('報到流程.md'))
+	})
+
 	it('should place the summary rail inside the scroll area before its outer scrollbar', async () => {
 		const { store } = await mountAskView()
 		store.openConversation(store.conversations[0].id)

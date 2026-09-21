@@ -5,12 +5,15 @@ import FilterSearchField from '@/components/FilterSearchField.vue'
 import { getEmployeeDocumentsBySourceId } from '@/repositories/knowledge.repository'
 import { useConversationStore } from '@/stores/conversation'
 import { useNotebooksStore } from '@/stores/notebooks'
+import type { AddNotebookSourceResult } from '@/stores/notebooks'
+import { useToastStore } from '@/stores/toast'
 import { buildAskKnowledgeSourceGroups } from '@/utils/knowledgeSources'
 
 /*
  * > 問答頁的知識來源與限定文件對話框
  * @ 選擇結果直接寫進 conversationStore；對話框關閉後發出 closed，讓頁面把焦點還給觸發按鈕。
  * @ 元件隨問答頁常駐掛載，來源文件變動時同步移除已失效的限定文件。
+ * @ 就地提供「建立筆記本」與「上傳檔案到選取筆記本」，讓使用者不必離開問答頁補齊來源。
  */
 
 interface SourceDocumentOption {
@@ -25,16 +28,30 @@ const emit = defineEmits<{ closed: [] }>()
 
 const conversationStore = useConversationStore()
 const notebooksStore = useNotebooksStore()
+const toastStore = useToastStore()
 const documentScopeSection = ref<HTMLElement>()
 const documentSearch = ref<string | null>('')
 const documentPage = ref(1)
+const isNotebookFormOpen = ref(false)
+const newNotebookName = ref('')
+const newNotebookDescription = ref('')
+const newNotebookNameError = ref('')
+// ref 位於 v-for 子樹內會被收集成陣列，改用 function ref 才能拿到元件實例
+const notebookNameField = ref<{ focus?: () => void } | null>(null)
+const sourceFileInput = ref<HTMLInputElement>()
+const isUploadingSource = ref(false)
+const sourceUploadError = ref('')
 
 const knowledgeSourceGroups = computed(() => buildAskKnowledgeSourceGroups(notebooksStore.notebooks))
-const visibleKnowledgeSourceGroups = computed(() => knowledgeSourceGroups.value.filter((group) => group.sources.length > 0))
+// 我的筆記本沒有任何項目時仍要顯示，使用者才找得到「建立筆記本」入口
+const visibleKnowledgeSourceGroups = computed(() => knowledgeSourceGroups.value.filter(
+	(group) => group.sources.length > 0 || group.id === 'personal-notebooks',
+))
 const knowledgeSources = computed(() => knowledgeSourceGroups.value.flatMap((group) => group.sources))
 const selectedKnowledgeSource = computed(() => knowledgeSources.value.find((source) => source.id === conversationStore.selectedKnowledgeSourceId) ?? null)
 
 const selectedNotebook = computed(() => notebooksStore.notebooks.find((notebook) => notebook.id === conversationStore.selectedKnowledgeSourceId) ?? null)
+const canAddNotebookSource = computed(() => Boolean(selectedNotebook.value) && notebooksStore.canEditContent(conversationStore.selectedKnowledgeSourceId))
 const supportsDocumentScope = computed(() => selectedKnowledgeSource.value?.kind === 'knowledge-base' || selectedKnowledgeSource.value?.kind === 'notebook')
 const availableSourceDocuments = computed<SourceDocumentOption[]>(() => {
 	if (selectedNotebook.value) {
@@ -89,6 +106,16 @@ watch([documentSearch, () => conversationStore.selectedKnowledgeSourceId], () =>
 	documentPage.value = 1
 })
 
+watch(() => conversationStore.selectedKnowledgeSourceId, () => {
+	sourceUploadError.value = ''
+})
+
+watch(isOpen, (opened) => {
+	if (opened) return
+	closeNotebookForm()
+	sourceUploadError.value = ''
+})
+
 watch(documentPageCount, (pageCount) => {
 	if (documentPage.value > pageCount) documentPage.value = pageCount
 })
@@ -111,6 +138,79 @@ function toggleSelectedDocument(document: SourceDocumentOption, isSelected: bool
 		? [...conversationStore.selectedDocuments, { id: document.id, name: document.name }]
 		: conversationStore.selectedDocuments.filter((selectedDocument) => selectedDocument.id !== document.id)
 	conversationStore.setSelectedDocuments({ sourceId: conversationStore.selectedKnowledgeSourceId, documents: selectedDocuments })
+}
+
+function openNotebookForm(): void {
+	isNotebookFormOpen.value = true
+	newNotebookName.value = ''
+	newNotebookDescription.value = ''
+	newNotebookNameError.value = ''
+	void nextTick(() => notebookNameField.value?.focus?.())
+}
+
+function setNotebookNameField(element: unknown): void {
+	notebookNameField.value = (element as { focus?: () => void } | null) ?? null
+}
+
+function closeNotebookForm(): void {
+	isNotebookFormOpen.value = false
+	newNotebookName.value = ''
+	newNotebookDescription.value = ''
+	newNotebookNameError.value = ''
+}
+
+/** 就地建立筆記本，成功後直接選為目前的知識來源。 */
+function createNotebook(): void {
+	newNotebookNameError.value = ''
+	if (!newNotebookName.value.trim()) {
+		newNotebookNameError.value = '請輸入筆記本名稱，方便之後辨識內容。'
+		return
+	}
+	const notebookId = notebooksStore.createNotebook({ name: newNotebookName.value, description: newNotebookDescription.value })
+	if (!notebookId) {
+		newNotebookNameError.value = '建立失敗，請稍後再試。'
+		return
+	}
+	const notebookName = newNotebookName.value.trim()
+	closeNotebookForm()
+	selectKnowledgeSource(notebookId)
+	toastStore.success(`已建立「${notebookName}」`, { detail: '已選為目前的知識來源，可以直接上傳檔案。' })
+}
+
+function openSourceFilePicker(): void {
+	sourceUploadError.value = ''
+	sourceFileInput.value?.click()
+}
+
+/** 把選取的檔案加入目前選取的筆記本，讓使用者不必離開問答頁。 */
+async function handleSourceFiles(event: Event): Promise<void> {
+	const input = event.target as HTMLInputElement
+	const files = input.files ? Array.from(input.files) : []
+	const notebookId = selectedNotebook.value?.id
+	input.value = ''
+	if (!notebookId || files.length === 0) return
+	sourceUploadError.value = ''
+	isUploadingSource.value = true
+	const result = await notebooksStore.addDocuments({ notebookId, files })
+		.finally(() => { isUploadingSource.value = false })
+	if (result !== 'added') {
+		sourceUploadError.value = getAddSourceError(result)
+		return
+	}
+	toastStore.success(`已新增 ${files.length} 份檔案`, { detail: '可以直接在下方勾選成限定文件。' })
+}
+
+function getAddSourceError(result: AddNotebookSourceResult): string {
+	switch (result) {
+		case 'forbidden':
+			return '你對這本筆記本沒有編輯權限，請聯絡擁有者。'
+		case 'not-found':
+			return '找不到這本筆記本，可能已被刪除。'
+		case 'invalid':
+			return '請選擇可上傳的檔案。'
+		case 'added':
+			return ''
+	}
 }
 </script>
 
@@ -140,7 +240,20 @@ function toggleSelectedDocument(document: SourceDocumentOption, isSelected: bool
 						role="group"
 						:aria-labelledby="`knowledge-source-group-${group.id}`"
 					>
-						<h3 :id="`knowledge-source-group-${group.id}`" class="source-group-label">{{ group.label }}</h3>
+						<div class="source-group-head">
+							<h3 :id="`knowledge-source-group-${group.id}`" class="source-group-label">{{ group.label }}</h3>
+							<VBtn
+								v-if="group.id === 'personal-notebooks' && !isNotebookFormOpen"
+								variant="text"
+								size="small"
+								density="comfortable"
+								prepend-icon="mdi-notebook-plus-outline"
+								data-testid="open-create-notebook-form"
+								@click="openNotebookForm"
+							>
+								新增筆記本
+							</VBtn>
+						</div>
 						<VRadio
 							v-for="source in group.sources"
 							:key="source.id"
@@ -151,6 +264,34 @@ function toggleSelectedDocument(document: SourceDocumentOption, isSelected: bool
 							:data-testid="`knowledge-source-${source.id}`"
 							@click="selectKnowledgeSource(source.id)"
 						/>
+						<p v-if="group.id === 'personal-notebooks' && group.sources.length === 0 && !isNotebookFormOpen" class="source-group-empty">
+							還沒有個人筆記本，建立一本就能把自己的文件當成問答來源。
+						</p>
+						<form v-if="group.id === 'personal-notebooks' && isNotebookFormOpen" class="notebook-form" @submit.prevent="createNotebook">
+							<VTextField
+								:ref="setNotebookNameField"
+								v-model="newNotebookName"
+								label="筆記本名稱"
+								variant="outlined"
+								density="compact"
+								maxlength="60"
+								:error-messages="newNotebookNameError"
+								data-testid="new-notebook-name"
+							/>
+							<VTextField
+								v-model="newNotebookDescription"
+								label="用途說明（選填）"
+								variant="outlined"
+								density="compact"
+								maxlength="160"
+								hide-details
+								data-testid="new-notebook-description"
+							/>
+							<div class="notebook-form-actions">
+								<VBtn variant="text" size="small" @click="closeNotebookForm">取消</VBtn>
+								<VBtn color="primary" variant="flat" size="small" type="submit" data-testid="submit-create-notebook">建立</VBtn>
+							</div>
+						</form>
 					</section>
 				</VRadioGroup>
 
@@ -162,6 +303,30 @@ function toggleSelectedDocument(document: SourceDocumentOption, isSelected: bool
 						</div>
 						<span class="document-count">{{ availableSourceDocuments.length }} 份可用</span>
 					</div>
+
+					<div v-if="canAddNotebookSource" class="document-upload">
+						<VBtn
+							variant="tonal"
+							size="small"
+							prepend-icon="mdi-file-upload-outline"
+							:loading="isUploadingSource"
+							data-testid="upload-notebook-source"
+							@click="openSourceFilePicker"
+						>
+							上傳檔案到此筆記本
+						</VBtn>
+						<span class="document-upload-hint">支援 PDF、Word、TXT 與 Markdown。</span>
+						<input
+							ref="sourceFileInput"
+							class="sr-only"
+							type="file"
+							multiple
+							accept=".pdf,.doc,.docx,.txt,.md"
+							data-testid="notebook-source-file-input"
+							@change="handleSourceFiles"
+						>
+					</div>
+					<p v-if="sourceUploadError" class="document-upload-error" role="alert">{{ sourceUploadError }}</p>
 
 					<FilterSearchField
 						v-if="availableSourceDocuments.length > 0"
@@ -297,6 +462,14 @@ function toggleSelectedDocument(document: SourceDocumentOption, isSelected: bool
 	border-top: 1px solid rgb(var(--v-theme-outline));
 }
 
+.source-group-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	min-height: 32px;
+}
+
 .source-group-label {
 	margin: 0;
 	padding-inline: var(--space-sm);
@@ -304,6 +477,61 @@ function toggleSelectedDocument(document: SourceDocumentOption, isSelected: bool
 	font-size: 0.68rem;
 	font-weight: 700;
 	letter-spacing: 0.06em;
+}
+
+.source-group-empty {
+	margin: 0;
+	padding: var(--space-xs) var(--space-sm) var(--space-sm);
+	color: var(--ink-muted);
+	font-size: 0.78rem;
+	line-height: 1.5;
+}
+
+.notebook-form {
+	display: grid;
+	gap: var(--space-xs);
+	margin: var(--space-xs) var(--space-sm) var(--space-sm);
+	padding: var(--space-sm);
+	border: 1px solid rgb(var(--v-theme-outline));
+	border-radius: var(--radius-sm);
+	background: rgb(var(--v-theme-surface-variant));
+}
+
+.notebook-form-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-xs);
+}
+
+/* 本元件的 legend 與檔案 input 都靠這個藏起來，scoped style 內必須自行定義 */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	border: 0;
+	white-space: nowrap;
+}
+
+.document-upload {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--space-xs) var(--space-sm);
+}
+
+.document-upload-hint {
+	color: var(--ink-subtle);
+	font-size: 0.74rem;
+}
+
+.document-upload-error {
+	margin: 0;
+	color: rgb(var(--v-theme-error));
+	font-size: 0.78rem;
 }
 
 .source-option {
