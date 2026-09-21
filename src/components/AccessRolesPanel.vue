@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 
 import FilterSearchField from '@/components/FilterSearchField.vue'
+import { useMasterDetailDraft } from '@/composables/useMasterDetailDraft'
 
 import {
 	CAPABILITIES,
@@ -16,7 +17,6 @@ import {
 	ADMIN_ONLY_CAPABILITY_CODES,
 	isRoleLocked,
 	updateRole,
-	type FieldErrors,
 	type RoleDraft,
 } from '@/mocks/access'
 
@@ -32,54 +32,25 @@ const capabilityGroups = computed(() => {
 })
 
 const search = ref('')
-const selectedId = ref<string | null>(accessState.roles[0]?.id ?? null)
-const pendingId = ref<string | null | undefined>(undefined)
-const form = reactive<RoleDraft>({ code: '', name: '', description: '', capabilityCodes: [] })
-const errors = ref<FieldErrors>({})
 const confirmDelete = ref(false)
+
+const { selectedId, pendingId, form, errors, isDirty, isCreating, resetForm, requestSelect, discardAndSwitch, clearError } = useMasterDetailDraft<RoleDraft>({
+	initialId: accessState.roles[0]?.id ?? null,
+	draftFromSelection: draftFromRole,
+})
 
 const filteredRoles = computed(() => {
 	const keyword = search.value?.trim().toLowerCase() ?? ''
 	return accessState.roles.filter((role) => !keyword || `${role.name} ${role.code} ${role.description}`.toLowerCase().includes(keyword))
 })
 const selectedRole = computed(() => (selectedId.value ? getRole(selectedId.value) : undefined))
-const isCreating = computed(() => selectedId.value === null)
 const locked = computed(() => Boolean(selectedRole.value && isRoleLocked(selectedRole.value)))
 const usage = computed(() => (selectedRole.value ? getRoleUsage(selectedRole.value.id) : null))
 const deleteBlocker = computed(() => (selectedRole.value ? getRoleDeleteBlocker(selectedRole.value.id) : null))
 
-function draftFromRole(): RoleDraft {
-	const role = selectedRole.value
+function draftFromRole(id: string | null): RoleDraft {
+	const role = id ? getRole(id) : undefined
 	return role ? { code: role.code, name: role.name, description: role.description, capabilityCodes: [...role.capabilityCodes] } : { code: '', name: '', description: '', capabilityCodes: ['km.portal.access'] }
-}
-
-const isDirty = computed(() => {
-	const base = draftFromRole()
-	return base.code !== form.code || base.name !== form.name || base.description !== form.description || base.capabilityCodes.length !== form.capabilityCodes.length || base.capabilityCodes.some((code) => !form.capabilityCodes.includes(code))
-})
-
-function resetForm(): void {
-	Object.assign(form, draftFromRole())
-	errors.value = {}
-}
-watch(selectedId, resetForm, { immediate: true })
-
-function requestSelect(id: string | null): void {
-	if (id === selectedId.value) return
-	if (isDirty.value) pendingId.value = id
-	else selectedId.value = id
-}
-
-function discardAndSwitch(): void {
-	const next = pendingId.value
-	pendingId.value = undefined
-	if (next === undefined) return
-	if (next === selectedId.value) resetForm()
-	else selectedId.value = next
-}
-
-function clearError(key: string): void {
-	if (errors.value[key]) errors.value = Object.fromEntries(Object.entries(errors.value).filter(([field]) => field !== key))
 }
 
 function toggleCapability(code: string, checked: boolean | null): void {

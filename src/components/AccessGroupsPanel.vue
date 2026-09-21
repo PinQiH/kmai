@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 
 import FilterSearchField from '@/components/FilterSearchField.vue'
+import { useMasterDetailDraft } from '@/composables/useMasterDetailDraft'
 
 import {
 	GROUP_TYPE_LABELS,
@@ -22,7 +23,6 @@ import {
 	getGroupTree,
 	removeGroupMember,
 	updateGroup,
-	type FieldErrors,
 	type GroupDraft,
 	type GroupType,
 } from '@/mocks/access'
@@ -32,18 +32,18 @@ const emit = defineEmits<{ notify: [text: string, tone?: 'success' | 'error']; o
 const typeItems = (Object.keys(GROUP_TYPE_LABELS) as GroupType[]).map((value) => ({ value, title: GROUP_TYPE_LABELS[value] }))
 
 const search = ref('')
-const selectedId = ref<string | null>(accessState.groups[0]?.id ?? null)
-const pendingId = ref<string | null | undefined>(undefined)
-const form = reactive<GroupDraft>({ name: '', type: 'department', parentId: null, roleIds: [] })
-const errors = ref<FieldErrors>({})
 const confirmDelete = ref(false)
+
+const { selectedId, pendingId, form, errors, isDirty, isCreating, resetForm, requestSelect, discardAndSwitch, clearError } = useMasterDetailDraft<GroupDraft>({
+	initialId: accessState.groups[0]?.id ?? null,
+	draftFromSelection: draftFromGroup,
+})
 
 const tree = computed(() => {
 	const keyword = search.value?.trim() ?? ''
 	return getGroupTree().filter(({ group }) => !keyword || getGroupPath(group.id).includes(keyword))
 })
 const selectedGroup = computed(() => (selectedId.value ? getGroup(selectedId.value) : undefined))
-const isCreating = computed(() => selectedId.value === null)
 const isSynced = computed(() => selectedGroup.value?.source === 'sso')
 const members = computed(() => (selectedGroup.value ? getGroupMembers(selectedGroup.value.id) : []))
 const children = computed(() => accessState.groups.filter((group) => selectedId.value && group.parentId === selectedId.value))
@@ -58,38 +58,9 @@ const parentItems = computed(() => {
 })
 const roleItems = computed(() => accessState.roles.map((role) => ({ value: role.id, title: role.name, props: { disabled: role.id === SYSTEM_ADMIN_ROLE_ID && !canGrantAdmin.value } })))
 
-function draftFromGroup(): GroupDraft {
-	const group = selectedGroup.value
+function draftFromGroup(id: string | null): GroupDraft {
+	const group = id ? getGroup(id) : undefined
 	return group ? { name: group.name, type: group.type, parentId: group.parentId, roleIds: [...group.roleIds] } : { name: '', type: 'team', parentId: null, roleIds: [] }
-}
-
-const isDirty = computed(() => {
-	const base = draftFromGroup()
-	return base.name !== form.name || base.type !== form.type || base.parentId !== form.parentId || base.roleIds.length !== form.roleIds.length || base.roleIds.some((id) => !form.roleIds.includes(id))
-})
-
-function resetForm(): void {
-	Object.assign(form, draftFromGroup())
-	errors.value = {}
-}
-watch(selectedId, resetForm, { immediate: true })
-
-function clearError(key: string): void {
-	if (errors.value[key] || errors.value.form) errors.value = Object.fromEntries(Object.entries(errors.value).filter(([field]) => field !== key && field !== 'form'))
-}
-
-function requestSelect(id: string | null): void {
-	if (id === selectedId.value) return
-	if (isDirty.value) pendingId.value = id
-	else selectedId.value = id
-}
-
-function discardAndSwitch(): void {
-	const next = pendingId.value
-	pendingId.value = undefined
-	if (next === undefined) return
-	if (next === selectedId.value) resetForm()
-	else selectedId.value = next
 }
 
 function save(): void {
