@@ -3,14 +3,33 @@ import { computed } from "vue"
 
 import AnimatedNumber from "@/components/AnimatedNumber.vue"
 import PageHeader from "@/components/PageHeader.vue"
+import StatePanel from "@/components/StatePanel.vue"
+import { useAsyncData } from "@/composables/useAsyncData"
 import { getOpenCases } from "@/mocks/feedbackAdmin"
 import {
-  getHealthMetricsSnapshot,
-  getRecentActivitiesSnapshot,
+  fetchHealthMetrics,
+  fetchRecentActivities,
 } from "@/repositories/admin.repository"
+import type { ActivityItem, HealthMetric } from "@/types"
 
-const healthMetrics = getHealthMetricsSnapshot()
-const recentActivities = getRecentActivitiesSnapshot()
+const {
+  data: healthMetrics,
+  isLoading: isLoadingMetrics,
+  errorMessage: metricsError,
+  reload: reloadMetrics,
+} = useAsyncData(fetchHealthMetrics, {
+  initialValue: [] as HealthMetric[],
+  errorMessage: () => "目前無法載入系統健康度，請稍後再試。",
+})
+const {
+  data: recentActivities,
+  isLoading: isLoadingActivities,
+  errorMessage: activitiesError,
+  reload: reloadActivities,
+} = useAsyncData(fetchRecentActivities, {
+  initialValue: [] as ActivityItem[],
+  errorMessage: () => "目前無法載入近期動態，請稍後再試。",
+})
 const openFeedbackCount = computed(() => getOpenCases().length)
 
 const metricColor = {
@@ -53,7 +72,20 @@ const metricColor = {
 
     <section aria-labelledby="health-title" class="mb-10">
       <h2 id="health-title" class="section-heading mb-4">內容與系統健康度</h2>
-      <VRow>
+      <StatePanel
+        v-if="metricsError"
+        icon="mdi-cloud-alert-outline"
+        title="無法載入健康度"
+        :description="metricsError"
+        action-label="重新載入"
+        @action="reloadMetrics"
+      />
+      <VRow v-else-if="isLoadingMetrics">
+        <VCol v-for="placeholder in 4" :key="placeholder" cols="12" sm="6" lg="3">
+          <VSkeletonLoader type="article" class="surface-border rounded-lg" />
+        </VCol>
+      </VRow>
+      <VRow v-else>
         <VCol
           v-for="(metric, index) in healthMetrics"
           :key="metric.label"
@@ -97,7 +129,16 @@ const metricColor = {
               >查看系統事件</VBtn
             >
           </div>
-          <VList lines="two">
+          <StatePanel
+            v-if="activitiesError"
+            icon="mdi-cloud-alert-outline"
+            title="無法載入近期動態"
+            :description="activitiesError"
+            action-label="重新載入"
+            @action="reloadActivities"
+          />
+          <VSkeletonLoader v-else-if="isLoadingActivities" type="list-item-two-line@3" />
+          <VList v-else lines="two">
             <template
               v-for="(activity, index) in recentActivities"
               :key="activity.id"

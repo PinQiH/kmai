@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	getAdminDocumentsSnapshot,
-	getHealthMetricsSnapshot,
-	getRecentActivitiesSnapshot,
+	fetchHealthMetrics,
+	fetchRecentActivities,
 } from '@/repositories/admin.repository'
 import {
 	getAlertEventsSnapshot,
@@ -25,15 +25,15 @@ describe('mock repository snapshots', () => {
 		expect(secondSnapshot[0]!.tags).not.toContain('mutated tag')
 	})
 
-	it('should return independent admin metric and activity snapshots', () => {
-		const metrics = getHealthMetricsSnapshot()
-		const activities = getRecentActivitiesSnapshot()
+	it('should return independent admin metric and activity snapshots', async () => {
+		const metrics = await fetchHealthMetrics()
+		const activities = await fetchRecentActivities()
 
 		metrics[0]!.value = -1
 		activities[0]!.title = 'mutated activity'
 
-		expect(getHealthMetricsSnapshot()[0]!.value).not.toBe(-1)
-		expect(getRecentActivitiesSnapshot()[0]!.title).not.toBe('mutated activity')
+		expect((await fetchHealthMetrics())[0]!.value).not.toBe(-1)
+		expect((await fetchRecentActivities())[0]!.title).not.toBe('mutated activity')
 	})
 
 	it('should return independent monitoring snapshots including nested data', () => {
