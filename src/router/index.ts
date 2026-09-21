@@ -95,12 +95,6 @@ const routes: RouteRecordRaw[] = [
 		meta: { title: "知識圖譜" },
 	},
 	{
-		path: "/notifications",
-		name: "notifications",
-		component: () => import("@/views/NotificationsView.vue"),
-		meta: { title: "通知中心" },
-	},
-	{
 		path: "/account",
 		name: "account",
 		component: () => import("@/views/AccountView.vue"),

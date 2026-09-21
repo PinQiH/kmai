@@ -1,16 +1,25 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref } from 'vue'
+import type { VBtn } from 'vuetify/components'
 
+import NotificationCenterDialog from '@/components/NotificationCenterDialog.vue'
+import { useMarkAllNotificationsRead } from '@/composables/useMarkAllNotificationsRead'
 import { CURRENT_NOTIFICATION_USER_ID } from '@/mocks/notifications'
 import { useNotificationsStore } from '@/stores/notifications'
 import type { NotificationPriority } from '@/types'
 import { formatNotificationMenuTimestamp, formatNotificationTimestamp } from '@/utils/notifications'
 
 const notificationsStore = useNotificationsStore()
+const markAllNotificationsRead = useMarkAllNotificationsRead()
+
+const isCenterOpen = ref(false)
+const centerInitialNotificationId = ref<string | null>(null)
+const bellButton = ref<InstanceType<typeof VBtn>>()
 
 const recentNotifications = computed(() => notificationsStore.currentUserNotifications.slice(0, 5))
 const priorityMeta: Record<NotificationPriority, { color: string; icon: string; label: string }> = {
-	normal: { color: 'primary', icon: 'mdi-bell-outline', label: '一般' },
+	// @ 與通知中心一致：一般通知用中性色，Archive Indigo 留給主要操作
+	normal: { color: 'medium-emphasis', icon: 'mdi-bell-outline', label: '一般' },
 	important: { color: 'warning', icon: 'mdi-bell-alert-outline', label: '重要' },
 	urgent: { color: 'error', icon: 'mdi-alert-circle-outline', label: '緊急' },
 }
@@ -19,6 +28,18 @@ function isUnread(notificationId: string): boolean {
 	const notification = notificationsStore.currentUserNotifications.find((item) => item.id === notificationId)
 	const recipient = notification?.recipients.find((item) => item.userId === CURRENT_NOTIFICATION_USER_ID)
 	return !recipient?.readAt
+}
+
+/* > 從鈴鐺開啟通知中心彈窗；帶 notificationId 時直接展開該則 */
+function openNotificationCenter(notificationId: string | null = null): void {
+	centerInitialNotificationId.value = notificationId
+	isCenterOpen.value = true
+}
+
+/* > 彈窗關閉後把焦點還給鈴鐺，鍵盤使用者不必從頭 Tab */
+function focusBell(): void {
+	centerInitialNotificationId.value = null
+	void nextTick(() => (bellButton.value?.$el as HTMLElement | undefined)?.focus({ preventScroll: true }))
 }
 </script>
 
@@ -33,6 +54,7 @@ function isUnread(notificationId: string): boolean {
 				offset-y="4"
 			>
 				<VBtn
+					ref="bellButton"
 					v-bind="menuProps"
 					icon="mdi-bell-outline"
 					:aria-label="`通知，${notificationsStore.unreadCount} 則未讀`"
@@ -51,7 +73,8 @@ function isUnread(notificationId: string): boolean {
 					v-if="notificationsStore.unreadCount > 0"
 					variant="text"
 					size="small"
-					@click.stop="notificationsStore.markAllRead()"
+					data-testid="notification-menu-mark-all"
+					@click.stop="markAllNotificationsRead()"
 				>
 					全部已讀
 				</VBtn>
@@ -61,8 +84,8 @@ function isUnread(notificationId: string): boolean {
 			<VList v-if="recentNotifications.length > 0" lines="three" class="py-0">
 				<template v-for="(notification, index) in recentNotifications" :key="notification.id">
 					<VListItem
-						:to="{ path: '/notifications', query: { id: notification.id } }"
 						:class="{ 'is-unread': isUnread(notification.id) }"
+						@click="openNotificationCenter(notification.id)"
 					>
 						<template #prepend>
 							<VIcon
@@ -71,7 +94,9 @@ function isUnread(notificationId: string): boolean {
 								:aria-label="priorityMeta[notification.priority].label"
 							/>
 						</template>
-						<VListItemTitle>{{ notification.title }}</VListItemTitle>
+						<VListItemTitle :class="isUnread(notification.id) ? 'font-weight-bold' : 'font-weight-regular'">
+						{{ notification.title }}
+					</VListItemTitle>
 						<VListItemSubtitle class="notification-meta">
 							<span class="notification-source" :title="notification.sourceLabel">
 								{{ notification.sourceLabel }}
@@ -99,10 +124,16 @@ function isUnread(notificationId: string): boolean {
 
 			<VDivider />
 			<VCardActions class="pa-2">
-				<VBtn block variant="text" to="/notifications">查看所有通知</VBtn>
+				<VBtn block variant="text" @click="openNotificationCenter()">查看所有通知</VBtn>
 			</VCardActions>
 		</VCard>
 	</VMenu>
+
+	<NotificationCenterDialog
+		v-model="isCenterOpen"
+		:initial-notification-id="centerInitialNotificationId"
+		@closed="focusBell"
+	/>
 </template>
 
 <style scoped>
@@ -118,7 +149,6 @@ function isUnread(notificationId: string): boolean {
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
 	font-size: 0.875rem;
-	font-weight: 600;
 	line-height: 1.4;
 	white-space: normal;
 }
@@ -146,6 +176,11 @@ function isUnread(notificationId: string): boolean {
 
 .is-unread {
 	background: var(--tint-hover);
+}
+
+.unread-mark {
+	display: inline-flex;
+	align-items: center;
 }
 
 .unread-dot {

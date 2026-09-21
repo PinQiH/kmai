@@ -463,13 +463,33 @@ export const useNotificationsStore = defineStore('notifications', {
 		/**
 		 * 將目前使用者的所有通知標示為已讀，但不計入查看成效。
 		 * @param readAt 已讀時間，測試可傳入固定值。
+		 * @returns 這次實際由未讀轉為已讀的通知識別碼，可交給 restoreUnread 復原。
 		 */
-		markAllRead(readAt = new Date().toISOString()): void {
+		markAllRead(readAt = new Date().toISOString()): string[] {
+			const changedIds: string[] = []
 			this.currentUserNotifications.forEach((notification) => {
 				const recipient = notification.recipients.find((item) => item.userId === CURRENT_NOTIFICATION_USER_ID)
 				if (!recipient || recipient.readAt) return
 				recipient.readAt = readAt
+				changedIds.push(notification.id)
 			})
+			return changedIds
+		},
+		/**
+		 * 把指定通知還原成未讀，用於復原「全部標示已讀」。
+		 * @param notificationIds markAllRead 回傳的通知識別碼。
+		 * @returns 實際還原成未讀的筆數。
+		 */
+		restoreUnread(notificationIds: string[]): number {
+			let restoredCount = 0
+			notificationIds.forEach((notificationId) => {
+				const notification = this.notifications.find((item) => item.id === notificationId)
+				const recipient = notification?.recipients.find((item) => item.userId === CURRENT_NOTIFICATION_USER_ID)
+				if (!recipient?.readAt) return
+				recipient.readAt = null
+				restoredCount += 1
+			})
+			return restoredCount
 		},
 		/**
 		 * 啟用或停用自動通知規則。
