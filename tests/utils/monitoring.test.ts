@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { alertEvents, alertRules, logEntries } from '../src/mocks/monitoring'
+import { alertEvents, alertRules, logEntries } from '../../src/mocks/monitoring'
 import {
 	ALL_FILTER,
 	buildSparkline,
@@ -10,8 +10,8 @@ import {
 	isValidEmail,
 	parseEmailList,
 	summarizeAlertEvents,
-} from '../src/utils/monitoring'
-import type { LogEntry } from '../src/types'
+} from '../../src/utils/monitoring'
+import type { LogEntry } from '../../src/types'
 
 function findRule(ruleId: string) {
 	const rule = alertRules.find((item) => item.id === ruleId)

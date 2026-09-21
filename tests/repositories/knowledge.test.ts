@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { getDocumentById, searchDocuments } from '../src/repositories/knowledge.repository'
+import { getDocumentById, searchDocuments } from '../../src/repositories/knowledge.repository'
 
 describe('knowledge repository', () => {
 	it('should return published documents when query is empty', async () => {

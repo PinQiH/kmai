@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { ThemeDefinition } from 'vuetify'
 
-import { clusterPalette, darkTheme, lightTheme, resolveThemeName, systemRecordCategoryPalette } from '../src/theme'
-import { buildBackdropTheme, extractImagePalette } from '../src/utils/imagePalette'
-import { contrastRatio, deltaE, relativeLuminance } from './helpers/color'
+import { clusterPalette, darkTheme, lightTheme, resolveThemeName, systemRecordCategoryPalette } from '../../src/theme'
+import { buildBackdropTheme, extractImagePalette } from '../../src/utils/imagePalette'
+import { contrastRatio, deltaE, relativeLuminance } from '../helpers/color'
 
 /*
  * > 主題語意色的可見性與可分辨性

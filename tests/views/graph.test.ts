@@ -5,8 +5,8 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
-import { getKnowledgeGraphBySourceId } from '../src/mocks/graph'
-import GraphView from '../src/views/GraphView.vue'
+import { getKnowledgeGraphBySourceId } from '../../src/mocks/graph'
+import GraphView from '../../src/views/GraphView.vue'
 
 class ResizeObserverStub {
 	observe(): void {}

@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { parseAnswerSegments, useConversationStore } from '../src/stores/conversation'
+import { parseAnswerSegments, useConversationStore } from '../../src/stores/conversation'
 
 describe('conversation store', () => {
 	beforeEach(() => {

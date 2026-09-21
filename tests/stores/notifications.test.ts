@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-import { CURRENT_NOTIFICATION_USER_ID } from '../src/mocks/notifications'
-import { useMonitoringStore } from '../src/stores/monitoring'
-import { useNotificationsStore } from '../src/stores/notifications'
-import type { NotificationRuleInput, SendNotificationInput } from '../src/types'
+import { CURRENT_NOTIFICATION_USER_ID } from '../../src/mocks/notifications'
+import { useMonitoringStore } from '../../src/stores/monitoring'
+import { useNotificationsStore } from '../../src/stores/notifications'
+import type { NotificationRuleInput, SendNotificationInput } from '../../src/types'
 
 function buildInput(overrides: Partial<SendNotificationInput> = {}): SendNotificationInput {
 	return {

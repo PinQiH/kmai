@@ -4,7 +4,7 @@ import {
 	clampAssistantPosition,
 	getDefaultAssistantPosition,
 	snapAssistantPosition,
-} from '../src/utils/assistantPosition'
+} from '../../src/utils/assistantPosition'
 
 const viewport = { width: 1200, height: 800 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { AppNotification } from '../src/types'
+import type { AppNotification } from '../../src/types'
 import {
 	formatElapsedTime,
 	formatNotificationMenuTimestamp,
@@ -11,7 +11,7 @@ import {
 	normalizeNotificationActionTarget,
 	parseNotificationSchedule,
 	summarizeNotificationPerformance,
-} from '../src/utils/notifications'
+} from '../../src/utils/notifications'
 
 function buildNotification(overrides: Partial<AppNotification> = {}): AppNotification {
 	return {

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { baseSystemRecords } from '../src/mocks/systemRecords'
-import type { SystemRecordEntry } from '../src/types'
+import { baseSystemRecords } from '../../src/mocks/systemRecords'
+import type { SystemRecordEntry } from '../../src/types'
 import {
 	buildAuditRecords,
 	buildSystemEventRecords,
 	getSystemRecordTimeCutoff,
 	SYSTEM_EVENT_CATEGORIES,
-} from '../src/utils/systemRecords'
+} from '../../src/utils/systemRecords'
 
 describe('system records', () => {
 	it('should keep only sign-in and scheduled job events in descending time order', () => {

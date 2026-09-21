@@ -5,11 +5,11 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import AdminAssistantLauncher from '../src/components/AdminAssistantLauncher.vue'
-import AdminAssistantPanel from '../src/components/AdminAssistantPanel.vue'
-import { ASSISTANT_MOCK_RESPONSE_MS, useAdminAssistantStore } from '../src/stores/adminAssistant'
-import { useNotebooksStore } from '../src/stores/notebooks'
-import { buildKnowledgeSourceOptions } from '../src/utils/knowledgeSources'
+import AdminAssistantLauncher from '../../src/components/AdminAssistantLauncher.vue'
+import AdminAssistantPanel from '../../src/components/AdminAssistantPanel.vue'
+import { ASSISTANT_MOCK_RESPONSE_MS, useAdminAssistantStore } from '../../src/stores/adminAssistant'
+import { useNotebooksStore } from '../../src/stores/notebooks'
+import { buildKnowledgeSourceOptions } from '../../src/utils/knowledgeSources'
 
 globalThis.ResizeObserver = class ResizeObserverStub {
 	observe(): void {}

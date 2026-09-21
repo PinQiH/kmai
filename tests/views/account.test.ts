@@ -7,10 +7,10 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
-import { useAppStore } from '../src/stores/app'
-import { getCase } from '../src/mocks/feedbackAdmin'
-import { createThemeDefinitions } from '../src/theme'
-import AccountView from '../src/views/AccountView.vue'
+import { useAppStore } from '../../src/stores/app'
+import { getCase } from '../../src/mocks/feedbackAdmin'
+import { createThemeDefinitions } from '../../src/theme'
+import AccountView from '../../src/views/AccountView.vue'
 
 globalThis.ResizeObserver = class ResizeObserverStub {
 	observe(): void {}

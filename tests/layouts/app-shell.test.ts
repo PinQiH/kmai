@@ -7,7 +7,7 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import AppShell from '../src/layouts/AppShell.vue'
+import AppShell from '../../src/layouts/AppShell.vue'
 
 const ConversationSearchDialogStub = defineComponent({
 	name: 'ConversationSearchDialog',

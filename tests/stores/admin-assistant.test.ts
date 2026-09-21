@@ -6,12 +6,12 @@ import {
 	ASSISTANT_IDLE_TIMEOUT_MS,
 	ASSISTANT_MOCK_RESPONSE_MS,
 	useAdminAssistantStore,
-} from '../src/stores/adminAssistant'
-import { useAssistantAuditStore } from '../src/stores/assistantAudit'
-import { useConversationStore } from '../src/stores/conversation'
-import { useNotebooksStore } from '../src/stores/notebooks'
-import { sanitizeAuditContent } from '../src/utils/assistantAudit'
-import { COMPANY_KNOWLEDGE_SOURCES, MODEL_ONLY_SOURCE } from '../src/utils/knowledgeSources'
+} from '../../src/stores/adminAssistant'
+import { useAssistantAuditStore } from '../../src/stores/assistantAudit'
+import { useConversationStore } from '../../src/stores/conversation'
+import { useNotebooksStore } from '../../src/stores/notebooks'
+import { sanitizeAuditContent } from '../../src/utils/assistantAudit'
+import { COMPANY_KNOWLEDGE_SOURCES, MODEL_ONLY_SOURCE } from '../../src/utils/knowledgeSources'
 
 describe('admin assistant store', () => {
 	beforeEach(() => {

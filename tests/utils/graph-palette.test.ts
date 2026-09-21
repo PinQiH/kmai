@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { clusterPalette, darkTheme, lightTheme } from '../src/theme'
-import { contrastRatio, deltaE, relativeLuminance } from './helpers/color'
+import { clusterPalette, darkTheme, lightTheme } from '../../src/theme'
+import { contrastRatio, deltaE, relativeLuminance } from '../helpers/color'
 
 /*
  * > 知識圖譜群組色票的對比檢查

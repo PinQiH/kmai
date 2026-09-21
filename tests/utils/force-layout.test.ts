@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { graphEdges, graphNodes } from '../src/mocks/graph'
-import { ForceLayout, type ForceLink } from '../src/utils/force-layout'
+import { graphEdges, graphNodes } from '../../src/mocks/graph'
+import { ForceLayout, type ForceLink } from '../../src/utils/force-layout'
 
 const WIDTH = 960
 const HEIGHT = 620

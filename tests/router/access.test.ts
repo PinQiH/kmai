@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { canAccessRoute, router } from '../src/router'
-import { useAppStore } from '../src/stores/app'
-import { pinia } from '../src/stores'
+import { canAccessRoute, router } from '../../src/router'
+import { useAppStore } from '../../src/stores/app'
+import { pinia } from '../../src/stores'
 
 describe('route access', () => {
 	it('should reject private route when user is signed out', () => {

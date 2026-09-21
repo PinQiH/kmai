@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-import { CURRENT_USER_ID, useNotebooksStore } from '../src/stores/notebooks'
-import type { Citation, NotebookCollaboratorRole } from '../src/types'
+import { CURRENT_USER_ID, useNotebooksStore } from '../../src/stores/notebooks'
+import type { Citation, NotebookCollaboratorRole } from '../../src/types'
 
 describe('notebooks store', () => {
 	beforeEach(() => setActivePinia(createPinia()))
