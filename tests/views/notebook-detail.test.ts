@@ -11,6 +11,18 @@ import { useConversationStore } from '@/stores/conversation'
 import { useNotebooksStore } from '@/stores/notebooks'
 import NotebookDetailView from '@/views/NotebookDetailView.vue'
 
+// @ 圖譜畫布依 prefers-reduced-motion 決定是否播放力導向動畫；測試直接取收斂結果
+globalThis.matchMedia = ((query: string) => ({
+	matches: query.includes('prefers-reduced-motion'),
+	media: query,
+	addEventListener: vi.fn(),
+	removeEventListener: vi.fn(),
+	addListener: vi.fn(),
+	removeListener: vi.fn(),
+	onchange: null,
+	dispatchEvent: vi.fn(() => true),
+})) as unknown as typeof globalThis.matchMedia
+
 globalThis.ResizeObserver = class ResizeObserverStub {
 	observe(): void {}
 	unobserve(): void {}
@@ -199,8 +211,14 @@ describe('NotebookDetailView knowledge graph', () => {
 		await flushPromises()
 		await nextTick()
 
-		expect(wrapper.get('[data-testid="notebook-knowledge-graph"]').attributes('aria-label')).toBe('這本筆記本的知識圖譜')
 		expect(wrapper.get('[data-testid="add-notebook-content"]').classes()).toContain('text-primary')
+		expect(wrapper.get('[data-testid="notebook-tab-documents"]').attributes('aria-selected')).toBe('true')
+		expect(wrapper.find('[data-testid="notebook-graph-panel"]').exists()).toBe(false)
+
+		await wrapper.get('[data-testid="notebook-tab-graph"]').trigger('click')
+		await nextTick()
+
+		expect(wrapper.get('[data-testid="notebook-knowledge-graph"]').attributes('aria-label')).toBe('這本筆記本的知識圖譜')
 		expect(wrapper.get('[data-testid="notebook-knowledge-graph"]').text()).not.toContain('這本筆記本的知識圖譜')
 		expect(wrapper.get('[data-testid="notebook-tab-graph"]').attributes('aria-selected')).toBe('true')
 		expect(wrapper.get('[data-testid="notebook-tab-graph"]').attributes('aria-controls')).toBe('notebook-panel-graph')

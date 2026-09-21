@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, type CSSProperties } from 'vue'
+import { computed, ref } from 'vue'
 
+import KnowledgeGraphCanvas from '@/components/KnowledgeGraphCanvas.vue'
+import type { KnowledgeGraphCanvasNode } from '@/utils/knowledgeGraphCanvas'
 import type { NotebookKnowledgeGraphContext } from '@/mocks/notebookKnowledgeGraph'
 
 interface ComponentProps {
@@ -8,36 +10,58 @@ interface ComponentProps {
 	canUpload: boolean
 }
 
-interface NodePosition {
-	x: number
-	y: number
-}
+/*
+ * > 筆記本知識圖譜
+ * @ 與知識庫頁的圖譜共用 KnowledgeGraphCanvas，風格、互動與無障礙行為一致；
+ *   這裡只負責把筆記本的節點資料轉成畫布格式，並提供自己的詳情面板。
+ */
+
+const NOTEBOOK_CLUSTER = '筆記本'
+const DOCUMENT_CLUSTER = '文件'
+const TOPIC_CLUSTER = '主題'
+const CLUSTERS = [NOTEBOOK_CLUSTER, DOCUMENT_CLUSTER, TOPIC_CLUSTER] as const
 
 const props = defineProps<ComponentProps>()
 
-const notebookPosition: NodePosition = { x: 50, y: 50 }
-const relatedNodePositions: NodePosition[] = [
-	{ x: 17, y: 20 },
-	{ x: 50, y: 15 },
-	{ x: 83, y: 20 },
-	{ x: 17, y: 80 },
-	{ x: 50, y: 85 },
-	{ x: 83, y: 80 },
-]
+const selectedId = ref('')
+const hoveredId = ref('')
 
-const nodePositions = computed(() => {
-	const positions = new Map<string, NodePosition>([[props.context.notebookNodeId, notebookPosition]])
-	props.context.nodes.forEach((node, index) => {
-		positions.set(node.id, relatedNodePositions[index] ?? notebookPosition)
-	})
-	return positions
+const canvasNodes = computed<KnowledgeGraphCanvasNode[]>(() => {
+	const notebookNode: KnowledgeGraphCanvasNode = {
+		id: props.context.notebookNodeId,
+		label: props.context.notebookName,
+		type: NOTEBOOK_CLUSTER,
+		cluster: NOTEBOOK_CLUSTER,
+	}
+	const relatedNodes = props.context.nodes.map((node) => ({
+		id: node.id,
+		label: node.label,
+		type: node.kind === 'document' ? DOCUMENT_CLUSTER : TOPIC_CLUSTER,
+		cluster: node.kind === 'document' ? DOCUMENT_CLUSTER : TOPIC_CLUSTER,
+	}))
+	return [notebookNode, ...relatedNodes]
 })
 
-const graphLines = computed(() => props.context.edges.flatMap((edge) => {
-	const source = nodePositions.value.get(edge.sourceId)
-	const target = nodePositions.value.get(edge.targetId)
-	return source && target ? [{ ...edge, source, target }] : []
-}))
+const canvasEdges = computed(() => props.context.edges.map((edge) => ({ from: edge.sourceId, to: edge.targetId })))
+
+const nodeById = computed(() => new Map(canvasNodes.value.map((node) => [node.id, node])))
+
+const selectedNode = computed(() => (selectedId.value ? nodeById.value.get(selectedId.value) ?? null : null))
+
+const relatedNodes = computed(() => {
+	const current = selectedId.value
+	if (!current) return []
+	return props.context.edges
+		.flatMap((edge) => {
+			if (edge.sourceId === current) return [edge.targetId]
+			if (edge.targetId === current) return [edge.sourceId]
+			return []
+		})
+		.flatMap((id) => {
+			const node = nodeById.value.get(id)
+			return node ? [node] : []
+		})
+})
 
 const graphSummaryText = computed(() => {
 	const summary = [
@@ -46,6 +70,7 @@ const graphSummaryText = computed(() => {
 	]
 	if (props.context.processingDocumentCount > 0) summary.push(`${props.context.processingDocumentCount} 份處理中`)
 	if (props.context.failedDocumentCount > 0) summary.push(`${props.context.failedDocumentCount} 份失敗`)
+	if (props.context.hiddenNodeCount > 0) summary.push(`另有 ${props.context.hiddenNodeCount} 個節點未顯示`)
 	return summary.join(' · ')
 })
 
@@ -69,18 +94,19 @@ const emptyStateDescription = computed(() => {
 	return '圖譜會在這裡呈現筆記本、文件與主題之間的關聯。'
 })
 
-function getNodeStyle(nodeId: string): CSSProperties {
-	const position = nodePositions.value.get(nodeId) ?? notebookPosition
-	return {
-		left: `${position.x}%`,
-		top: `${position.y}%`,
-	}
+function selectNode(id: string): void {
+	selectedId.value = selectedId.value === id ? '' : id
 }
 </script>
 
 <template>
-	<section class="notebook-knowledge-section surface-border" aria-label="這本筆記本的知識圖譜" data-testid="notebook-knowledge-graph">
-		<div v-if="context.totalNodeCount === 0" class="notebook-knowledge-empty" role="status" data-testid="notebook-knowledge-empty">
+	<section class="notebook-knowledge-section" aria-label="這本筆記本的知識圖譜" data-testid="notebook-knowledge-graph">
+		<div
+			v-if="context.totalNodeCount === 0"
+			class="notebook-knowledge-empty surface-border"
+			role="status"
+			data-testid="notebook-knowledge-empty"
+		>
 			<VIcon icon="mdi-file-tree-outline" size="34" color="primary" aria-hidden="true" />
 			<div>
 				<h3>{{ emptyStateTitle }}</h3>
@@ -88,50 +114,66 @@ function getNodeStyle(nodeId: string): CSSProperties {
 			</div>
 		</div>
 
-		<figure v-else class="notebook-knowledge-figure" data-testid="notebook-knowledge-canvas">
-			<figcaption class="sr-only">
-				{{ context.notebookName }} 包含 {{ context.documentCount }} 份文件與 {{ context.topicCount }} 個主題；目前顯示 {{ context.nodes.length + 1 }} 個節點。
-			</figcaption>
+		<template v-else>
 			<p class="notebook-knowledge-summary" aria-label="圖譜摘要">{{ graphSummaryText }}</p>
-			<svg class="notebook-knowledge-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-				<line
-					v-for="line in graphLines"
-					:key="line.id"
-					:x1="line.source.x"
-					:y1="line.source.y"
-					:x2="line.target.x"
-					:y2="line.target.y"
+			<div class="graph-layout" :class="{ 'has-selection': Boolean(selectedNode) }" data-testid="notebook-knowledge-canvas">
+				<KnowledgeGraphCanvas
+					v-model:selected-id="selectedId"
+					v-model:hovered-id="hoveredId"
+					:nodes="canvasNodes"
+					:edges="canvasEdges"
+					:clusters="CLUSTERS"
+					:node-types="CLUSTERS"
+					canvas-label="筆記本知識圖譜關聯圖"
+					search-label="搜尋節點"
 				/>
-			</svg>
-			<div class="notebook-node" :title="context.notebookName">
-				<span>筆記本</span>
-				<strong>{{ context.notebookName }}</strong>
+
+				<aside v-if="selectedNode" class="surface-border pa-5 graph-detail" aria-label="節點詳情">
+					<div class="detail-heading">
+						<div>
+							<p class="eyebrow text-primary mb-2">目前節點</p>
+							<h3 class="text-h6 font-weight-bold" :title="selectedNode.label">{{ selectedNode.label }}</h3>
+						</div>
+						<VBtn
+							icon="mdi-close"
+							variant="text"
+							size="small"
+							aria-label="關閉節點詳情"
+							@click="selectedId = ''"
+						/>
+					</div>
+					<div class="d-flex align-center ga-2 mt-3">
+						<VChip size="small" variant="tonal">{{ selectedNode.type }}</VChip>
+					</div>
+					<p class="detail-hint mt-3">與 {{ relatedNodes.length }} 個節點直接相關。</p>
+
+					<VDivider class="my-5" />
+
+					<p class="text-caption font-weight-bold mb-2">關聯節點</p>
+					<ul class="related-list">
+						<li v-for="related in relatedNodes" :key="related.id">
+							<button
+								type="button"
+								class="related-item"
+								@click="selectNode(related.id)"
+								@mouseenter="hoveredId = related.id"
+								@mouseleave="hoveredId = ''"
+							>
+								<span class="related-label">{{ related.label }}</span>
+								<span class="related-relation">{{ related.type }}</span>
+							</button>
+						</li>
+					</ul>
+				</aside>
 			</div>
-			<ul class="notebook-related-nodes" aria-label="知識圖譜節點">
-				<li
-					v-for="node in context.nodes"
-					:key="node.id"
-					class="notebook-related-node"
-					:class="`notebook-related-node--${node.kind}`"
-					:style="getNodeStyle(node.id)"
-					:title="node.label"
-				>
-					<span>{{ node.kind === 'document' ? '文件' : '主題' }}</span>
-					<strong>{{ node.label }}</strong>
-				</li>
-			</ul>
-			<p v-if="context.hiddenNodeCount > 0" class="notebook-hidden-node-note" role="status">
-				另有 {{ context.hiddenNodeCount }} 個節點未顯示
-			</p>
-		</figure>
+		</template>
 	</section>
 </template>
 
 <style scoped>
 .notebook-knowledge-section {
-	overflow: hidden;
-	border-radius: var(--radius-md);
-	background: rgb(var(--v-theme-surface));
+	display: grid;
+	gap: var(--space-sm);
 }
 
 .notebook-knowledge-empty {
@@ -141,6 +183,7 @@ function getNodeStyle(nodeId: string): CSSProperties {
 	gap: var(--space-lg);
 	min-height: 220px;
 	padding: var(--space-xl);
+	border-radius: var(--radius-md);
 	background: rgb(var(--v-theme-background));
 }
 
@@ -154,172 +197,103 @@ function getNodeStyle(nodeId: string): CSSProperties {
 	color: var(--ink-muted);
 }
 
-.notebook-knowledge-figure {
-	position: relative;
-	min-height: 410px;
-	margin: 0;
-	background: rgb(var(--v-theme-background));
-}
-
 .notebook-knowledge-summary {
-	position: absolute;
-	left: var(--space-md);
-	top: var(--space-md);
-	z-index: 2;
 	margin: 0;
-	padding: 5px var(--space-sm);
-	border: 1px solid rgb(var(--v-theme-outline));
-	border-radius: 999px;
-	background: rgb(var(--v-theme-surface));
 	color: var(--ink-muted);
-	font-size: 0.75rem;
+	font-size: 0.78rem;
 }
 
-.notebook-knowledge-links {
-	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
+.graph-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--space-lg);
 }
 
-.notebook-knowledge-links line {
-	stroke: rgb(var(--v-theme-outline));
-	stroke-width: 0.4;
-	stroke-dasharray: 1.5 1.5;
-	vector-effect: non-scaling-stroke;
+.graph-layout.has-selection {
+	grid-template-columns: minmax(0, 1fr) 300px;
 }
 
-.notebook-node,
-.notebook-related-node {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-xs);
-	padding: 14px var(--space-md);
-	border: 1px solid rgb(var(--v-theme-outline));
+.graph-detail {
+	align-self: start;
 	border-radius: var(--radius-md);
 	background: rgb(var(--v-theme-surface));
-	color: var(--ink-strong);
 }
 
-.notebook-node {
-	position: absolute;
-	left: 50%;
-	top: 50%;
-	z-index: 2;
-	width: min(230px, 34%);
-	border-color: rgb(var(--v-theme-primary));
-	background: color-mix(in srgb, rgb(var(--v-theme-primary)) 10%, rgb(var(--v-theme-surface)));
-	transform: translate(-50%, -50%);
+.detail-heading {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-sm);
 }
 
-.notebook-node span,
-.notebook-related-node span {
-	color: var(--ink-muted);
-	font-size: 0.74rem;
-}
-
-.notebook-node strong,
-.notebook-related-node strong {
+/* @ 檔名可能很長，詳情標題最多兩行，完整名稱留在 title */
+.detail-heading h3 {
 	display: -webkit-box;
 	overflow: hidden;
 	overflow-wrap: anywhere;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
-	font-size: 0.9rem;
-	line-height: 1.35;
 }
 
-.notebook-related-nodes {
+.detail-hint {
+	font-size: 0.86rem;
+	line-height: 1.6;
+	color: var(--ink-muted);
+}
+
+.related-list {
+	display: grid;
+	gap: 2px;
 	margin: 0;
 	padding: 0;
 	list-style: none;
 }
 
-.notebook-related-node {
-	position: absolute;
-	z-index: 1;
-	width: min(190px, 27%);
-	transform: translate(-50%, -50%);
+.related-item {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-sm);
+	width: 100%;
+	padding: 6px 8px;
+	border-radius: var(--radius-sm);
+	background: none;
+	border: none;
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+	transition: background-color var(--motion-fast) var(--ease-standard);
 }
 
-.notebook-related-node--document {
-	border-color: color-mix(in srgb, rgb(var(--v-theme-primary)) 52%, rgb(var(--v-theme-outline)));
+.related-item:hover {
+	background: var(--tint-hover);
 }
 
-.notebook-related-node--topic {
-	background: color-mix(in srgb, rgb(var(--v-theme-surface-variant)) 54%, rgb(var(--v-theme-surface)));
+.related-label {
+	overflow-wrap: anywhere;
+	font-size: 0.88rem;
+	color: rgb(var(--v-theme-on-surface));
 }
 
-.notebook-hidden-node-note {
-	position: absolute;
-	right: var(--space-md);
-	bottom: var(--space-md);
-	margin: 0;
-	padding: 5px var(--space-sm);
-	border-radius: 999px;
-	background: rgb(var(--v-theme-surface));
-	color: var(--ink-muted);
-	font-size: 0.75rem;
+.related-relation {
+	flex-shrink: 0;
+	font-size: 0.72rem;
+	color: var(--ink-subtle);
 }
 
-.sr-only {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border: 0;
+@media (max-width: 900px) {
+	.graph-layout,
+	.graph-layout.has-selection {
+		grid-template-columns: 1fr;
+	}
 }
 
 @media (max-width: 700px) {
 	.notebook-knowledge-empty {
 		align-items: stretch;
 		flex-direction: column;
-		padding: var(--space-lg);
-	}
-
-	.notebook-knowledge-empty {
 		min-height: 0;
-	}
-
-	.notebook-knowledge-figure {
-		display: grid;
-		min-height: 0;
-		gap: var(--space-sm);
 		padding: var(--space-lg);
-	}
-
-	.notebook-knowledge-summary {
-		position: static;
-		justify-self: start;
-	}
-
-	.notebook-knowledge-links {
-		display: none;
-	}
-
-	.notebook-node,
-	.notebook-related-node {
-		position: static;
-		width: 100%;
-		transform: none;
-	}
-
-	.notebook-related-nodes {
-		display: grid;
-		gap: var(--space-sm);
-	}
-
-	.notebook-related-node--topic {
-		width: calc(100% - var(--space-md));
-		margin-left: var(--space-md);
-	}
-
-	.notebook-hidden-node-note {
-		position: static;
-		justify-self: start;
 	}
 }
 </style>

@@ -1,18 +1,43 @@
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import NotebookKnowledgeGraph from '@/components/NotebookKnowledgeGraph.vue'
 import { buildNotebookKnowledgeGraph } from '@/mocks/notebookKnowledgeGraph'
+
+class ResizeObserverStub {
+	observe(): void {}
+	unobserve(): void {}
+	disconnect(): void {}
+}
+
+// @ 圖譜畫布依 prefers-reduced-motion 決定是否播放力導向動畫；測試直接取收斂結果
+function stubGraphEnvironment(): void {
+	vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+	vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+		matches: String(query).includes('prefers-reduced-motion'),
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
+	})))
+}
 
 function createFileSource(fileName: string) {
 	return { type: 'file' as const, fileName, mimeType: 'application/pdf', extension: 'pdf' }
 }
 
 describe('NotebookKnowledgeGraph', () => {
-	it('should render the notebook graph summary and visible nodes when documents exist', () => {
+	beforeEach(() => {
+		stubGraphEnvironment()
+	})
+
+	afterEach(() => {
+		vi.unstubAllGlobals()
+	})
+
+	it('should render the notebook graph summary and visible nodes when documents exist', async () => {
 		const context = buildNotebookKnowledgeGraph({
 			id: 'notebook-product',
 			name: '產品研究筆記',
@@ -29,6 +54,8 @@ describe('NotebookKnowledgeGraph', () => {
 			props: { context, canUpload: true },
 			global: { plugins: [createVuetify({ components, directives })] },
 		})
+		// @ 力導向收斂後才會畫出節點標籤
+		await nextTick()
 
 		expect(wrapper.get('[data-testid="notebook-knowledge-graph"]').attributes('aria-label')).toBe('這本筆記本的知識圖譜')
 		expect(wrapper.find('h2').exists()).toBe(false)
@@ -37,7 +64,9 @@ describe('NotebookKnowledgeGraph', () => {
 		expect(wrapper.text()).toContain('2026-Q3-市場觀察.pdf')
 		expect(wrapper.text()).toContain('市場趨勢')
 		expect(wrapper.findAll('svg line')).toHaveLength(5)
-		expect(wrapper.get('.notebook-related-node--document').attributes('title')).toBe('2026-Q3-市場觀察.pdf')
+		expect(wrapper.findAll('.graph-node')).toHaveLength(6)
+		expect(wrapper.get('[data-node-id="document:nb-doc-001"]').attributes('aria-label'))
+			.toBe('2026-Q3-市場觀察.pdf，文件，屬於文件，5 個關聯')
 	})
 
 	it('should render guidance without duplicating the page upload action when the graph is empty', () => {
@@ -55,7 +84,7 @@ describe('NotebookKnowledgeGraph', () => {
 		expect(wrapper.find('[data-testid="notebook-graph-upload"]').exists()).toBe(false)
 	})
 
-	it('should preserve the full file name as a title when the visible label is clamped', () => {
+	it('should keep the full file name available on the node and its detail panel', async () => {
 		const longFileName = `${'季度市場與競品研究報告'.repeat(8)}.pdf`
 		const context = buildNotebookKnowledgeGraph({
 			id: 'notebook-long-name',
@@ -67,7 +96,12 @@ describe('NotebookKnowledgeGraph', () => {
 			global: { plugins: [createVuetify({ components, directives })] },
 		})
 
-		expect(wrapper.get('.notebook-related-node--document').attributes('title')).toBe(longFileName)
+		const documentNode = wrapper.get('[data-node-id="document:long-name"]')
+		expect(documentNode.attributes('aria-label')).toContain(longFileName)
+
+		await documentNode.trigger('keydown', { key: 'Enter' })
+
+		expect(wrapper.get('.graph-detail h3').attributes('title')).toBe(longFileName)
 	})
 
 	it('should explain processing and failed documents without showing graph nodes', () => {

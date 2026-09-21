@@ -42,7 +42,7 @@ const memberRole = ref<NotebookCollaboratorRole>('viewer')
 const memberError = ref('')
 const memberRemovalTarget = ref<MemberRemovalTarget | null>(null)
 const memberRemovalTriggerId = ref<string | null>(null)
-const activeContentTab = ref<NotebookContentTab>('graph')
+const activeContentTab = ref<NotebookContentTab>('documents')
 const isEditOpen = ref(false)
 const editName = ref('')
 const editDescription = ref('')
@@ -375,15 +375,12 @@ async function confirmNotebookDeletion(): Promise<void> {
 
 		<div class="notebook-content-tabs">
 			<VTabs v-model="activeContentTab" color="primary" density="comfortable" aria-label="筆記本內容檢視">
-				<VTab id="notebook-tab-graph" value="graph" prepend-icon="mdi-graph-outline" aria-controls="notebook-panel-graph" data-testid="notebook-tab-graph">知識圖譜</VTab>
 				<VTab id="notebook-tab-documents" value="documents" prepend-icon="mdi-file-document-multiple-outline" aria-controls="notebook-panel-documents" data-testid="notebook-tab-documents">文件（{{ notebook.documents.length }}）</VTab>
+				<VTab id="notebook-tab-graph" value="graph" prepend-icon="mdi-graph-outline" aria-controls="notebook-panel-graph" data-testid="notebook-tab-graph">知識圖譜</VTab>
 			</VTabs>
 		</div>
 
-		<div v-if="activeContentTab === 'graph'" id="notebook-panel-graph" class="notebook-content-panel" role="tabpanel" aria-labelledby="notebook-tab-graph" tabindex="0" data-testid="notebook-graph-panel">
-			<NotebookKnowledgeGraph v-if="notebookKnowledgeGraph" :context="notebookKnowledgeGraph" :can-upload="canEditContent" />
-		</div>
-		<div v-else id="notebook-panel-documents" class="notebook-content-panel" role="tabpanel" aria-labelledby="notebook-tab-documents" tabindex="0" data-testid="notebook-documents-panel">
+		<div v-if="activeContentTab === 'documents'" id="notebook-panel-documents" class="notebook-content-panel" role="tabpanel" aria-labelledby="notebook-tab-documents" tabindex="0" data-testid="notebook-documents-panel">
 			<StatePanel
 				v-if="notebook.documents.length === 0"
 				icon="mdi-file-upload-outline"
@@ -444,6 +441,9 @@ async function confirmNotebookDeletion(): Promise<void> {
 			</template>
 		</div>
 
+		<div v-else id="notebook-panel-graph" class="notebook-content-panel" role="tabpanel" aria-labelledby="notebook-tab-graph" tabindex="0" data-testid="notebook-graph-panel">
+			<NotebookKnowledgeGraph v-if="notebookKnowledgeGraph" :context="notebookKnowledgeGraph" :can-upload="canEditContent" />
+		</div>
 		<VDialog
 			:model-value="isShareOpen"
 			:max-width="memberRemovalTarget ? 460 : 640"
