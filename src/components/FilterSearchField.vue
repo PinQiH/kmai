@@ -8,7 +8,7 @@ interface ComponentProps {
 	modelValue: string | null | undefined
 	label?: string
 	placeholder?: string
-	// @ 省略時依序用 label、placeholder，確保沒有可見標籤時螢幕閱讀器仍讀得到用途
+	// @ 沒有可見 label 時才需要；省略則用 placeholder 補上，確保螢幕閱讀器讀得到用途
 	ariaLabel?: string
 }
 
@@ -26,7 +26,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 		:model-value="props.modelValue ?? ''"
 		:label="label"
 		:placeholder="placeholder"
-		:aria-label="ariaLabel ?? label ?? placeholder"
+		:aria-label="ariaLabel ?? (label ? undefined : placeholder)"
 		prepend-inner-icon="mdi-magnify"
 		clearable
 		hide-details
