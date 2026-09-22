@@ -38,5 +38,30 @@
 4. **設定類頁面**（AI 與檢索設定、系統資源、系統設定、使用者與存取）：多為表單儲存，搭配寫入 API 一起改。
 5. **其餘元件**（約 28 個）：多數只讀取展示用資料，可在對應頁面轉換時一併處理。
 
+## 後端合約（來源：`D:\_Work\KM\src\kmai`，`apps/api`）
+
+後端是 Express，路由掛在 `/api/v2`，`httpClient` 已依此調整。
+
+- **驗證**：session cookie（express-session），所以請求一律帶 `credentials: 'include'`；不需要自己加 Authorization header。
+- **權限**：middleware 以 capability 判斷（例如 `km.admin.users`、`km.admin.kb.edit`），權限不足回 403、未登入回 401。capability 代碼與前端 `mocks/access.ts` 的同一套。
+- **回應信封**：一律為
+
+  ```json
+  { "success": true, "data": {}, "meta": { "trace_id": "..." }, "error": null }
+  ```
+
+  失敗時 `data` 為 null，`error` 為 `{ code, message, trace_id }`。`request()` 會拆出 `data`，並把 `error.code`／`trace_id` 帶進 `HttpError`。
+- **清單分頁**：query 用 `page`（預設 1）與 `pageSize`（預設 20、上限 100），另有 `keyword` 與各自的篩選欄位。`request()` 的 `query` 參數可直接帶。
+
+### 主要掛載點
+
+`/auth`、`/collections`、`/portal`、`/system`、`/issue-reports`，以及 `/admin/` 底下的
+`users`、`groups`、`documents`、`ingestion-jobs`、`ingestion-strategies`、`knowledge-graph`、
+`audit-logs`、`login-logs`、`chat-logs`、`schedule-logs`、`model-settings`、
+`feedback/portal-answers`、`issue-reports`、`notebooks`、`collections`、`privacy-policy`、
+`release-notes`、`branding`、`mail`。
+
+實際的路徑、參數與回應欄位以各 `apps/api/src/routes/v2/*.ts` 與對應的 `schemas/*.ts` 為準。
+
 ## 待確認
-- 後端 API 規格（路徑、分頁、錯誤格式）尚未提供，`httpClient` 的錯誤訊息與分頁參數之後可能要調整。
+- 前端目前的資料結構（`src/types`）是照 mock 設計的，與後端 entity 欄位命名尚未逐一比對；每批轉換時需要一份對應表或轉換層。
