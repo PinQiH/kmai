@@ -5,16 +5,32 @@
 ## 已完成
 
 ### 共用基礎
-- `src/services/httpClient.ts`：`request()` 收斂 base URL（`VITE_API_BASE_URL`，預設 `/api`）、15 秒逾時、錯誤訊息，以及 401 時登出並導回登入頁（保留原目標路徑）。目前尚未被呼叫，串接後端時由 repository 使用。
+- `src/services/httpClient.ts`：`request()` 收斂 base URL（`VITE_API_BASE_URL`，預設 `/api/v2`）、15 秒逾時、信封解析、錯誤訊息，以及 401 時登出並導回登入頁（保留原目標路徑）。
 - `src/composables/useAsyncData.ts`：載入中、錯誤訊息、重新載入三態，並自動忽略過期請求的結果。
 
-### 已改為非同步的頁面
+### 資料存取邊界
+`src/views`、`src/components`、`src/stores` 已不再直接 import `@/mocks`，一律經 `src/repositories`。
+串接後端時只需改 repository 這一層，不必再動頁面。
+
+### 已改為非同步（有載入與錯誤狀態）
 | 頁面 | repository 函式 |
 |---|---|
 | 首頁、知識庫 | `fetchEmployeeDocuments` |
 | 管理總覽 | `fetchHealthMetrics`、`fetchRecentActivities` |
 | 系統紀錄（AI 問答紀錄） | `fetchAdminQuestionRecords` |
-| 營運監控（指標、服務健康、日誌） | `fetchServiceMetrics`、`fetchServiceHealth`、`fetchLogEntries` |
+| 營運監控 | `fetchServiceMetrics`、`fetchServiceHealth`、`fetchLogEntries` |
+| 文件管理 | `fetchAdminDocuments` |
+
+### 已收斂的寫入操作
+`createAdminDocument`、`createDocumentVersion`、`addDocumentAttachments`、
+`removeDocumentAttachment`、`createProcessingJob`、`deleteAdminDocument`、`publishAdminDocuments`。
+頁面不再直接修改 mock 陣列。
+
+### 仍為同步轉接的 repository
+`documents`、`graph`、`feedback`、`access`、`aiSettings`、`systemResources`、`mailBot`、
+`systemRecords`、`settings`、`conversation`、`notifications` 目前是 `export *` 的轉接層，
+把 mock 原樣轉出。**這是刻意的中繼狀態**：邊界已經就位，接後端時逐一把函式改成
+`fetchXxx(): Promise<T>` 並在頁面補三態即可，不需要再改 import。
 
 ## 要沿用的寫法
 
@@ -28,15 +44,14 @@
 - **測試**：原本同步斷言的測試要改用 `vi.waitFor`，或等骨架消失後再斷言。
 - **會被就地修改的資料**：頁面若直接對 mock 陣列做 `splice`／`push`（例如文件管理的刪除），必須先補上 repository 的寫入函式，不能只把讀取改成非同步。
 
-## 剩餘批次
+## 剩餘工作
 
-依相依程度排列，建議一次一批並各自 commit：
+邊界已經建立，剩下的是把各轉接層真正接上後端，建議依頁面分批：
 
-1. **文件管理（`AdminDocumentsView`）**：目前直接持有 `workspaceDocuments` 並就地修改。需要先設計 `fetchAdminDocuments` 與刪除、批次操作的寫入函式。
-2. **文件管理詳情、新增文件**：版本、附件、處理策略都會寫回 mock，同樣要先有寫入 API。
-3. **筆記本與問答**：`stores/conversation.ts`、`stores/notebooks.ts` 直接讀寫 mocks，屬於 store 層的轉換。
-4. **設定類頁面**（AI 與檢索設定、系統資源、系統設定、使用者與存取）：多為表單儲存，搭配寫入 API 一起改。
-5. **其餘元件**（約 28 個）：多數只讀取展示用資料，可在對應頁面轉換時一併處理。
+1. 把 repository 的同步函式改成 `fetchXxx(): Promise<T>`，內部改呼叫 `request()`。
+2. 對應頁面改用 `useAsyncData`，補上載入骨架與錯誤重試。
+3. 寫入操作比照 `admin.repository` 的寫法，回傳後重新載入清單。
+4. 逐一比對前端 `src/types` 與後端 schema 的欄位（見下方待確認）。
 
 ## 後端合約（來源：`D:\_Work\KM\src\kmai`，`apps/api`）
 
