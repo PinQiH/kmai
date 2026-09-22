@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import DocumentVersionContent from '@/components/DocumentVersionContent.vue'
-import { getDocumentVersionDetail } from '@/mocks/documentDetails'
-import { documentChunks, getAttachmentSections, getChunkKey, saveDocumentChunks } from '@/mocks/documentChunks'
-import { getDocumentProcessingRecord } from '@/mocks/documentProcessing'
+import { getDocumentVersionDetail } from '@/repositories/documents.repository'
+import { documentChunks, getAttachmentSections, getChunkKey, saveDocumentChunks } from '@/repositories/documents.repository'
+import { getDocumentProcessingRecord } from '@/repositories/documents.repository'
 import { useToastStore } from '@/stores/toast'
 import type { DocumentContentSection, DocumentProcessingFile, DocumentVersionEntry, KnowledgeDocument } from '@/types'
 

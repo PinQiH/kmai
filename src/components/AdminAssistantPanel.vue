@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import FilterSearchField from '@/components/FilterSearchField.vue'
 import AnswerSettingsMenu from '@/components/AnswerSettingsMenu.vue'
-import { CURRENT_HANDLER, addCaseNote } from '@/mocks/feedbackAdmin'
+import { CURRENT_HANDLER, addCaseNote } from '@/repositories/feedback.repository'
 import { getEmployeeDocumentsBySourceId } from '@/repositories/knowledge.repository'
 import { useAdminAssistantStore } from '@/stores/adminAssistant'
 import { useNotebooksStore } from '@/stores/notebooks'

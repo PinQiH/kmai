@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 
 import DocumentStrategyEditor from '@/components/DocumentStrategyEditor.vue'
-import { fileTypeGroups, fileTypeOverrideEnabled } from '@/mocks/documentStrategies'
+import { fileTypeGroups, fileTypeOverrideEnabled } from '@/repositories/documents.repository'
 
 // > 處理策略分頁：全域 + 各檔案類型
 const strategyScope = ref<string>('global')

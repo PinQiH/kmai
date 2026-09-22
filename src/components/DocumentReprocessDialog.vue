@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { getProcessingStageIndex, getProcessingStageName, hasEditedChunks, processingStages, reprocessJob, type ProcessingStageId, type ReprocessScope } from '@/mocks/documentProcessing'
-import { clearStrategyChanged, getEarliestPendingStage, pendingStrategyStages } from '@/mocks/documentStrategies'
-import { getVersionCount } from '@/mocks/documentReprocess'
-import { workspaceDocuments } from '@/mocks/documentWorkspace'
+import { getProcessingStageIndex, getProcessingStageName, hasEditedChunks, processingStages, reprocessJob, type ProcessingStageId, type ReprocessScope } from '@/repositories/documents.repository'
+import { clearStrategyChanged, getEarliestPendingStage, pendingStrategyStages } from '@/repositories/documents.repository'
+import { getVersionCount } from '@/repositories/documents.repository'
+import { workspaceDocuments } from '@/repositories/documents.repository'
 import type { DocumentProcessingRecord } from '@/types'
 
 interface ComponentProps {

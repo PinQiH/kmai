@@ -2,8 +2,8 @@
 import { computed, ref, watch } from 'vue'
 
 import type { DocumentProcessingRecord, DocumentProcessingStep, DocumentStatus } from '@/types'
-import { processingStages } from '@/mocks/documentProcessing'
-import { describeOptions, getFileTypeIdByExtension, getFileTypeName, resolveStrategy, strategySourceLabels } from '@/mocks/documentStrategies'
+import { processingStages } from '@/repositories/documents.repository'
+import { describeOptions, getFileTypeIdByExtension, getFileTypeName, resolveStrategy, strategySourceLabels } from '@/repositories/documents.repository'
 import { DOCUMENT_LIFECYCLE_STAGES, getDocumentLifecycle } from '@/utils/documentLifecycle'
 
 interface ComponentProps {

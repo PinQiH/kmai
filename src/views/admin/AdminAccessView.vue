@@ -35,7 +35,7 @@ import {
 	type FieldErrors,
 	type IssuedCredential,
 	type UserStatus,
-} from '@/mocks/access'
+} from '@/repositories/access.repository'
 import { useToastStore } from '@/stores/toast'
 
 type AccessTab = 'users' | 'roles' | 'groups'

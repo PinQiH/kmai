@@ -20,9 +20,9 @@ import {
 	type AiSettings,
 	type AiSettingsSection,
 	type AiSettingsTab,
-} from '@/mocks/aiSettings'
-import { CURRENT_HANDLER, formatDateTime } from '@/mocks/feedbackAdmin'
-import { describeProfile, getProfile, getProfilesByKind, type ResourceKind } from '@/mocks/systemResources'
+} from '@/repositories/aiSettings.repository'
+import { CURRENT_HANDLER, formatDateTime } from '@/repositories/feedback.repository'
+import { describeProfile, getProfile, getProfilesByKind, type ResourceKind } from '@/repositories/systemResources.repository'
 
 type FlowState = 'ok' | 'off' | 'dirty' | 'error'
 

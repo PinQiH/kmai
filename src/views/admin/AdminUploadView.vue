@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { prepareVersionFiles } from '@/mocks/documentFiles'
+import { prepareVersionFiles } from '@/repositories/documents.repository'
 import DocumentFileActions from '@/components/DocumentFileActions.vue'
 import type { KnowledgeDocument, UserDocumentSource } from '@/types'
 import { COMPANY_KNOWLEDGE_SOURCES } from '@/utils/knowledgeSources'

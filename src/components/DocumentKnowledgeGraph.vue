@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
 
-import type { DocumentKnowledgeContext } from '@/mocks/documentDetails'
+import type { DocumentKnowledgeContext } from '@/repositories/documents.repository'
 
 interface ComponentProps {
 	context: DocumentKnowledgeContext

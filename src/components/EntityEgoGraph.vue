@@ -2,8 +2,8 @@
 import { computed } from 'vue'
 import { useTheme } from 'vuetify'
 
-import { GRAPH_CLUSTERS } from '@/mocks/graph'
-import type { GraphEntity } from '@/mocks/graphAdmin'
+import { GRAPH_CLUSTERS } from '@/repositories/graph.repository'
+import type { GraphEntity } from '@/repositories/graph.repository'
 import { clusterPalette } from '@/theme'
 
 // > 實體抽屜內的一階關聯小圖：只畫中心實體與直接相連者，協助判斷重複名稱與雜訊

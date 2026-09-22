@@ -9,7 +9,7 @@ import {
 	getKnowledgeGraphBySourceId,
 	getNeighbors,
 	type KnowledgeGraphNode,
-} from '@/mocks/graph'
+} from '@/repositories/graph.repository'
 import { getEmployeeDocumentsBySourceId } from '@/repositories/knowledge.repository'
 import { DEFAULT_ASK_SOURCE_ID, getCompanyKnowledgeSourceById } from '@/utils/knowledgeSources'
 

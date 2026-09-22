@@ -4,7 +4,7 @@ import { useDisplay } from 'vuetify'
 
 import StatePanel from '@/components/StatePanel.vue'
 import { useMarkAllNotificationsRead } from '@/composables/useMarkAllNotificationsRead'
-import { CURRENT_NOTIFICATION_USER_ID } from '@/mocks/notifications'
+import { CURRENT_NOTIFICATION_USER_ID } from '@/repositories/notifications.repository'
 import { useNotificationsStore } from '@/stores/notifications'
 import type { AppNotification, NotificationPriority } from '@/types'
 import { formatNotificationTimestamp, getNotificationActionTargetKind } from '@/utils/notifications'

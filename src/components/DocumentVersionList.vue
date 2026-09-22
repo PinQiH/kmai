@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import DocumentFileActions from '@/components/DocumentFileActions.vue'
-import { versionFiles } from '@/mocks/documentFiles'
+import { versionFiles } from '@/repositories/documents.repository'
 import type { DocumentVersionEntry } from '@/types'
 
 // > 文件管理詳情的版本紀錄：最新在上，可切換檢視版本、下載該版原始檔，並從這裡上傳新版本

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { describeProfile, getAssignedProfile, getConnection, getProfilesByKind, getUsage } from '@/mocks/systemResources'
-import { hasEditedChunks, processingStages, type ProcessingStageId } from '@/mocks/documentProcessing'
-import { getVersionCount, reprocessAllVersions } from '@/mocks/documentReprocess'
+import { describeProfile, getAssignedProfile, getConnection, getProfilesByKind, getUsage } from '@/repositories/systemResources.repository'
+import { hasEditedChunks, processingStages, type ProcessingStageId } from '@/repositories/documents.repository'
+import { getVersionCount, reprocessAllVersions } from '@/repositories/documents.repository'
 import {
 	chunkOptionsError,
 	describeOptions,
@@ -26,7 +26,7 @@ import {
 	type ResolvedStage,
 	type StrategyOptions,
 	type StrategySource,
-} from '@/mocks/documentStrategies'
+} from '@/repositories/documents.repository'
 
 interface ComponentProps {
 	/** 編輯單一文件的策略；優先於 fileTypeId。 */

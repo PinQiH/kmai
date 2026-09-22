@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 
 import KnowledgeGraphCanvas from '@/components/KnowledgeGraphCanvas.vue'
 import type { KnowledgeGraphCanvasNode } from '@/utils/knowledgeGraphCanvas'
-import type { NotebookKnowledgeGraphContext } from '@/mocks/notebookKnowledgeGraph'
+import type { NotebookKnowledgeGraphContext } from '@/repositories/graph.repository'
 
 interface ComponentProps {
 	context: NotebookKnowledgeGraphContext

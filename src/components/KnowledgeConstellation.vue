@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useTheme } from 'vuetify'
 
-import { GRAPH_CLUSTERS, graphNodes } from '@/mocks/graph'
+import { GRAPH_CLUSTERS, graphNodes } from '@/repositories/graph.repository'
 
 // > 知識星圖：首頁 hero 的可互動 3D 背景
 // @ 不引入 three.js，用 Canvas 2D 自行做透視投影；bundle 已接近 500KB 警告線

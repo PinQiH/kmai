@@ -18,14 +18,14 @@ import {
   workspaceDocuments,
   getWorkspaceVersions,
   suggestVersion,
-} from "@/mocks/documentWorkspace"
+} from "@/repositories/documents.repository"
 import {
   downloadFile,
   prepareVersionFiles,
   versionFiles,
-} from "@/mocks/documentFiles"
-import { getDocumentVersionDetail } from "@/mocks/documentDetails"
-import { getDocumentProcessingRecord } from "@/mocks/documentProcessing"
+} from "@/repositories/documents.repository"
+import { getDocumentVersionDetail } from "@/repositories/documents.repository"
+import { getDocumentProcessingRecord } from "@/repositories/documents.repository"
 import {
   addDocumentAttachments,
   createDocumentVersion,

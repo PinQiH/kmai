@@ -14,7 +14,7 @@ import {
 	getSatisfactionByModel,
 	getSatisfactionBySource,
 	getSatisfactionSummary,
-} from '@/mocks/answerSatisfaction'
+} from '@/repositories/feedback.repository'
 import {
 	CURRENT_HANDLER,
 	FEEDBACK_CAUSE_LABELS,
@@ -34,7 +34,7 @@ import {
 	isOverdue,
 	type FeedbackCase,
 	type FeedbackKind,
-} from '@/mocks/feedbackAdmin'
+} from '@/repositories/feedback.repository'
 import { useAdminAssistantStore } from '@/stores/adminAssistant'
 import { useNotebooksStore } from '@/stores/notebooks'
 import { useToastStore } from '@/stores/toast'

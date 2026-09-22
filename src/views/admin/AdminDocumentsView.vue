@@ -11,8 +11,8 @@ import {
   fileTypeGroups,
   getFileTypeId,
   getFileTypeName,
-} from "@/mocks/documentStrategies"
-import { isDocumentProcessing } from "@/mocks/documentReprocess"
+} from "@/repositories/documents.repository"
+import { isDocumentProcessing } from "@/repositories/documents.repository"
 import { useProcessingJobs } from "@/composables/useProcessingJobs"
 import PageHeader from "@/components/PageHeader.vue"
 import StatePanel from "@/components/StatePanel.vue"

@@ -2,8 +2,8 @@
 import { computed } from 'vue'
 import DocumentSourcePreview from '@/components/DocumentSourcePreview.vue'
 import DocumentFileActions from '@/components/DocumentFileActions.vue'
-import { getDocumentVersionDetail } from '@/mocks/documentDetails'
-import { downloadFile, versionFiles } from '@/mocks/documentFiles'
+import { getDocumentVersionDetail } from '@/repositories/documents.repository'
+import { downloadFile, versionFiles } from '@/repositories/documents.repository'
 import type { DocumentVersionEntry, KnowledgeDocument } from '@/types'
 
 const props = defineProps<{ document: KnowledgeDocument; version: DocumentVersionEntry }>()

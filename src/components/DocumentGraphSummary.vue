@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { getDocumentGraphSummary } from '@/mocks/graphAdmin'
+import { getDocumentGraphSummary } from '@/repositories/graph.repository'
 
 // > 文件在知識圖譜中的摘要：抽出的實體數、關係數與待覆核數，並連到圖譜管理
 

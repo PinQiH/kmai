@@ -21,8 +21,8 @@ import {
 	startCase,
 	type FeedbackAttachment,
 	type FeedbackCause,
-} from '@/mocks/feedbackAdmin'
-import { workspaceDocuments } from '@/mocks/documentWorkspace'
+} from '@/repositories/feedback.repository'
+import { workspaceDocuments } from '@/repositories/documents.repository'
 import StatusChip from '@/components/StatusChip.vue'
 import { getAnswerModelLabel, getAnswerStyleLabel } from '@/utils/answerSettings'
 import { formatNumber } from '@/utils/format'

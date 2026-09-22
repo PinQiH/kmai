@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import DocumentKnowledgeGraph from '@/components/DocumentKnowledgeGraph.vue'
 import DocumentVersionContent from '@/components/DocumentVersionContent.vue'
 import DocumentVersionSelector from '@/components/DocumentVersionSelector.vue'
-import { getDocumentKnowledgeContext, getDocumentVersionDetail } from '@/mocks/documentDetails'
+import { getDocumentKnowledgeContext, getDocumentVersionDetail } from '@/repositories/documents.repository'
 import type { DocumentVersionEntry, KnowledgeDocument } from '@/types'
 import { getDocumentSourceLabel } from '@/utils/documentSources'
 

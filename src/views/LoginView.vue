@@ -3,7 +3,7 @@ import { ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 import brandLogoUrl from "@/assets/brand/kmai-logo.png"
-import { settingsState } from "@/mocks/systemSettings"
+import { settingsState } from "@/repositories/settings.repository"
 import { useAppStore } from "@/stores/app"
 
 const router = useRouter()

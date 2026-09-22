@@ -21,8 +21,8 @@ import {
 	type AiProfile,
 	type ConnectionStatus,
 	type ResourceKind,
-} from '@/mocks/systemResources'
-import { countProfileStrategyReferences } from '@/mocks/documentStrategies'
+} from '@/repositories/systemResources.repository'
+import { countProfileStrategyReferences } from '@/repositories/documents.repository'
 import { useToastStore } from '@/stores/toast'
 
 type ResourceTab = 'profiles' | 'connections'

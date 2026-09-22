@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 
 import FilterSearchField from '@/components/FilterSearchField.vue'
 import StatePanel from '@/components/StatePanel.vue'
-import { baseSystemRecords } from '@/mocks/systemRecords'
+import { baseSystemRecords } from '@/repositories/systemRecords.repository'
 import { useAppStore } from '@/stores/app'
 import { useAssistantAuditStore } from '@/stores/assistantAudit'
 import { useNotificationsStore } from '@/stores/notifications'

@@ -11,9 +11,9 @@ import {
   getCasesByReporter,
   rateResolution,
   reportIssue,
-} from "@/mocks/feedbackAdmin"
+} from "@/repositories/feedback.repository"
 import MarkdownContent from "@/components/MarkdownContent.vue"
-import { formatSettingsTime, getPublishedReleaseHistory, settingsState } from "@/mocks/systemSettings"
+import { formatSettingsTime, getPublishedReleaseHistory, settingsState } from "@/repositories/settings.repository"
 import { useAppStore } from "@/stores/app"
 import type { ThemePreference } from "@/theme"
 import type { DocumentVersionEntry } from "@/types"

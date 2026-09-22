@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { downloadFile } from '@/mocks/documentFiles'
+import { downloadFile } from '@/repositories/documents.repository'
 
 const props = defineProps<{ file: File; label?: string }>()
 const open = ref(false)

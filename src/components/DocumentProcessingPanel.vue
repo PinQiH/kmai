@@ -14,8 +14,8 @@ import {
 	retryProcessingFile,
 	updateProcessingJob,
 	type ProcessingStageId,
-} from '@/mocks/documentProcessing'
-import { getEarliestPendingStage } from '@/mocks/documentStrategies'
+} from '@/repositories/documents.repository'
+import { getEarliestPendingStage } from '@/repositories/documents.repository'
 import type { DocumentProcessingFile } from '@/types'
 import {
 	useProcessingJobs,

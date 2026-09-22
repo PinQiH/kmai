@@ -4,7 +4,7 @@ import type { VBtn } from 'vuetify/components'
 
 import NotificationCenterDialog from '@/components/NotificationCenterDialog.vue'
 import { useMarkAllNotificationsRead } from '@/composables/useMarkAllNotificationsRead'
-import { CURRENT_NOTIFICATION_USER_ID } from '@/mocks/notifications'
+import { CURRENT_NOTIFICATION_USER_ID } from '@/repositories/notifications.repository'
 import { useNotificationsStore } from '@/stores/notifications'
 import type { NotificationPriority } from '@/types'
 import { formatNotificationMenuTimestamp, formatNotificationTimestamp } from '@/utils/notifications'

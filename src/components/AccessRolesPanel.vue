@@ -18,7 +18,7 @@ import {
 	isRoleLocked,
 	updateRole,
 	type RoleDraft,
-} from '@/mocks/access'
+} from '@/repositories/access.repository'
 
 const emit = defineEmits<{ notify: [text: string, tone?: 'success' | 'error'] }>()
 

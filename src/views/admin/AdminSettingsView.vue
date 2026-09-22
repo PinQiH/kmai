@@ -36,7 +36,7 @@ import {
 	type BrandSettings,
 	type FieldErrors,
 	type PrivacyPolicy,
-} from '@/mocks/systemSettings'
+} from '@/repositories/settings.repository'
 import { diffLines } from '@/utils/lineDiff'
 import { useAppStore } from '@/stores/app'
 import type { ThemePreference } from '@/theme'

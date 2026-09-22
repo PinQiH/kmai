@@ -1,4 +1,7 @@
 import { citations, conversationFolders, conversationHistory, conversationMessagesById } from '@/mocks/data'
+
+// @ 其餘展示用資料（文件、知識來源等）原樣轉接
+export * from '@/mocks/data'
 import type { Citation, ConversationFolder, ConversationMessage, ConversationSummary } from '@/types'
 
 // > 前台問答的初始資料；store 以此建立自己的狀態，不直接依賴 Mock 資料來源

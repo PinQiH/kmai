@@ -25,7 +25,7 @@ import {
 	updateGroup,
 	type GroupDraft,
 	type GroupType,
-} from '@/mocks/access'
+} from '@/repositories/access.repository'
 
 const emit = defineEmits<{ notify: [text: string, tone?: 'success' | 'error']; openUser: [userId: string] }>()
 

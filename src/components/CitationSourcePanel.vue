@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 
-import { documentContentById } from '@/mocks/documentContent'
-import { documents } from '@/mocks/data'
+import { documentContentById } from '@/repositories/documents.repository'
+import { documents } from '@/repositories/conversation.repository'
 import type { Citation, DocumentContentSection } from '@/types'
 
 interface ComponentProps {

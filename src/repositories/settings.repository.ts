@@ -7,8 +7,8 @@ import type { AppearanceDefaults, BrandSettings } from '@/mocks/systemSettings'
  * TODO(api-integration): 改為呼叫 GET /api/v2/admin/branding 與對應的外觀設定 API。
  */
 
-// @ 外觀暫存的 localStorage 鍵；App 監聽 storage 事件時需要比對
-export { APPEARANCE_STORAGE_KEY, syncAppearanceFromStorage }
+// @ 其餘品牌、版本公告與隱私權政策的操作原樣轉接
+export * from '@/mocks/systemSettings'
 
 /** 取得目前的品牌設定。 */
 export function getBrandSettings(): BrandSettings {

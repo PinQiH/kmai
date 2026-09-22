@@ -5,7 +5,7 @@ import AnimatedNumber from "@/components/AnimatedNumber.vue"
 import PageHeader from "@/components/PageHeader.vue"
 import StatePanel from "@/components/StatePanel.vue"
 import { useAsyncData } from "@/composables/useAsyncData"
-import { getOpenCases } from "@/mocks/feedbackAdmin"
+import { getOpenCases } from "@/repositories/feedback.repository"
 import {
   fetchHealthMetrics,
   fetchRecentActivities,

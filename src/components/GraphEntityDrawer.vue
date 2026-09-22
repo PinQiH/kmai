@@ -2,9 +2,9 @@
 import { computed, ref, watch } from 'vue'
 
 import EntityEgoGraph from '@/components/EntityEgoGraph.vue'
-import { GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE, GRAPH_NODE_TYPES, type GraphNodeType } from '@/mocks/graph'
-import { getEntity, getEntityRelations, revertEntityEdits, setEntityHidden, updateEntity } from '@/mocks/graphAdmin'
-import { workspaceDocuments } from '@/mocks/documentWorkspace'
+import { GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE, GRAPH_NODE_TYPES, type GraphNodeType } from '@/repositories/graph.repository'
+import { getEntity, getEntityRelations, revertEntityEdits, setEntityHidden, updateEntity } from '@/repositories/graph.repository'
+import { workspaceDocuments } from '@/repositories/documents.repository'
 
 interface ComponentProps {
 	entityId: string | null

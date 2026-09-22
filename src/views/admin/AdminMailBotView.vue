@@ -6,7 +6,7 @@ import FilterSearchField from '@/components/FilterSearchField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
-import { aiSettingsState } from '@/mocks/aiSettings'
+import { aiSettingsState } from '@/repositories/aiSettings.repository'
 import {
 	CONNECTION_STATE_LABELS,
 	MAIL_IGNORED_REASON_LABELS,
@@ -36,8 +36,8 @@ import {
 	type MailSettings,
 	type MailStatsRange,
 	type MailStatus,
-} from '@/mocks/mailBot'
-import { describeProfile, getProfile, getProfilesByKind } from '@/mocks/systemResources'
+} from '@/repositories/mailBot.repository'
+import { describeProfile, getProfile, getProfilesByKind } from '@/repositories/systemResources.repository'
 import { useToastStore } from '@/stores/toast'
 
 type MailBotTab = 'messages' | 'stats' | 'settings'

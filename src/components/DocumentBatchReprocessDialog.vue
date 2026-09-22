@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { getProcessingStageName, processingStages } from '@/mocks/documentProcessing'
-import { planBatchReprocess, runBatchReprocess, type BatchStartStage, type BatchVersionScope } from '@/mocks/documentReprocess'
+import { getProcessingStageName, processingStages } from '@/repositories/documents.repository'
+import { planBatchReprocess, runBatchReprocess, type BatchStartStage, type BatchVersionScope } from '@/repositories/documents.repository'
 
 interface ComponentProps {
 	documentIds: string[]

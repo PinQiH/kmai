@@ -10,7 +10,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import { useToastStore } from '@/stores/toast'
 import StatusChip from '@/components/StatusChip.vue'
-import { GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE, GRAPH_NODE_TYPES, type GraphNodeType } from '@/mocks/graph'
+import { GRAPH_CLUSTERS_BY_KNOWLEDGE_SOURCE, GRAPH_NODE_TYPES, type GraphNodeType } from '@/repositories/graph.repository'
 import {
 	BUILD_MODE_LABELS,
 	BUILD_STATUS_COLORS,
@@ -43,8 +43,8 @@ import {
 	type GraphScope,
 	type MergeCandidate,
 	type SummaryStatus,
-} from '@/mocks/graphAdmin'
-import { workspaceDocuments } from '@/mocks/documentWorkspace'
+} from '@/repositories/graph.repository'
+import { workspaceDocuments } from '@/repositories/documents.repository'
 import { getCompanyKnowledgeSourceById } from '@/utils/knowledgeSources'
 
 type GraphTab = 'health' | 'entities' | 'review' | 'communities' | 'builds'
