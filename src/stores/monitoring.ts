@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-import { alertEvents, alertRules } from '@/mocks/monitoring'
+import { getAlertEventsSnapshot, getAlertRulesSnapshot } from '@/repositories/monitoring.repository'
 import type { AlertEvent, AlertRule } from '@/types'
 
 interface MonitoringState {
@@ -10,8 +10,8 @@ interface MonitoringState {
 
 export const useMonitoringStore = defineStore('monitoring', {
 	state: (): MonitoringState => ({
-		rules: alertRules.map((rule) => ({ ...rule })),
-		events: alertEvents.map((event) => ({ ...event })),
+		rules: getAlertRulesSnapshot(),
+		events: getAlertEventsSnapshot(),
 	}),
 	actions: {
 		/** 新增告警規則。 */

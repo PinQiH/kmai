@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import type { ThemeInstance } from 'vuetify'
 
-import { APPEARANCE_STORAGE_KEY, settingsState, syncAppearanceFromStorage } from '@/mocks/systemSettings'
+import { APPEARANCE_STORAGE_KEY, getAppearanceDefaults, syncAppearanceFromStorage } from '@/repositories/settings.repository'
 import { resolveThemeName, type ThemeMode, type ThemePreference } from '@/theme'
 import type { AdminRole } from '@/types'
 import { buildBackdropTheme, type BackdropTheme, type ImagePalette } from '@/utils/imagePalette'
@@ -50,7 +50,7 @@ export const useAppStore = defineStore('app', {
 		isNavigationRail: false,
 		mustChangePassword: false,
 		// @ 新工作階段的預設外觀由管理端「系統設定」決定
-		themePreference: settingsState.appearance.themePreference,
+		themePreference: getAppearanceDefaults().themePreference,
 		themeMode: 'light',
 		backdrop: null,
 	}),
@@ -75,14 +75,14 @@ export const useAppStore = defineStore('app', {
 			const colorSchemeQuery = getSystemColorSchemeQuery()
 			if (this.themePreference === 'system') this.themeMode = resolveSystemThemeMode(colorSchemeQuery)
 			// TODO(api-integration): 系統背景圖改由設定 API 取得
-			this.setBackdrop(theme, settingsState.appearance.backdrop)
+			this.setBackdrop(theme, getAppearanceDefaults().backdrop)
 
 			// @ 後台在另一個分頁儲存背景圖時，已開啟的前台分頁即時跟著換
 			if (typeof window !== 'undefined') {
 				const handleAppearanceStorage = (event: StorageEvent): void => {
 					if (event.key !== APPEARANCE_STORAGE_KEY) return
 					syncAppearanceFromStorage()
-					this.setBackdrop(theme, settingsState.appearance.backdrop)
+					this.setBackdrop(theme, getAppearanceDefaults().backdrop)
 				}
 				window.addEventListener('storage', handleAppearanceStorage)
 				removeAppearanceStorageListener = () => window.removeEventListener('storage', handleAppearanceStorage)

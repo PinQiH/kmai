@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 
-import { citations, conversationFolders, conversationHistory, conversationMessagesById } from '@/mocks/data'
+import {
+	getConversationFoldersSnapshot,
+	getConversationHistorySnapshot,
+	getConversationMessagesSnapshot,
+	getDemoCitationsSnapshot,
+} from '@/repositories/conversation.repository'
 import type {
 	AnswerModelId,
 	AnswerFeedback,
@@ -183,7 +188,7 @@ function createMockAnswer(
 ): ConversationMessage {
 	const normalizedQuestion = question.toLowerCase()
 	const hasDocumentScope = includeCitations && selectedDocuments.length > 0
-	const answerCitations = hasDocumentScope ? createScopedCitations(selectedDocuments) : (includeCitations ? citations : [])
+	const answerCitations = hasDocumentScope ? createScopedCitations(selectedDocuments) : (includeCitations ? getDemoCitationsSnapshot() : [])
 	const scopedCitationMarkers = answerCitations.map((_, index) => `[${index + 1}]`).join(' ')
 	let content = hasDocumentScope
 		? `我只會在「${scope}」範圍內整理答案 ${scopedCitationMarkers}。這是展示回答；正式環境會依限定文件的實際檢索結果回傳答案與原文引用。`
@@ -228,12 +233,12 @@ export const useConversationStore = defineStore('conversation', {
 		errorMessage: '',
 		thinkingStages: [],
 		retrievedCount: 0,
-		conversations: conversationHistory.map((conversation) => ({ ...conversation })),
-		conversationMessagesById: cloneConversationHistory(conversationMessagesById),
+		conversations: getConversationHistorySnapshot(),
+		conversationMessagesById: cloneConversationHistory(getConversationMessagesSnapshot()),
 		activeConversationId: null,
 		historyKeyword: '',
 		onlyArchived: false,
-		folders: conversationFolders.map((folder) => ({ ...folder })),
+		folders: getConversationFoldersSnapshot(),
 		selectedFolderId: ALL_FOLDER_ID,
 		selectedConversationIds: [],
 	}),

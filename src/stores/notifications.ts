@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 
 import {
-	automaticNotificationRules,
 	CURRENT_NOTIFICATION_USER_ID,
-	emailChannelSettings,
-	notifications,
-	notificationUsers,
-	recipientGroups,
-} from '@/mocks/notifications'
+	getAutomaticNotificationRulesSnapshot,
+	getEmailChannelSettingsSnapshot,
+	getNotificationsSnapshot,
+	getNotificationUsersSnapshot,
+	getRecipientGroupsSnapshot,
+} from '@/repositories/notifications.repository'
 import type {
 	AlertSeverity,
 	AppNotification,
@@ -173,16 +173,11 @@ function alertEventLink(eventId: string, status: 'triggered' | 'resolved' | 'tes
 
 export const useNotificationsStore = defineStore('notifications', {
 	state: (): NotificationsState => ({
-		notifications: notifications.map(cloneNotification),
-		rules: automaticNotificationRules.map(cloneRule),
-		users: notificationUsers.map((user) => ({ ...user })),
-		recipientGroups: recipientGroups.map((group) => ({
-			...group,
-			memberUserIds: [...group.memberUserIds],
-			emails: [...group.emails],
-			severities: [...group.severities],
-		})),
-		emailSettings: { ...emailChannelSettings },
+		notifications: getNotificationsSnapshot().map(cloneNotification),
+		rules: getAutomaticNotificationRulesSnapshot().map(cloneRule),
+		users: getNotificationUsersSnapshot(),
+		recipientGroups: getRecipientGroupsSnapshot(),
+		emailSettings: getEmailChannelSettingsSnapshot(),
 		deliveryClock: Date.now(),
 	}),
 	getters: {
