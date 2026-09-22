@@ -11,10 +11,11 @@ import MetricSparkline from '@/components/MetricSparkline.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatePanel from '@/components/StatePanel.vue'
 import {
-	getLogEntriesSnapshot,
-	getServiceHealthSnapshot,
-	getServiceMetricsSnapshot,
+	fetchLogEntries,
+	fetchServiceHealth,
+	fetchServiceMetrics,
 } from '@/repositories/monitoring.repository'
+import { useAsyncData } from '@/composables/useAsyncData'
 import { useMonitoringStore } from '@/stores/monitoring'
 import { useNotificationsStore } from '@/stores/notifications'
 import type {
@@ -25,6 +26,7 @@ import type {
 	LogEntry,
 	LogLevel,
 	MetricStatus,
+	ServiceHealth,
 	ServiceMetric,
 } from '@/types'
 import {
@@ -48,9 +50,31 @@ const monitoringStore = useMonitoringStore()
 const notificationsStore = useNotificationsStore()
 const { rules, events } = storeToRefs(monitoringStore)
 
-const metrics = ref(getServiceMetricsSnapshot())
-const services = ref(getServiceHealthSnapshot())
-const logs = ref(getLogEntriesSnapshot())
+// > 指標與服務健康一起刷新；日誌另外載入，即時追蹤時不重取
+const {
+	data: overview,
+	isLoading: isLoadingOverview,
+	errorMessage: overviewError,
+	reload: reloadOverview,
+} = useAsyncData(async () => {
+	const [metrics, services] = await Promise.all([fetchServiceMetrics(), fetchServiceHealth()])
+	return { metrics, services }
+}, {
+	initialValue: { metrics: [] as ServiceMetric[], services: [] as ServiceHealth[] },
+	errorMessage: () => '目前無法載入服務指標，請稍後再試。',
+})
+const metrics = computed(() => overview.value.metrics)
+const services = computed(() => overview.value.services)
+
+const {
+	data: logs,
+	isLoading: isLoadingLogs,
+	errorMessage: logsError,
+	reload: reloadLogs,
+} = useAsyncData(fetchLogEntries, {
+	initialValue: [] as LogEntry[],
+	errorMessage: () => '目前無法載入服務日誌，請稍後再試。',
+})
 // @ 送達對象由通知管理維護，這裡只讀來顯示，避免兩邊各有一套收件人
 
 const activeTab = ref('overview')
@@ -102,11 +126,9 @@ let refreshTimer = 0
 
 const lastUpdatedLabel = computed(() => lastUpdatedAt.value.toLocaleTimeString('zh-TW', { hour12: false }))
 
-function refreshSnapshot(): void {
-	metrics.value = getServiceMetricsSnapshot()
-	services.value = getServiceHealthSnapshot()
+async function refreshSnapshot(): Promise<void> {
 	// @ 即時追蹤中不要重取日誌，否則會把追蹤到的新訊息洗掉
-	if (!isLiveTail.value) logs.value = getLogEntriesSnapshot()
+	await Promise.all([reloadOverview(), isLiveTail.value ? Promise.resolve() : reloadLogs()])
 	lastUpdatedAt.value = new Date()
 }
 
@@ -134,7 +156,8 @@ watch(isAutoRefresh, (isEnabled) => {
 // > 日誌查詢
 const LIVE_TAIL_INTERVAL_MS = 4000
 const LIVE_TAIL_LIMIT = 60
-const liveTailTemplates = getLogEntriesSnapshot()
+// @ 開啟追蹤時擷取當下的日誌當樣板，避免把追蹤產生的訊息又當成樣板
+let liveTailTemplates: LogEntry[] = []
 
 const logService = ref(ALL_FILTER)
 const logLevel = ref(ALL_FILTER)
@@ -201,7 +224,9 @@ function appendLiveLog(): void {
 
 watch(isLiveTail, (isEnabled) => {
 	window.clearInterval(liveTailTimer)
-	if (isEnabled) liveTailTimer = window.setInterval(appendLiveLog, LIVE_TAIL_INTERVAL_MS)
+	if (!isEnabled) return
+	liveTailTemplates = [...logs.value]
+	liveTailTimer = window.setInterval(appendLiveLog, LIVE_TAIL_INTERVAL_MS)
 })
 
 // > 告警規則
@@ -555,9 +580,22 @@ onBeforeUnmount(() => {
 					<p class="text-caption text-medium-emphasis">最後更新 {{ lastUpdatedLabel }}</p>
 				</div>
 
-				<section aria-labelledby="signal-title" class="mb-8">
+				<StatePanel
+					v-if="overviewError"
+					icon="mdi-cloud-alert-outline"
+					title="無法載入服務指標"
+					:description="overviewError"
+					action-label="重新載入"
+					@action="reloadOverview"
+				/>
+				<section v-else aria-labelledby="signal-title" class="mb-8">
 					<h2 id="signal-title" class="section-heading mb-4">核心訊號</h2>
-					<VRow>
+					<VRow v-if="isLoadingOverview">
+						<VCol v-for="placeholder in 4" :key="placeholder" cols="12" sm="6" lg="3">
+							<VSkeletonLoader type="article" class="surface-border rounded-lg" />
+						</VCol>
+					</VRow>
+					<VRow v-else>
 						<VCol v-for="(metric, index) in metrics" :key="metric.id" cols="12" sm="6" lg="3">
 							<VCard class="surface-border pa-5 h-100 rise-in" :style="{ '--rise-index': index }">
 								<div class="d-flex align-center ga-2">
@@ -656,7 +694,16 @@ onBeforeUnmount(() => {
 					<VBtn v-if="hasLogFilter" variant="text" size="small" @click="resetLogFilter">清除條件</VBtn>
 				</div>
 
-				<VCard v-if="filteredLogs.length > 0" class="surface-border log-panel">
+				<StatePanel
+					v-if="logsError"
+					icon="mdi-cloud-alert-outline"
+					title="無法載入服務日誌"
+					:description="logsError"
+					action-label="重新載入"
+					@action="reloadLogs"
+				/>
+				<VSkeletonLoader v-else-if="isLoadingLogs" type="list-item-two-line@5" class="surface-border rounded-lg" />
+				<VCard v-else-if="filteredLogs.length > 0" class="surface-border log-panel">
 					<button
 						v-for="entry in filteredLogs"
 						:key="entry.id"

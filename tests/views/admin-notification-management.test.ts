@@ -136,8 +136,9 @@ describe('admin notification management views', () => {
 		)
 		await flushPromises()
 
+		// @ 問答紀錄改為非同步載入，等抽屜帶出內容再斷言
+		await vi.waitFor(() => expect(wrapper.get('[data-testid="admin-question-drawer"]').text()).toContain('國內出差住宿費用上限是多少？'))
 		const drawer = wrapper.get('[data-testid="admin-question-drawer"]')
-		expect(drawer.text()).toContain('國內出差住宿費用上限是多少？')
 		expect(drawer.text()).toContain('Conversation ID')
 		await drawer.get('button[aria-label="關閉問答詳情"]').trigger('click')
 		await flushPromises()
@@ -304,7 +305,8 @@ describe('admin notification management views', () => {
 		)
 		await flushPromises()
 
-		expect(wrapper.get('[data-testid="system-record-route-message"]').text()).toContain('找不到 Question ID')
+		// @ 紀錄載入完成後才會判定找不到
+		await vi.waitFor(() => expect(wrapper.get('[data-testid="system-record-route-message"]').text()).toContain('找不到 Question ID'))
 		expect(wrapper.get('[data-testid="admin-question-drawer"]').text()).toBe('')
 	})
 })

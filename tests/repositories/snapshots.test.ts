@@ -8,9 +8,9 @@ import {
 import {
 	getAlertEventsSnapshot,
 	getAlertRulesSnapshot,
-	getLogEntriesSnapshot,
-	getServiceHealthSnapshot,
-	getServiceMetricsSnapshot,
+	fetchLogEntries,
+	fetchServiceHealth,
+	fetchServiceMetrics,
 } from '@/repositories/monitoring.repository'
 
 describe('mock repository snapshots', () => {
@@ -36,10 +36,10 @@ describe('mock repository snapshots', () => {
 		expect((await fetchRecentActivities())[0]!.title).not.toBe('mutated activity')
 	})
 
-	it('should return independent monitoring snapshots including nested data', () => {
-		const metrics = getServiceMetricsSnapshot()
-		const health = getServiceHealthSnapshot()
-		const logs = getLogEntriesSnapshot()
+	it('should return independent monitoring snapshots including nested data', async () => {
+		const metrics = await fetchServiceMetrics()
+		const health = await fetchServiceHealth()
+		const logs = await fetchLogEntries()
 		const rules = getAlertRulesSnapshot()
 		const events = getAlertEventsSnapshot()
 
@@ -49,9 +49,9 @@ describe('mock repository snapshots', () => {
 		rules[0]!.enabled = !rules[0]!.enabled
 		events[0]!.status = 'resolved'
 
-		expect(getServiceMetricsSnapshot()[0]!.series).not.toContain(-1)
-		expect(getServiceHealthSnapshot()[0]!.status).not.toBe('down')
-		expect(getLogEntriesSnapshot()[0]!.fields).not.toHaveProperty('mutated')
+		expect((await fetchServiceMetrics())[0]!.series).not.toContain(-1)
+		expect((await fetchServiceHealth())[0]!.status).not.toBe('down')
+		expect((await fetchLogEntries())[0]!.fields).not.toHaveProperty('mutated')
 		expect(getAlertRulesSnapshot()[0]!.enabled).not.toBe(rules[0]!.enabled)
 		expect(getAlertEventsSnapshot()[0]!.status).not.toBe('resolved')
 	})
