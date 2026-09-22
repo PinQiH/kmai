@@ -82,9 +82,9 @@ describe('admin information architecture', () => {
 			{ path: '/admin/documents', component: AdminDocumentsView },
 			{ path: '/admin/documents/:id/manage', component: { template: '<div />' } },
 		])
+		// @ 標籤上的文件標題來自非同步載入的清單，載入前只會顯示代號
+		await vi.waitFor(() => expect(wrapper.get('[data-testid="document-id-filter-doc-003"]').text()).toContain('文件：客戶資料存取與分享規範'))
 		const filterChip = wrapper.get('[data-testid="document-id-filter-doc-003"]')
-
-		expect(filterChip.text()).toContain('文件：客戶資料存取與分享規範')
 		await filterChip.get('.v-chip__close').trigger('click')
 		await vi.waitFor(() => expect(router.currentRoute.value.query.documentId).toBeUndefined())
 		expect(wrapper.find('[data-testid="document-id-filter-doc-003"]').exists()).toBe(false)

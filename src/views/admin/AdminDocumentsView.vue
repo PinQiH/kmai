@@ -2,7 +2,6 @@
 import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
-import { workspaceDocuments } from "@/mocks/documentWorkspace"
 import FilterSearchField from "@/components/FilterSearchField.vue"
 import DocumentBatchReprocessDialog from "@/components/DocumentBatchReprocessDialog.vue"
 import DocumentPreviewDrawer from "@/components/DocumentPreviewDrawer.vue"
@@ -17,9 +16,13 @@ import { isDocumentProcessing } from "@/mocks/documentReprocess"
 import { useProcessingJobs } from "@/composables/useProcessingJobs"
 import PageHeader from "@/components/PageHeader.vue"
 import StatePanel from "@/components/StatePanel.vue"
+import { useAsyncData } from "@/composables/useAsyncData"
 import {
+  deleteAdminDocument,
+  fetchAdminDocuments,
   getDocumentCategoryGroupsSnapshot,
   getOrganizationUnitsSnapshot,
+  publishAdminDocuments,
 } from "@/repositories/admin.repository"
 import type { DocumentStatus, KnowledgeDocument } from "@/types"
 import { getDocumentSourceIcon } from "@/utils/documentSources"
@@ -84,7 +87,15 @@ const isImportDialogOpen = ref(false)
 const isPreviewOpen = ref(false)
 const previewDocumentId = ref<string | null>(null)
 const deleteTargetId = ref<string | null>(null)
-const managedDocuments = workspaceDocuments
+const {
+  data: managedDocuments,
+  isLoading: isLoadingDocuments,
+  errorMessage: documentsError,
+  reload: reloadDocuments,
+} = useAsyncData(fetchAdminDocuments, {
+  initialValue: [] as KnowledgeDocument[],
+  errorMessage: () => "目前無法載入文件清單，請稍後再試。",
+})
 
 const statusOptions: Array<DocumentStatus | typeof ALL_STATUS> = [
   ALL_STATUS,
@@ -160,7 +171,7 @@ const documentIds = computed(() => {
 const documentIdFilters = computed(() =>
   documentIds.value.map((id) => ({
     id,
-    title: managedDocuments.find((document) => document.id === id)?.title ?? id,
+    title: managedDocuments.value.find((document) => document.id === id)?.title ?? id,
   })),
 )
 
@@ -256,7 +267,7 @@ function matchesUploadedRange(document: KnowledgeDocument): boolean {
 }
 
 const visibleDocuments = computed(() =>
-  managedDocuments
+  managedDocuments.value
     .filter((document) => {
       if (documentIds.value.length && !documentIds.value.includes(document.id))
         return false
@@ -373,7 +384,7 @@ const activeFilters = computed(() => {
 const selectedDocuments = computed(() =>
   selected.value
     .map((documentId) =>
-      managedDocuments.find((document) => document.id === documentId),
+      managedDocuments.value.find((document) => document.id === documentId),
     )
     .filter((document): document is KnowledgeDocument => Boolean(document)),
 )
@@ -424,29 +435,22 @@ function openDeleteDialog(documentId: string): void {
   isDeleteDialogOpen.value = true
 }
 
-function confirmDelete(): void {
-  if (!deleteTargetId.value) return
-  managedDocuments.splice(
-    0,
-    managedDocuments.length,
-    ...managedDocuments.filter(
-      (document) => document.id !== deleteTargetId.value,
-    ),
-  )
-  selected.value = selected.value.filter((id) => id !== deleteTargetId.value)
+async function confirmDelete(): Promise<void> {
+  const documentId = deleteTargetId.value
+  if (!documentId) return
+  await deleteAdminDocument(documentId)
+  selected.value = selected.value.filter((id) => id !== documentId)
   deleteTargetId.value = null
   isDeleteDialogOpen.value = false
+  await reloadDocuments()
 }
 
-function approveSelected(): void {
-  const approvableIds = new Set(
-    reviewableSelection.value.map((document) => document.id),
-  )
-  for (const document of managedDocuments) {
-    if (approvableIds.has(document.id)) document.status = "已發布"
-  }
-  const skipped = pendingReviewSelection.value.length - approvableIds.size
-  batchMessage.value = `已核准並發布 ${approvableIds.size} 份文件${skipped ? `；${skipped} 份仍在重新處理，未核准` : ""}。`
+async function approveSelected(): Promise<void> {
+  const approvableIds = reviewableSelection.value.map((document) => document.id)
+  const skipped = pendingReviewSelection.value.length - approvableIds.length
+  const approved = await publishAdminDocuments(approvableIds)
+  await reloadDocuments()
+  batchMessage.value = `已核准並發布 ${approved} 份文件${skipped ? `；${skipped} 份仍在重新處理，未核准` : ""}。`
   showProcessingLink.value = false
   selected.value = []
 }
@@ -701,7 +705,21 @@ function approveSelected(): void {
       <VDivider />
 
       <StatePanel
-        v-if="visibleDocuments.length === 0"
+        v-if="documentsError"
+        class="ma-5"
+        icon="mdi-cloud-alert-outline"
+        title="無法載入文件清單"
+        :description="documentsError"
+        action-label="重新載入"
+        @action="reloadDocuments"
+      />
+      <VSkeletonLoader
+        v-else-if="isLoadingDocuments"
+        type="table-heading, table-row@6"
+        class="ma-5"
+      />
+      <StatePanel
+        v-else-if="visibleDocuments.length === 0"
         class="ma-5"
         icon="mdi-file-search-outline"
         title="找不到符合條件的文件"

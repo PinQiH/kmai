@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getAdminDocumentsSnapshot } from '@/repositories/admin.repository'
 import type { DocumentStatus } from '@/types'
@@ -57,6 +57,8 @@ async function mountDocumentsView(): Promise<VueWrapper> {
 		attachTo: window.document.body,
 	})
 	await flushPromises()
+	// @ 文件清單改為非同步載入，等骨架消失代表第一次載入完成
+	await vi.waitFor(() => expect(wrapper!.find('.v-skeleton-loader').exists()).toBe(false))
 	return wrapper
 }
 

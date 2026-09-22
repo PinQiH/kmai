@@ -96,6 +96,8 @@ describe('core views', () => {
 		await router.push('/admin/documents')
 		await router.isReady()
 		const documentsView = mountView(AdminDocumentsView, router)
+		// @ 文件清單改為非同步載入
+		await vi.waitFor(() => expect(documentsView.find('.v-skeleton-loader').exists()).toBe(false))
 
 		expect(documentsView.text()).toContain('文件管理')
 		expect(documentsView.text()).toContain(getAdminDocumentsSnapshot()[0]!.title)
@@ -106,6 +108,7 @@ describe('core views', () => {
 		await router.push('/admin/documents?status=待審核')
 		await router.isReady()
 		const documentsView = mountView(AdminDocumentsView, router)
+		await vi.waitFor(() => expect(documentsView.find('.v-skeleton-loader').exists()).toBe(false))
 
 		const pendingTitles = getAdminDocumentsSnapshot().filter((item) => item.status === '待審核').map((item) => item.title)
 		const publishedTitle = getAdminDocumentsSnapshot().find((item) => item.status === '已發布')?.title
