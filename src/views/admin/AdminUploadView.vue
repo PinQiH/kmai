@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { addWorkspaceDocument } from '@/mocks/documentWorkspace'
 import { prepareVersionFiles } from '@/mocks/documentFiles'
-import { enqueueDocumentProcessing } from '@/mocks/documentProcessing'
 import DocumentFileActions from '@/components/DocumentFileActions.vue'
 import type { KnowledgeDocument, UserDocumentSource } from '@/types'
 import { COMPANY_KNOWLEDGE_SOURCES } from '@/utils/knowledgeSources'
 import PageHeader from '@/components/PageHeader.vue'
 import {
+	createAdminDocument,
 	getDirectoryGroupsSnapshot,
 	getDirectoryUsersSnapshot,
 	getDocumentCategoryGroupsSnapshot,
@@ -172,11 +171,11 @@ async function nextStep(): Promise<void> {
 			}
 			return { document, files: await prepareVersionFiles(source, file, attachments.value) }
 		}))
-		for (const item of prepared) {
-			addWorkspaceDocument(item.document, versionNote.value.trim(), item.files)
-			enqueueDocumentProcessing(item.document.id, version.value, item.document.owner)
-		}
-		createdIds.value = prepared.map((item) => item.document.id)
+		createdIds.value = await Promise.all(prepared.map((item) => createAdminDocument({
+			document: item.document,
+			versionNote: versionNote.value.trim(),
+			files: item.files,
+		})))
 		isComplete.value = true
 	} catch {
 		submitError.value = '讀取文件失敗，請檢查檔案後重試。'

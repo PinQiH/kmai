@@ -17,7 +17,6 @@ import StatePanel from "@/components/StatePanel.vue"
 import {
   workspaceDocuments,
   getWorkspaceVersions,
-  addWorkspaceVersion,
   suggestVersion,
 } from "@/mocks/documentWorkspace"
 import {
@@ -26,17 +25,16 @@ import {
   versionFiles,
 } from "@/mocks/documentFiles"
 import { getDocumentVersionDetail } from "@/mocks/documentDetails"
+import { getDocumentProcessingRecord } from "@/mocks/documentProcessing"
 import {
-  getDocumentProcessingRecord,
-  enqueueDocumentProcessing,
-  enqueueAttachmentProcessing,
-  removeProcessingFile,
-} from "@/mocks/documentProcessing"
-import {
+  addDocumentAttachments,
+  createDocumentVersion,
+  createProcessingJob,
   getDirectoryGroupsSnapshot,
   getDirectoryUsersSnapshot,
   getDocumentCategoryGroupsSnapshot,
   getOrganizationUnitsSnapshot,
+  removeDocumentAttachment,
 } from "@/repositories/admin.repository"
 import {
   getDocumentSourceIcon,
@@ -281,8 +279,12 @@ async function uploadVersion(): Promise<void> {
       mimeType: file.type,
     }
     const files = await prepareVersionFiles(source, file)
-    addWorkspaceVersion(target, newVersion.value, newVersionNote.value, files)
-    enqueueDocumentProcessing(target.id, newVersion.value, target.owner)
+    await createDocumentVersion({
+      document: target,
+      version: newVersion.value,
+      versionNote: newVersionNote.value,
+      files,
+    })
     selectedVersionNumber.value = newVersion.value
     activeTab.value = "versions"
     isVersionDialogOpen.value = false
@@ -293,7 +295,7 @@ async function uploadVersion(): Promise<void> {
     versionBusy.value = false
   }
 }
-function addAttachment(event: Event): void {
+async function addAttachment(event: Event): Promise<void> {
   if (!document.value || !selectedVersion.value) return
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
@@ -302,41 +304,24 @@ function addAttachment(event: Event): void {
     input.value = ""
     return
   }
-  const id = document.value.id
-  const version = selectedVersion.value.version
-  versionFiles[id] ??= {}
-  if (!versionFiles[id][version])
-    versionFiles[id][version] = {
-      source: document.value.source,
-      attachments: [],
-      sections: getDocumentVersionDetail({
-        documentId: id,
-        version,
-        versionSummary: selectedVersion.value.summary,
-      }).sections,
-    }
-  versionFiles[id][version].attachments.push(...files)
-  enqueueAttachmentProcessing(
-    id,
-    version,
-    files.map((file) => file.name),
-    mainFileName.value,
-  )
+  await addDocumentAttachments({
+    document: document.value,
+    version: selectedVersion.value.version,
+    versionSummary: selectedVersion.value.summary,
+    files,
+    mainFileName: mainFileName.value,
+  })
   versionError.value = ""
   input.value = ""
 }
-function confirmDeleteAttachment(): void {
-  if (!deleteAttachmentTarget.value || !selectedVersionFiles.value) return
-  if (document.value && selectedVersion.value)
-    removeProcessingFile(
-      document.value.id,
-      selectedVersion.value.version,
-      deleteAttachmentTarget.value.name,
-    )
-  selectedVersionFiles.value.attachments =
-    selectedVersionFiles.value.attachments.filter(
-      (file) => file !== deleteAttachmentTarget.value,
-    )
+async function confirmDeleteAttachment(): Promise<void> {
+  const target = deleteAttachmentTarget.value
+  if (!target || !document.value || !selectedVersion.value) return
+  await removeDocumentAttachment({
+    documentId: document.value.id,
+    version: selectedVersion.value.version,
+    fileName: target.name,
+  })
   deleteAttachmentTarget.value = null
 }
 
@@ -376,11 +361,11 @@ const isEffectiveVersion = computed(
 )
 
 /** 歷史版本沒有處理紀錄時，替這個版本建立一筆新的處理工作。 */
-function createVersionJob(): void {
+async function createVersionJob(): Promise<void> {
   const target = document.value
   const version = selectedVersion.value?.version
   if (!target || !version) return
-  enqueueDocumentProcessing(target.id, version, target.owner)
+  await createProcessingJob({ documentId: target.id, version, owner: target.owner })
   notify(`已為第 ${version} 版建立處理工作，尚未執行後端處理。`)
 }
 

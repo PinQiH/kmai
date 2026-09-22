@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { documentChunks, saveDocumentChunks } from '@/mocks/documentChunks'
 import { prepareVersionFiles, versionFiles } from '@/mocks/documentFiles'
@@ -203,7 +203,8 @@ describe('AdminUploadView 三種文件來源', () => {
 		await view.find('[data-testid="upload-next"]').trigger('click')
 		await flushPromises()
 
-		expect(workspaceDocuments.length).toBe(documentCountBefore + 1)
+		// @ 建立文件改為非同步，等寫入完成
+		await vi.waitFor(() => expect(workspaceDocuments.length).toBe(documentCountBefore + 1))
 		const created = workspaceDocuments[0]!
 		expect(created.title).toBe('文字建立的測試文件')
 		expect(created.source.type).toBe('text')
