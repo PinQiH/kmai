@@ -1,4 +1,4 @@
-# Syscom Cubi Frontend
+# Cubi-KM
 
 ## GitHub Pages
 
